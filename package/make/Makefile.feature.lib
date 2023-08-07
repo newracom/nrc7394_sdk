@@ -1,0 +1,227 @@
+#// --------------------------------------------------
+#// LIB
+#// LWIP
+#// --------------------------------------------------
+ifeq ($(CONFIG_LWIP), y)
+	LWIP_BASE = $(LIB_PATH)/lwip
+	include $(LWIP_BASE)/module.mk
+endif #CONFIG_LWIP
+
+ifeq ($(CONFIG_IPV6), y)
+	DEFINE += -DCONFIG_IPV6
+endif
+
+ifeq ($(CONFIG_STANDALONE_USER_LIBRARY), y)
+	DEFINE	+= -DSUPPORT_LWIP
+else ifeq ($(CONFIG_LWIP), y)
+	DEFINE	+= -DSUPPORT_LWIP
+endif
+
+
+#// --------------------------------------------------
+#// LIB
+#// mbedtls
+#// --------------------------------------------------
+ifeq ($(CONFIG_MBEDTLS), y)
+	MBEDTLS_BASE = $(LIB_PATH)/mbedtls
+	include $(MBEDTLS_BASE)/module.mk
+endif #CONFIG_MBEDTLS
+
+#// --------------------------------------------------
+#// LIB
+#//	WPA_SUPPLICANT
+#// --------------------------------------------------
+WPA_SUPP_ROOT	= $(LIB_PATH)/hostap
+WPA_SUPP_PATH	= $(shell find $(WPA_SUPP_ROOT) -type d \
+					-not -path $(WPA_SUPP_ROOT)/hostapd -not -path $(WPA_SUPP_ROOT)/wlantest)
+
+INCLUDE	+= $(addprefix -I,$(WPA_SUPP_PATH))
+include $(WPA_SUPP_ROOT)/wpa_supplicant/FreeRTOS.config
+
+ifeq ($(CONFIG_WPA_SUPP), y)
+	include $(WPA_SUPP_ROOT)/wpa_supplicant/FreeRTOS.mk
+	CSRCS	+= $(notdir $(WPA_SUPP_CSRCS))
+	SRCS	+= $(notdir $(WPA_SUPP_CPPSRCS))
+	VPATH	+= $(WPA_SUPP_PATH)
+	MAC_ADDR_SEED	= $(shell git config user.name | sed -e 's/ /_/g')
+	DEFINE	+= -DINCLUDE_WPA_SUPP -DMAC_ADDR_SEED=\"$(MAC_ADDR_SEED)\"
+	DEFINE	+= -DNRC_WPA_SUPP
+endif # CONFIG_WPA_SUPP
+
+#// --------------------------------------------------
+#// LIB
+#// COAP
+#// --------------------------------------------------
+ifeq ($(CONFIG_COAP), y)
+	COAP_BASE = $(LIB_PATH)/coap
+	include $(COAP_BASE)/module.mk
+endif #CONFIG_COAP
+
+#// --------------------------------------------------
+#// LIB
+#// cJSON
+#// --------------------------------------------------
+ifeq ($(CONFIG_CJSON), y)
+	CJSON_BASE = $(LIB_PATH)/cJSON
+	include $(CJSON_BASE)/module.mk
+endif #CONFIG_CJSON
+
+#// --------------------------------------------------
+#// LIB
+#// paho.mqtt.embedded-c
+#// --------------------------------------------------
+ifeq ($(CONFIG_MQTT), y)
+	MQTT_BASE = $(LIB_PATH)/paho.mqtt
+	include $(MQTT_BASE)/module.mk
+endif #CONFIG_MQTT
+
+#// --------------------------------------------------
+#// LIB
+#// Mini-XML
+#// --------------------------------------------------
+ifeq ($(CONFIG_MXML), y)
+	MXML_BASE = $(LIB_PATH)/mxml
+	include $(MXML_BASE)/module.mk
+endif #CONFIG_MXML
+
+#// --------------------------------------------------
+#// LIB
+#// FreeRTOS-core (coreHTTP/coreJSON/coreMQTT/corePKCS11)
+#// --------------------------------------------------
+ifeq ($(CONFIG_FREERTOS_CORE), y)
+	FREERTOS_CORE_BASE = $(LIB_PATH)/FreeRTOS-core
+	include $(FREERTOS_CORE_BASE)/module.mk
+endif #CONFIG_FREERTOS_CORE
+
+#// --------------------------------------------------
+#// LIB
+#// Tinycbor (Tiny Concise Binary Object Representation)
+#// --------------------------------------------------
+ifeq ($(CONFIG_TINYCBOR), y)
+	TINYCBOR_BASE = $(LIB_PATH)/tinycbor
+	include $(TINYCBOR_BASE)/module.mk
+endif #CONFIG_TINYCBOR
+
+#// --------------------------------------------------
+#// LIB
+#// http_parser (http parser)
+#// --------------------------------------------------
+ifeq ($(CONFIG_HTTP_PARSER), y)
+	HTTP_PARSER_BASE = $(LIB_PATH)/http_parser
+	include $(HTTP_PARSER_BASE)/module.mk
+endif
+
+
+#// --------------------------------------------------
+#// LIB
+#// http_server (http server)
+#// --------------------------------------------------
+ifeq ($(CONFIG_HTTP_SERVER), y)
+	HTTP_SERVER_BASE = $(LIB_PATH)/http_server
+	include $(HTTP_SERVER_BASE)/module.mk
+endif
+
+#// --------------------------------------------------
+#// LIB
+#// ethernet (ethernet driver)
+#// --------------------------------------------------
+ifeq ($(CONFIG_ETHERNET), y)
+	ETH_BASE = $(LIB_PATH)/ethernet
+	include $(ETH_BASE)/module.mk
+endif
+
+#// --------------------------------------------------
+#// LIB
+#// enc28j60 ethernet (enc28j60 ethernet driver through SPI)
+#// --------------------------------------------------
+ifeq ($(CONFIG_ETH_ENC28J60), y)
+	ETH_ENC28J60_BASE    = $(LIB_PATH)/eth_enc28j60
+	include $(ETH_ENC28J60_BASE)/module.mk
+endif
+
+#// --------------------------------------------------
+#// LIB
+#// w5500 ethernet (Wiznet w5500 ethernet driver through SPI)
+#// --------------------------------------------------
+ifeq ($(CONFIG_ETH_W5500), y)
+	ETH_W5500_BASE = $(LIB_PATH)/eth_w5500
+	include $(ETH_W5500_BASE)/module.mk
+endif
+
+#// --------------------------------------------------
+#// LIB
+#// e-Paper
+#// --------------------------------------------------
+ifeq ($(CONFIG_EPAPER), y)
+	EPAPER_BASE = $(LIB_PATH)/e_paper
+	include $(EPAPER_BASE)/module.mk
+endif
+
+#// --------------------------------------------------
+#// LIB
+#// nvs_flash (NVRAM Key/Value store lib)
+#// --------------------------------------------------
+ifeq ($(CONFIG_NVS_FLASH), y)
+	NVS_FLASH = $(LIB_PATH)/nvs_flash
+	include $(NVS_FLASH)/module.mk
+endif
+
+#// --------------------------------------------------
+#// LIB
+#// BME680
+#// --------------------------------------------------
+ifeq ($(CONFIG_BME680), y)
+	BME680_BASE = $(LIB_PATH)/bme680
+	include $(BME680_BASE)/module.mk
+endif
+
+#// --------------------------------------------------
+#// LIB
+#// SSD1306
+#// --------------------------------------------------
+ifeq ($(CONFIG_SSD1306), y)
+	SSD1306_BASE = $(LIB_PATH)/ssd1306
+	include $(SSD1306_BASE)/module.mk
+endif
+
+#// --------------------------------------------------
+#// LIB
+#// SHT30
+#// --------------------------------------------------
+ifeq ($(CONFIG_SHT30), y)
+	SHT30_BASE = $(LIB_PATH)/sht30
+	include $(SHT30_BASE)/module.mk
+endif
+
+#// --------------------------------------------------
+#// LIB
+#// SGP30
+#// --------------------------------------------------
+ifeq ($(CONFIG_SGP30), y)
+	SGP30_BASE = $(LIB_PATH)/sgp30
+	include $(SGP30_BASE)/module.mk
+endif
+
+#// --------------------------------------------------
+#// LIB
+#// CAMERA
+#// --------------------------------------------------
+ifeq ($(CONFIG_CAMERA), y)
+    include lib/camera/module.mk
+endif
+
+#// W25QXX
+#// --------------------------------------------------
+ifeq ($(CONFIG_W25QXX), y)
+	W25QXX_BASE = $(LIB_PATH)/w25qxx
+	include $(W25QXX_BASE)/module.mk
+endif
+
+#// --------------------------------------------------
+#// LIB
+#// PSRAM
+#// --------------------------------------------------
+ifeq ($(CONFIG_PSRAM), y)
+	PSRAM_BASE = $(LIB_PATH)/psram
+	include $(PSRAM_BASE)/module.mk
+endif
