@@ -735,8 +735,10 @@ static int iperf_udp_server_run (iperf_opt_t *option)
 		}
 	}
 
-	if (info->done)
-		elapse_time = info->stop_time - info->start_time;
+	if (!info->done)
+		info->stop_time = current_time;	
+
+	elapse_time = info->stop_time - info->start_time;	
 
 	if (info->report_interval > 0 && elapse_time > (report_time - info->report_interval))
 	{
@@ -755,9 +757,9 @@ static int iperf_udp_server_run (iperf_opt_t *option)
 							info->error_cnt,
 							info->outoforder_cnt);
 
-	iperf_udp_server_report_to_client(info);
-
 	iperf_log(" Done: %d/%d\n", info->datagram_cnt, info->datagram_seq);
+
+	iperf_udp_server_report_to_client(info);
 
 	sleep(1);
 
@@ -778,6 +780,7 @@ static void iperf_udp_server_recv (iperf_socket_t *socket, char *buf, int len)
 		int32_t id = ntohl(datagram->id);
 		iperf_time_t tx_time = ntohl(datagram->tv_sec) + ntohl(datagram->tv_usec) / 1000000.;
 
+/*		iperf_debug("id: %d, cnt=%d, seq=%d\n", id, info->datagram_cnt, info->datagram_seq); */
 /*		iperf_client_header_print (&datagram->client_header, true); */
 
 		if (id == 0)
@@ -841,8 +844,9 @@ static void iperf_udp_server_recv (iperf_socket_t *socket, char *buf, int len)
 				{
 /*					iperf_debug("out of order: %d -> %d\n", info->datagram_seq, id); */
 
+					info->datagram_cnt--;
+					info->datagram_seq--;
 					info->outoforder_cnt++;
-					info->datagram_seq = id;
 				}
 				else if (id > info->datagram_seq)
 				{

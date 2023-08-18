@@ -198,6 +198,7 @@ int8_t   system_modem_api_get_ignore_broadcast_ssid_type(void);
 uint32_t system_api_get_version(void);
 uint32_t system_api_get_align(void);
 uint32_t system_api_get_buffer_length(void);
+bool 	 system_api_get_rssi(int vif_id , int8_t* rssi_avg , int8_t* rssi_last);
 
 #if defined (INCLUDE_AMPDU_AUTO_TX)
 void system_modem_tx_ampdu_control(int vif_id, uint8_t control, uint8_t *addr, uint8_t tid);
@@ -232,7 +233,7 @@ bool system_modem_api_set_hw_version(uint16_t version);
 void system_modem_api_update_probe_resp(uint8_t* probe, uint16_t len);
 void system_modem_api_read_signal_noise(int loc, uint32_t *signal, uint32_t *noise);
 uint32_t system_modem_api_get_snr(struct _SYS_BUF *packet);
-int system_modem_api_get_avg_snr(void);
+int system_modem_api_get_avg_snr(int vif_id);
 uint32_t system_modem_api_get_current_snr(int loc);
 uint32_t system_modem_api_get_current_snr_i(int loc);
 void system_modem_api_init_retention();
@@ -294,4 +295,8 @@ uint32_t system_modem_api_get_bmt_threshold(int vif_id);
 void system_modem_api_update_probe_req(int vif_id, uint8_t* ven_ie, uint16_t len);
 void system_modem_api_update_probe_rsp(int vif_id, uint8_t* ven_ie, uint16_t len);
 void system_modem_api_update_assoc_req(int vif_id, uint8_t* ven_ie, uint16_t len);
+
+#if defined(INCLUDE_MANUAL_CONT_TX_SUPPORT)
+bool system_modem_api_set_cont_tx(bool enable, uint32_t freq_100k, const char* bw, uint8_t mcs, uint8_t txpwr, uint32_t interval);
+#endif
 #endif //__SYSTEM_MODEM_API_H__

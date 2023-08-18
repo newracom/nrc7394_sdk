@@ -91,7 +91,9 @@ bool insert_ie_s1g_aid_response(struct byte_stream *bs, bool is_tx, int8_t vif_i
 bool insert_ie_timeout_interval(struct byte_stream *bs, bool is_tx, int8_t vif_id);
 bool insert_ie_bss_max_idle_period(struct byte_stream *bs, bool is_tx, int8_t vif_id, bool ap_sta);
 bool insert_ie_s1g_header_compression(struct byte_stream *bs, bool is_tx, int8_t vif_id, uint8_t* addr);
+#if 0		// currently not used.
 bool insert_ie_edca_parameter_set(struct byte_stream *bs);
+#endif
 #if defined(INCLUDE_TWT_SUPPORT)
 bool insert_ie_s1g_twt(struct byte_stream *bs, bool is_tx, int8_t vif_id, bool ap_sta);
 #endif /* defined(INCLUDE_TWT_SUPPORT) */

@@ -29,6 +29,7 @@
 #include "lwip/errno.h"
 #include "wifi_config_setup.h"
 #include "wifi_connect_common.h"
+#include "sample_ps_schedule_version.h"
 
 #include "nvs.h"
 #include "ps_config.h"
@@ -363,8 +364,15 @@ nrc_err_t schedule_deep_sleep()
 void user_init(void)
 {
 	nrc_err_t ret;
+	VERSION_T app_version;
 
 	nrc_uart_console_enable(true);
+
+	app_version.major = SAMPLE_PS_SCHEDULE_MAJOR;
+	app_version.minor = SAMPLE_PS_SCHEDULE_MINOR;
+	app_version.patch = SAMPLE_PS_SCHEDULE_PATCH;
+	nrc_set_app_version(&app_version);
+	nrc_set_app_name(SAMPLE_PS_SCHEDULE_APP_NAME);
 
 	/* Open nvram */
 	/* Note that nvs_init should have already called, and it is done in system start up. */

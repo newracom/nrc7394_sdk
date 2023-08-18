@@ -30,11 +30,13 @@
 #include "lwip/netif.h"
 #include "driver_nrc.h"
 #ifdef SUPPORT_ETHERNET_ACCESSPOINT
-#include "netif/bridgeif.h"
 #include "nrc_eth_if.h"
 #include "nrc_lwip.h"
-extern struct netif br_netif;
 #endif
+#if LWIP_BRIDGE
+#include "netif/bridgeif.h"
+extern struct netif br_netif;
+#endif /* LWIP_BRIDGE */
 extern struct netif* nrc_netif[];
 
 #ifdef CONFIG_IPV6
@@ -72,6 +74,7 @@ static void wifi_event_handler(int vif, tWIFI_EVENT_ID event, int data_len, void
 			}
 
 #ifdef SUPPORT_ETHERNET_ACCESSPOINT
+#if LWIP_BRIDGE
 			if (wifi_config->network_mode == WIFI_NETWORK_MODE_BRIDGE) {
 				nrc_usr_print("[%s] Adding nrc_netif[%d] to bridge...\n", __func__, vif_id);
 				bridgeif_add_port(&br_netif, nrc_netif[vif_id]);
@@ -80,7 +83,8 @@ static void wifi_event_handler(int vif, tWIFI_EVENT_ID event, int data_len, void
 				}
 				break;
 			}
-#endif
+#endif /* LWIP_BRIDGE */
+#endif /* SUPPORT_ETHERNET_ACCESSPOINT */
 			nrc_wifi_get_ip_mode(vif_id, &ip_mode);
 			if ((ip_mode == WIFI_DYNAMIC_IP) && (!override_ip_to_static)) {
 				while(1){
@@ -162,10 +166,12 @@ static void wifi_event_handler(int vif, tWIFI_EVENT_ID event, int data_len, void
 			nrc_usr_print("[%s] Receive Start Soft AP Event\n", __func__);
 #endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
 #ifdef SUPPORT_ETHERNET_ACCESSPOINT
+#if LWIP_BRIDGE
 			if (wifi_config->network_mode == WIFI_NETWORK_MODE_BRIDGE) {
 				bridgeif_add_port(&br_netif, nrc_netif[vif_id]);
 			}
-#endif
+#endif /* LWIP_BRIDGE */
+#endif /* SUPPORT_ETHERNET_ACCESSPOINT */
 			break;
 		case WIFI_EVT_AP_STA_CONNECTED:
 #if !defined(INCLUDE_MEASURE_AIRTIME)

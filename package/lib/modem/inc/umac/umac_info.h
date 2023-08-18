@@ -187,14 +187,12 @@ typedef struct _MCS_INFO {
 	uint8_t last_rx_mcs:4;
 }__attribute__((packed)) MCS_INFO;
 
-#if defined(INCLUDE_DYNAMIC_FRAG)
 typedef struct _M_SIG_INFO{
 	int8_t rssi_avg;
 	int8_t rssi_last;
 	//int8_t snr_avg;
 	//int8_t snr_last;
 }__attribute__((packed)) M_SIG_INFO;
-#endif/* INCLUDE_DYNAMIC_FRAG */
 
 
 /**************************************************************
@@ -214,9 +212,7 @@ typedef struct _APINFO{
 #endif /* defined(INCLUDE_TWT_SUPPORT) */
 	SECURITY_INFO m_secrurity;
 	KEY_INFO m_key;
-#if defined(INCLUDE_DYNAMIC_FRAG)
 	M_SIG_INFO msig;
-#endif/* INCLUDE_DYNAMIC_FRAG */
 } __attribute__((packed)) APINFO;
 
 /**************************************************************

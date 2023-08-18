@@ -35,6 +35,10 @@
 
 #include "api_wifi.h"
 
+#if LWIP_BRIDGE
+extern struct netif br_netif;
+#endif
+
 struct client_data {
 	iperf_opt_t *option;
 };
@@ -60,18 +64,35 @@ static void iperf_tcp_client_report (iperf_opt_t * option )
 	nrc_wifi_get_device_mode(0, &mode);
 
 	if (mode == WIFI_MODE_STATION) {
-		nrc_wifi_get_snr(&snr);
-		nrc_wifi_get_rssi(&rssi);
+		nrc_wifi_get_snr(0, &snr);
+		nrc_wifi_get_rssi(0, &rssi);
 	} else {
 		const ip4_addr_t *ip_addr;
 		struct eth_addr *mac_addr;
 		STA_INFO info;
-
+		
 		if (etharp_find_addr(nrc_netif[0], (const ip4_addr_t *) &option->addr, &mac_addr, &ip_addr) >= 0) {
 			if (nrc_wifi_softap_get_sta_by_addr(0, mac_addr->addr, &info) == WIFI_SUCCESS) {
 				snr = info.snr;
 				rssi = info.rssi;
 			}
+		} else if (etharp_find_addr(nrc_netif[1], (const ip4_addr_t *) &option->addr, &mac_addr, &ip_addr) >= 0) {
+			if (nrc_wifi_softap_get_sta_by_addr(1, mac_addr->addr, &info) == WIFI_SUCCESS) {
+				snr = info.snr;
+				rssi = info.rssi;
+			}
+#if LWIP_BRIDGE
+		} else if (etharp_find_addr(&br_netif, (const ip4_addr_t *) &option->addr, &mac_addr, &ip_addr) >= 0) {
+			if (nrc_wifi_softap_get_sta_by_addr(0, mac_addr->addr, &info) == WIFI_SUCCESS) {
+				snr = info.snr;
+				rssi = info.rssi;
+			} else if (nrc_wifi_softap_get_sta_by_addr(1, mac_addr->addr, &info) == WIFI_SUCCESS) {
+				snr = info.snr;
+				rssi = info.rssi;
+			}
+#endif
+		} else {
+			A("##### [%s] etharp_find_addr failed\n", __func__);
 		}
 	}
 
@@ -267,8 +288,8 @@ static void iperf_tcp_server_report (struct client_data *client)
 	nrc_wifi_get_device_mode(0, &mode);
 
 	if (mode == WIFI_MODE_STATION) {
-		nrc_wifi_get_snr(&snr);
-		nrc_wifi_get_rssi(&rssi);
+		nrc_wifi_get_snr(0, &snr);
+		nrc_wifi_get_rssi(0, &rssi);
 	} else {
 		ip4_addr_t client_ip;
 		const ip4_addr_t *ip_addr;
@@ -279,10 +300,26 @@ static void iperf_tcp_server_report (struct client_data *client)
 		client_ip.addr = addr4->sin_addr.s_addr;
 		if (etharp_find_addr(nrc_netif[0], &client_ip, &mac_addr, &ip_addr) >= 0) {
 			if (nrc_wifi_softap_get_sta_by_addr(0, mac_addr->addr, &info) == WIFI_SUCCESS) {
-				A("nrc_wifi_softap_get_sta_by_addr : snr : %u, rssi : %d\n", info.snr, info.rssi);
 				snr = info.snr;
 				rssi = info.rssi;
 			}
+		} else if (etharp_find_addr(nrc_netif[1], &client_ip, &mac_addr, &ip_addr) >= 0) {
+			if (nrc_wifi_softap_get_sta_by_addr(1, mac_addr->addr, &info) == WIFI_SUCCESS) {
+				snr = info.snr;
+				rssi = info.rssi;
+			}
+#if LWIP_BRIDGE
+		} else if (etharp_find_addr(&br_netif, &client_ip, &mac_addr, &ip_addr) >= 0) {
+			if (nrc_wifi_softap_get_sta_by_addr(0, mac_addr->addr, &info) == WIFI_SUCCESS) {
+				snr = info.snr;
+				rssi = info.rssi;
+			} else if (nrc_wifi_softap_get_sta_by_addr(1, mac_addr->addr, &info) == WIFI_SUCCESS) {
+				snr = info.snr;
+				rssi = info.rssi;
+			}
+#endif
+		} else {
+			A("##### [%s] etharp_find_addr failed\n", __func__);
 		}
 	}
 

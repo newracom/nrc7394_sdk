@@ -92,9 +92,9 @@ static bool _atcmd_wifi_country_valid (atcmd_wifi_country_t country_code)
 	{
 		int i;
 
-		for (i = 0 ; g_wifi_country_list[i].code ; i++)
+		for (i = 0 ; g_wifi_country_list[i].cc_index < COUNTRY_CODE_MAX ; i++)
 		{
-			if (strcmp(country_code, g_wifi_country_list[i].code) == 0)
+			if (strcmp(country_code, g_wifi_country_list[i].alpha2_cc) == 0)
 				return true;
 		}
 	}
@@ -420,12 +420,12 @@ static int _atcmd_wifi_country_set (int argc, char *argv[])
 	{
 		case 0:
 		{
-			char buf[36];
+			char buf[3 * COUNTRY_CODE_MAX];
 			int len;
 			int i;
 
-			for (len = i = 0 ; len < sizeof(buf) && g_wifi_country_list[i].code ; i++)
-				len += snprintf(buf, sizeof(buf) - len, "%s|", g_wifi_country_list[i].code);
+			for (len = i = 0 ; len < sizeof(buf) && g_wifi_country_list[i].cc_index < COUNTRY_CODE_MAX ; i++)
+				len += snprintf(buf + len, sizeof(buf) - len, "%s|", g_wifi_country_list[i].alpha2_cc);
 
 			buf[--len] = '\0';
 
@@ -4228,6 +4228,215 @@ static atcmd_info_t g_atcmd_wifi_bmt =
 
 /**********************************************************************************************/
 
+#if defined(INCLUDE_MANUAL_CONT_TX_SUPPORT) /* Furuno */
+
+extern bool system_modem_api_set_cont_tx (bool enable, uint32_t freq_100k, const char* bw,
+											uint8_t mcs, uint8_t txpwr, uint32_t interval);
+
+#define CTX_FREQ_MIN		7500
+#define CTX_FREQ_MAX		9500
+
+#define CTX_INTERVAL_MIN	10
+#define CTX_INTERVAL_DEF	100
+
+static struct
+{
+	bool enable;
+	uint16_t freq;
+	uint8_t bw;
+	uint8_t mcs;
+	uint8_t txpwr;
+	uint32_t interval;
+} g_atcmd_wifi_ctx = { false, 0, 0, 0, 0, 0 };
+
+static int _atcmd_wifi_continuous_tx_start (void)
+{
+	_atcmd_info("cont_tx_start\n");
+
+	if (g_atcmd_wifi_ctx.enable)
+		return 1;
+	else
+	{
+		uint32_t freq = g_atcmd_wifi_ctx.freq;
+		uint8_t bw = g_atcmd_wifi_ctx.bw;
+		uint8_t mcs = g_atcmd_wifi_ctx.mcs;
+		uint8_t txpwr = g_atcmd_wifi_ctx.txpwr;
+		uint32_t interval = g_atcmd_wifi_ctx.interval;
+		char str_bw[2+1];
+
+		snprintf(str_bw, sizeof(str_bw), "%cm", '0' + bw);
+
+		if (!system_modem_api_set_cont_tx(true, freq, str_bw, mcs, txpwr, interval))
+			return -1;
+
+		g_atcmd_wifi_ctx.enable = 1;
+	}
+
+	return 0;
+}
+
+static void _atcmd_wifi_continuous_tx_stop (void)
+{
+	if (g_atcmd_wifi_ctx.enable)
+	{
+		_atcmd_info("cont_tx_stop\n");
+
+		system_modem_api_set_cont_tx(false, 0, NULL, 0, 0, 0);
+
+		g_atcmd_wifi_ctx.enable = 0;
+	}
+}
+
+static int _atcmd_wifi_continuous_tx_run (int argc, char *argv[])
+{
+	_atcmd_info("cont_tx_run: freq=%u bw=%u mcs=%u power=%u interval=%u\n",
+				g_atcmd_wifi_ctx.freq, g_atcmd_wifi_ctx.bw, g_atcmd_wifi_ctx.mcs,
+				g_atcmd_wifi_ctx.txpwr, g_atcmd_wifi_ctx.interval);
+
+	switch (_atcmd_wifi_continuous_tx_start())
+	{
+		case 1:
+			return ATCMD_ERROR_BUSY;
+
+		case -1:
+			return ATCMD_ERROR_FAIL;
+	}
+
+	return ATCMD_SUCCESS;
+}
+
+static int _atcmd_wifi_continuous_tx_get (int argc, char *argv[])
+{
+	switch (argc)
+	{
+		case 0:
+			_atcmd_info("cont_tx_get: freq=%u bw=%u mcs=%u txpwr=%u interval=%u\n",
+						g_atcmd_wifi_ctx.freq, g_atcmd_wifi_ctx.bw,
+						g_atcmd_wifi_ctx.mcs, g_atcmd_wifi_ctx.txpwr,
+						g_atcmd_wifi_ctx.interval);
+
+
+			if (g_atcmd_wifi_ctx.interval == CTX_INTERVAL_DEF)
+			{
+				ATCMD_MSG_INFO("WCTX", "%u,%u,%u,%u",
+							g_atcmd_wifi_ctx.freq, g_atcmd_wifi_ctx.bw,
+							g_atcmd_wifi_ctx.mcs, g_atcmd_wifi_ctx.txpwr);
+			}
+			else
+			{
+				ATCMD_MSG_INFO("WCTX", "%u,%u,%u,%u,%u",
+							g_atcmd_wifi_ctx.freq, g_atcmd_wifi_ctx.bw,
+							g_atcmd_wifi_ctx.mcs, g_atcmd_wifi_ctx.txpwr,
+							g_atcmd_wifi_ctx.interval);
+			}
+
+			break;
+
+		default:
+			return ATCMD_ERROR_INVAL;
+	}
+
+	return ATCMD_SUCCESS;
+}
+
+static int _atcmd_wifi_continuous_tx_set (int argc, char *argv[])
+{
+	uint16_t freq = 0;
+	uint8_t bw = 0;
+	uint8_t mcs = 0;
+	uint8_t txpwr = 0;
+	uint32_t interval = 0;
+
+	switch (argc)
+	{
+		case 0:
+			ATCMD_MSG_HELP("AT+WCTX=<frequency>,<bandwidth>,<mcs>,<tx_power>");
+			ATCMD_MSG_HELP("AT+WCTX=0");
+			return ATCMD_SUCCESS;
+
+		case 5:
+			if (atcmd_param_to_uint32(argv[4], &interval) != 0 || interval < CTX_INTERVAL_MIN)
+			{
+				_atcmd_info("cont_tx_set: invalid interval (%u)\n", interval);
+				break;
+			}
+
+		case 4:
+			if (atcmd_param_to_uint8(argv[3], &txpwr) != 0 || (txpwr < TX_POWER_MIN || txpwr > TX_POWER_MAX))
+			{
+				_atcmd_info("cont_tx_set: invalid tx power (%u)\n", txpwr);
+				break;
+			}
+
+			if (atcmd_param_to_uint8(argv[2], &mcs) != 0 || (mcs > 10 || mcs == 8 || mcs == 9))
+			{
+				_atcmd_info("cont_tx_set: invalid mcs (%u)\n", mcs);
+				break;
+			}
+
+			if (atcmd_param_to_uint8(argv[1], &bw) != 0 || (bw != 1 && bw != 2 && bw != 4))
+			{
+				_atcmd_info("cont_tx_set: invalid bandwidth (%u)\n", bw);
+				break;
+			}
+
+			if (atcmd_param_to_uint16(argv[0], &freq) != 0 || (freq < CTX_FREQ_MIN || freq > CTX_FREQ_MAX))
+			{
+				_atcmd_info("cont_tx_set: invalid frequency (%u)\n", freq);
+				break;
+			}
+
+			if (g_atcmd_wifi_ctx.enable)
+				return ATCMD_ERROR_BUSY;
+
+			g_atcmd_wifi_ctx.freq = freq;
+			g_atcmd_wifi_ctx.bw = bw;
+			g_atcmd_wifi_ctx.mcs = mcs;
+			g_atcmd_wifi_ctx.txpwr = txpwr;
+
+			if (interval > 0)
+				g_atcmd_wifi_ctx.interval = interval;
+			else
+				g_atcmd_wifi_ctx.interval = CTX_INTERVAL_DEF;
+
+			_atcmd_info("cont_tx_set: freq=%u bw=%u mcs=%u txpwr=%u interval=%u\n",
+						g_atcmd_wifi_ctx.freq, g_atcmd_wifi_ctx.bw,
+						g_atcmd_wifi_ctx.mcs, g_atcmd_wifi_ctx.txpwr,
+						g_atcmd_wifi_ctx.interval);
+
+			return ATCMD_SUCCESS;
+
+		case 1:
+			if (atoi(argv[0]) != 0)
+				break;
+
+			_atcmd_wifi_continuous_tx_stop();
+
+			return ATCMD_SUCCESS;
+	}
+
+	return ATCMD_ERROR_INVAL;
+}
+
+static atcmd_info_t g_atcmd_wifi_continuous_tx =
+{
+	.list.next = NULL,
+	.list.prev = NULL,
+
+	.group = ATCMD_GROUP_WIFI,
+
+	.cmd = "CTX",
+	.id = ATCMD_WIFI_CONTINUOUS_TX,
+
+	.handler[ATCMD_HANDLER_RUN] = _atcmd_wifi_continuous_tx_run,
+	.handler[ATCMD_HANDLER_GET] = _atcmd_wifi_continuous_tx_get,
+	.handler[ATCMD_HANDLER_SET] = _atcmd_wifi_continuous_tx_set,
+};
+
+#endif /* #if defined(INCLUDE_MANUAL_CONT_TX_SUPPORT) */
+
+/**********************************************************************************************/
+
 static atcmd_group_t g_atcmd_group_wifi =
 {
 	.list.next = NULL,
@@ -4287,6 +4496,9 @@ static atcmd_info_t *g_atcmd_wifi[] =
 	&g_atcmd_wifi_lbt,
 	&g_atcmd_wifi_mic_scan,
 	&g_atcmd_wifi_bmt,
+#if defined(INCLUDE_MANUAL_CONT_TX_SUPPORT)
+	&g_atcmd_wifi_continuous_tx,
+#endif
 
 	NULL
 };

@@ -87,27 +87,45 @@ tWIFI_STATUS nrc_wifi_set_tx_power (uint8_t txpower, uint8_t type);
 
 
 /**********************************************
- * @fn  tWIFI_STATUS nrc_wifi_get_rssi(int8_t* rssi)
+ * @fn  tWIFI_STATUS nrc_wifi_get_rssi(int vif_id, int8_t *rssi)
  *
- * @brief Get RSSI
+ * @brief Get the RSSI (Received Signal Strength Indication) from the latest packet
  *
- * @param rssi: RSSI value (in dB)
+ * @param vif_id: Network interface index
+ *
+ * @param rssi: Pointer to a variable where the RSSI value will be stored.(in dB)
  *
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-tWIFI_STATUS nrc_wifi_get_rssi (int8_t *rssi);
+tWIFI_STATUS nrc_wifi_get_rssi(int vif_id, int8_t *rssi);
 
 
 /**********************************************
- * @fn tWIFI_STATUS nrc_wifi_get_snr(uint8_t* snr)
+ * @fn  tWIFI_STATUS nrc_wifi_get_average_rssi(int vif_id, int8_t *average_rssi)
+ *
+ * @brief Get the average RSSI based on the latest 4 packets
+ *
+ * @param vif_id: Network interface index
+ *
+ * @param average_rssi: Pointer to a variable where the average RSSI value will be stored.
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_average_rssi(int vif_id, int8_t *average_rssi);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_get_snr(int vif_id, uint8_t* snr)
  *
  * @brief Get SNR
+ *
+ * @param vif_id: Network interface index
  *
  * @param snr: SNR value (in dB)
  *
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-tWIFI_STATUS nrc_wifi_get_snr (uint8_t *snr);
+tWIFI_STATUS nrc_wifi_get_snr(int vif_id, uint8_t *snr);
 
 
 /**********************************************

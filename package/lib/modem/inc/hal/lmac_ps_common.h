@@ -218,6 +218,9 @@ void lmac_ps_set_sync_time_ms(uint32_t time);
 uint32_t lmac_ps_get_sync_time_ms(void);
 void lmac_ps_set_addr(uint8_t *addr, bool ap);
 void lmac_ps_set_country(uint8_t *cc);
+#if defined(NRC7394)
+void lmac_ps_set_freq(uint32_t freq);
+#endif
 void lmac_ps_set_ssid(uint8_t *ssid, uint8_t  len);
 void lmac_ps_set_ndp_preq(uint8_t enable);
 void lmac_ps_set_guard_interval(uint8_t gi);

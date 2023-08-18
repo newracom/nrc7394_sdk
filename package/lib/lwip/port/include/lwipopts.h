@@ -64,10 +64,11 @@ struct netif;
 extern int ip4_input_nat(struct pbuf *p, struct netif *inp);
 
 #define LWIP_HOOK_IP4_INPUT		ip4_input_nat
-
+#endif /* SUPPORT_ETHERNET_ACCESSPOINT */
+#if LWIP_BRIDGE
 #define BRIDGEIF_PORT_NETIFS_OUTPUT_DIRECT 1
 #define BRIDGEIF_MAX_PORTS 2
-#endif /* SUPPORT_ETHERNET_ACCESSPOINT */
+#endif /* LWIP_BRIDGE */
 
 /* IP4 is default */
 #define LWIP_IPV4                   1
@@ -398,6 +399,9 @@ a lot of data that needs to be copied, this should be set high. */
 
 /* LWIP_DHCPS==1: Enable dhcp server application */
 #define LWIP_DHCPS            1
+
+/* LWIP_BRIDGE==1: Enable bridge interface application */
+#define LWIP_BRIDGE            1
 
 /* define for sys_arch.c */
 #define LWIP_FREERTOS_THREAD_STACKSIZE_IS_STACKWORDS  1

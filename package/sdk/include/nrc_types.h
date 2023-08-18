@@ -50,7 +50,7 @@ typedef uint64_t u64;
 #define MAX_BSSID_LENGTH				(17)
 #define MAX_CC_LENGTH					(3)
 #define MAX_STATIC_IP_LENGTH			(48)
-#define MAX_PW_LENGTH					(30)
+#define MAX_PW_LENGTH					(64)
 #define MAX_PMK_LENGTH                  (64)
 #define MAX_MAC_ADDR					(17)
 
@@ -271,6 +271,12 @@ typedef struct {
 	uint16_t total_num;
 	STA_INFO sta[MAX_STA_CONN_NUM];
 } STA_LIST;
+
+typedef struct {
+	uint8_t major;
+	uint8_t minor;
+	uint8_t patch;
+} VERSION_T;
 
 typedef void (*intr_handler_fn)(int vector);
 

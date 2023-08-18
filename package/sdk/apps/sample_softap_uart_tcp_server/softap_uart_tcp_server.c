@@ -256,8 +256,12 @@ static void init_default_backoff()
  *******************************************************************************/
 void user_init(void)
 {
-	nrc_usr_print("[%s] version : %d.%d.%d\n",__func__, SAMPLE_SOFTAP_UART_TCP_SERVER_MAJOR,
-	SAMPLE_SOFTAP_UART_TCP_SERVER_MINOR, SAMPLE_SOFTAP_UART_TCP_SERVER_PATCH);
+	VERSION_T app_version;
+	app_version.major = SAMPLE_SOFTAP_UART_TCP_SERVER_MAJOR;
+	app_version.minor = SAMPLE_SOFTAP_UART_TCP_SERVER_MINOR;
+	app_version.patch = SAMPLE_SOFTAP_UART_TCP_SERVER_PATCH;
+	nrc_set_app_version(&app_version);
+	nrc_set_app_name(SAMPLE_SOFTAP_UART_TCP_SERVER_APP_NAME);
 
 	if (uart_handler_init()) {
 		nrc_usr_print("** UART2 init failed **\n");
@@ -269,6 +273,8 @@ void user_init(void)
 #ifdef INCLUDE_SCAN_BACKOFF
 	init_default_backoff();
 #endif
+
+	nrc_wifi_set_use_4address(true);
 
 	while(1){
 		if (wifi_init(param)== WIFI_SUCCESS) {

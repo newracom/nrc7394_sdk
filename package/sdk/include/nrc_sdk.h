@@ -49,6 +49,7 @@
 #include "util_bcast_fota.h"
 #include "util_trace.h"
 #include "util_cli_freertos.h"
+#include "util_version.h"
 
 #include "umac_scan.h"
 #include "umac_s1g_channel.h"

@@ -33,7 +33,7 @@ extern "C" {
 #include "util_trace.h"
 
 /**********************************************
- * @fn nrc_err_t nrc_get_rtc(uint64_t *rtc_time);
+ * @fn nrc_err_t nrc_get_rtc(uint64_t *rtc_time)
  *
  * @brief Read RTC time since boot
  *
@@ -44,7 +44,7 @@ extern "C" {
 nrc_err_t nrc_get_rtc(uint64_t *rtc_time);
 
 /**********************************************
- * @fn void nrc_reset_rtc(void);
+ * @fn void nrc_reset_rtc(void)
  *
  * @brief Set RTC hardware to 0
  *
@@ -126,6 +126,65 @@ nrc_err_t nrc_wdt_enable(void);
  ***********************************************/
 nrc_err_t nrc_wdt_disable(void);
 
+
+/**********************************************
+ * @fn nrc_err_t nrc_set_app_version(VERSION_T* version)
+ *
+ * @brief Set application version, which is a mandatory to use broadcast FOTA
+ *
+ * @param A pointer application version
+ *
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
+ ***********************************************/
+nrc_err_t nrc_set_app_version(VERSION_T* version);
+
+
+/**********************************************
+ * @fn  VERSION_T* nrc_get_app_version(void)
+ *
+ * @brief Get application version, which is a mandatory to use broadcast FOTA
+ *
+ * @param void
+ *
+ * @return A pointer to version
+ ***********************************************/
+VERSION_T* nrc_get_app_version(void);
+
+
+/**********************************************
+ * @fn nrc_err_t nrc_set_app_name(char* appname)
+ *
+ * @brief Set application name, which is a mandatory to use broadcast FOTA
+ *
+ * @param A pointer application name
+ *
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
+ ***********************************************/
+nrc_err_t nrc_set_app_name(char* appname);
+
+
+/**********************************************
+ * @fn  char* nrc_get_app_name(void)
+ *
+ * @brief Get application name, which is a mandatory to use broadcast FOTA
+ *
+ * @param void
+ *
+ * @return A pointer to app name
+ ***********************************************/
+char* nrc_get_app_name(void);
+
+
+/**********************************************
+ * @fn	VERSION_T* nrc_get_sdk_version(void)
+ *
+ * @brief Get SDK version
+ *
+ * @param void
+ *
+ * @return A pointer to version
+ ***********************************************/
+VERSION_T* nrc_get_sdk_version(void);
 
 #ifdef __cplusplus
 }

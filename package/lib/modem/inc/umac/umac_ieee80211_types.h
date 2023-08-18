@@ -175,7 +175,7 @@
 #define MAX_LEGACY_LISTEN_INTERVAL				65535
 #define MAX_S1G_UNSCALED_INTERVAL				16383
 
-#define USF2SF(usf)	((usf == 0) ? 1 : (usf == 1) ? 10 : (usf == 2) ? 1000: 10000);
+#define USF2SF(usf)	((usf == 0) ? 1 : (usf == 1) ? 10 : (usf == 2) ? 1000: 10000)
 
 typedef enum {
     MAC_STA_TYPE_STA = 0,
@@ -674,13 +674,6 @@ typedef  struct {
 	uint8_t		asel_capabilities;
 } ie_ht_capabilities;
 
-// EID 48: RSN
-typedef struct {
-	uint8_t		eid;
-	uint8_t		length;
-	uint8_t		data[255];
-} ie_rsn;
-
 // EID 56: TIMEOUT INTERVAL
 typedef struct {
 	uint8_t		eid;
@@ -971,13 +964,6 @@ typedef struct {
 	uint8_t		command[REMOTECMD_COMMAND_MAX_LENGTH];
 } ie_vendor_remotecmd;
 #endif // INCLUDE_VENDOR_REMOTECMD
-
-// EID 244: RSN Extension
-typedef struct {
-	uint8_t		eid;
-	uint8_t		length;
-	uint8_t		data[255];
-} ie_rsn_extension;
 
 #pragma pack(pop)
 #endif

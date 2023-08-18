@@ -32,6 +32,9 @@ struct nrc_wpa;
 #define NRC_WPA_INTERFACE_NAME_0		("wlan0")
 #define NRC_WPA_INTERFACE_NAME_1		("wlan1")
 
+#define NRC_WPA_ROUTE_TIMEOUT_SEC		60*5
+#define NRC_WPA_ROUTE_MAX				20
+
 #if defined(MAX_STA)
 #define NRC_WPA_SOFTAP_MAX_STA			MAX_STA
 #else
@@ -188,12 +191,18 @@ struct sta_ampdu_mlme {
 #endif //defined (INCLUDE_EARLY_FREE_SYSRXBUF) || defined (INCLUDE_AMPDU_REORDER ) || defined (INCLUDE_AMPDU_AUTO_AGGR_TX)
 };
 
+struct nrc_wpa_route {
+	struct dl_list 			list;
+	bool 				used;
+  	uint32_t 				ts;
+	uint8_t 				addr[6];
+};
 struct nrc_wpa_sta {
 	struct nrc_wpa_key		key;
 	uint8_t 				addr[6];
 
 	/* only use softAP */
-	uint8_t 				ethaddr[6];
+	struct dl_list 			route_list;
 	bool					use_4addr;
 
 	uint16_t				aid;
@@ -236,6 +245,7 @@ struct nrc_wpa_if {
 	struct nrc_wpa	*global;
 	struct nrc_wpa_sta *ap_sta[NRC_WPA_SOFTAP_MAX_STA];
 	int num_ap_sta;
+	uint8_t	num_route_list;
 	int key_mgmt ;
 };
 
@@ -325,7 +335,8 @@ SYS_BUF * alloc_sys_buf_try(int hif_len, int nTry);
 
 struct nrc_wpa_if *wpa_driver_get_interface(int vif);
 struct nrc_wpa_sta* nrc_wpa_find_sta(struct nrc_wpa_if *intf,
-						const uint8_t addr[ETH_ALEN]);
+						const uint8_t addr[ETH_ALEN],
+						bool enabled);
 struct nrc_wpa_key *nrc_wpa_get_key_by_key_idx(struct nrc_wpa_if *intf,
 						int key_idx);
 struct nrc_wpa_key *nrc_wpa_get_key_by_addr(struct nrc_wpa_if *intf,
@@ -381,6 +392,7 @@ static inline bool is_key_ccmp(struct nrc_wpa_key *key)
 	return (key && is_ccmp(key->cipher));
 }
 
+bool nrc_update_route(struct nrc_wpa_if* intf, struct nrc_wpa_sta* sta, uint8_t* addr);
 void nrc_set_use_4address(bool value);
 bool nrc_get_use_4address(void);
 void nrc_set_scan_max_interval(uint32_t interval);

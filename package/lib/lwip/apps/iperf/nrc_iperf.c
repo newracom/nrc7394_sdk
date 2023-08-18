@@ -152,9 +152,10 @@ struct iperf_task {
 };
 
 extern struct netif* nrc_netif[MAX_IF];
-
-#ifdef SUPPORT_ETHERNET_ACCESSPOINT
+#if LWIP_BRIDGE
 extern struct netif br_netif;
+#endif /* LWIP_BRIDGE */
+#ifdef SUPPORT_ETHERNET_ACCESSPOINT
 extern struct netif eth_netif;
 #endif /* SUPPORT_ETHERNET_ACCESSPOINT */
 
@@ -516,15 +517,16 @@ static int check_destination_address(iperf_opt_t* option)
 	int i=0;
 
 	if(option->mThreadMode == kMode_Client){
+#if LWIP_BRIDGE
+		if(netif_is_up(&br_netif)) {
+			if (ip_addr_cmp(&br_netif.ip_addr, &option->addr)) {
+				return -1;
+			}
+		} else
+#endif /* LWIP_BRIDGE */
 #ifdef SUPPORT_ETHERNET_ACCESSPOINT
-		if (nrc_eth_get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
-			if (ip4_addr_cmp(&br_netif.ip_addr, &option->addr)) {
-				return -1;
-			}
-		} else {
-			if (ip4_addr_cmp(&eth_netif.ip_addr, &option->addr)) {
-				return -1;
-			}
+		if (ip4_addr_cmp(&eth_netif.ip_addr, &option->addr)) {
+			return -1;
 		}
 #else
 		for(i=0; i<MAX_IF; i++){
@@ -685,16 +687,17 @@ int iperf_stop(iperf_opt_t* option)
 	int i;
 	if(option->mThreadMode == kMode_Server){
 #ifdef SUPPORT_ETHERNET_ACCESSPOINT
-		if (nrc_eth_get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
-			if(!ip4_addr_isany_val(br_netif.ip_addr)){
-				ip4_addr_copy(option->addr, br_netif.ip_addr);
+#if LWIP_BRIDGE
+		if(netif_is_up(&br_netif)){
+			if(!ip4_addr_isany_val(*netif_ip4_addr(&br_netif))){
+				ip_addr_copy(option->addr, br_netif.ip_addr);
 				iperf_stop_session(option);
 			}
-		} else {
-			if(!ip4_addr_isany_val(eth_netif.ip_addr)){
+		} else
+#endif /* LWIP_BRIDGE */
+		if(!ip4_addr_isany_val(eth_netif.ip_addr)){
 				ip4_addr_copy(option->addr, eth_netif.ip_addr);
 				iperf_stop_session(option);
-			}
 		}
 #else
 		for(i=0; i<MAX_IF; i++){
@@ -750,40 +753,16 @@ int  iperf_run(int argc, char *argv[], void *report_cb)
 			return false;
 		}
 	}else {
-#ifdef SUPPORT_ETHERNET_ACCESSPOINT
 		struct netif *target_if;
-
-		if (nrc_eth_get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
-			target_if = &br_netif;
-		} else {
-			target_if = &eth_netif;
-		}
-		if (!ip4_addr_isany_val(target_if->ip_addr)) {
-			if(server_started == true) {
-				iperf_opt_t* option2 =  iperf_option_alloc();
-				memcpy(option2, option, sizeof(iperf_opt_t));
-				option = option2;
-			}
-			ip4_addr_copy(option->addr, target_if->ip_addr);
-			ret = iperf_start_session(option, report_cb);
-			if(ret < 0) {
-				if(server_started == true){
-					iperf_option_free(option);
-					return false;
-				}
-			} else {
-				server_started = true;
-			}
-		}
-#else
-		for(i=0; i<MAX_IF; i++){
-			if (!ip4_addr_isany_val(*netif_ip4_addr(nrc_netif[i]))) {
+		for(i=0; i<END_INTERFACE; i++){
+			target_if = nrc_netif_get_by_idx(i);
+			if (!ip4_addr_isany_val(*netif_ip4_addr(target_if))) {
 				if(server_started == true){
 					iperf_opt_t* option2 =  iperf_option_alloc();
 					memcpy(option2, option, sizeof(iperf_opt_t));
 					option = option2;
 				}
-				ip_addr_copy(option->addr, nrc_netif[i]->ip_addr);
+				ip_addr_copy(option->addr, target_if->ip_addr);
 				ret = iperf_start_session(option, report_cb);
 				if(ret < 0){
 					if(server_started == true){
@@ -795,7 +774,6 @@ int  iperf_run(int argc, char *argv[], void *report_cb)
 				}
 			}
 		}
-#endif /* SUPPORT_ETHERNET_ACCESSPOINT */
 	}
 	return true;
 }

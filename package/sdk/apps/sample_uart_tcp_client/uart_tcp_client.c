@@ -581,8 +581,12 @@ static int network_init()
  *******************************************************************************/
 void user_init(void)
 {
-	nrc_usr_print("[%s] version : %d.%d.%d\n",__func__, SAMPLE_UART_TCP_BRIDGE_MAJOR,
-	SAMPLE_UART_TCP_BRIDGE_MINOR, SAMPLE_UART_TCP_BRIDGE_PATCH);
+	VERSION_T app_version;
+	app_version.major = SAMPLE_UART_TCP_CLIENT_MAJOR;
+	app_version.minor = SAMPLE_UART_TCP_CLIENT_MINOR;
+	app_version.patch = SAMPLE_UART_TCP_CLIENT_PATCH;
+	nrc_set_app_version(&app_version);
+	nrc_set_app_name(SAMPLE_UART_TCP_CLIENT_APP_NAME);
 
 	if (network_init() < 0) {
 		nrc_usr_print("** network init failed **\n");

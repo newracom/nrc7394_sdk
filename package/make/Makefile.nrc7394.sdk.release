@@ -202,7 +202,7 @@ CONFIG_SFLASH_DP=y
 CONFIG_SFLASH_PAGE_PROG=y
 
 # Manual Continuous Tx support
-CONFIG_MANUAL_CONT_TX_SUPPORT=n
+CONFIG_MANUAL_CONT_TX_SUPPORT=y
 
 # (AP) AP sends 1/2/4M BW probe response according to BW of probe request
 CONFIG_MATCH_OP_BW_PREQ_PRSP=y

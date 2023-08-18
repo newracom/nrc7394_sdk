@@ -32,21 +32,25 @@
 
 static const int vif_id = ATCMD_NETIF_INDEX;
 
-wifi_country_list_t g_wifi_country_list =
+#if UMAC_COUNTRY_CODES == 0
+static const wifi_country_t _wifi_country_list[] =
 {
-	{ 8, "AU" },
-	{ 6, "CN" },
-	{ 5, "EU" },
-	{ 1, "JP" },
-	{ 7, "NZ" },
-	{ 4, "TW" },
-	{ 0, "US" },
-	{ 2, "K0" },
-	{ 3, "K1" },
-	{ 9, "K2" },
+	{ COUNTRY_CODE_AU, "AU" },
+	{ COUNTRY_CODE_CN, "CN" },
+	{ COUNTRY_CODE_EU, "EU" },
+	{ COUNTRY_CODE_JP, "JP" },
+	{ COUNTRY_CODE_NZ, "NZ" },
+	{ COUNTRY_CODE_TW, "TW" },
+	{ COUNTRY_CODE_US, "US" },
+	{ COUNTRY_CODE_K1, "K1" },
+	{ COUNTRY_CODE_K2, "K2" },
 
-	{ -1, NULL }
+	{ COUNTRY_CODE_MAX, "00" }
 };
+const wifi_country_t *g_wifi_country_list = _wifi_country_list;
+#else
+const wifi_country_t *g_wifi_country_list = _country_codes;
+#endif
 
 /**********************************************************************************************/
 
@@ -208,11 +212,11 @@ int wifi_api_get_supported_channels (const char *country, wifi_channels_t *chann
 
 /*	_atcmd_debug("%s: %s\n", __func__, channels->country_code); */
 
-	for (i = 0 ; g_wifi_country_list[i].code ; i++)
+	for (i = 0 ; g_wifi_country_list[i].cc_index < COUNTRY_CODE_MAX ; i++)
 	{
-		if (strcmp(country, g_wifi_country_list[i].code) == 0)
+		if (strcmp(country, g_wifi_country_list[i].alpha2_cc) == 0)
 		{
-			channel_table = get_channel_mapping_tables(g_wifi_country_list[i].id);
+			channel_table = get_channel_mapping_tables(g_wifi_country_list[i].cc_index);
 
 			memset(channels, 0, sizeof(wifi_channels_t));
 
@@ -393,7 +397,7 @@ int wifi_api_get_snr (uint8_t *snr)
 
 	*snr = 0;
 
-	if (nrc_wifi_get_snr(snr) != WIFI_SUCCESS)
+	if (nrc_wifi_get_snr(0, snr) != WIFI_SUCCESS)
 		return -1;
 
 	return 0;
@@ -406,7 +410,7 @@ int wifi_api_get_rssi (int8_t *rssi)
 
 	*rssi = ATCMD_WIFI_RSSI_MIN;
 
-	if (nrc_wifi_get_rssi(rssi) != WIFI_SUCCESS)
+	if (nrc_wifi_get_rssi(0, rssi) != WIFI_SUCCESS)
 		return -1;
 
 	return 0;

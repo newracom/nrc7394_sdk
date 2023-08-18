@@ -43,13 +43,17 @@ enum
 	DHCP_TIMEOUT = -4
 };
 
+#define UMAC_COUNTRY_CODES	1
+
+#if UMAC_COUNTRY_CODES == 0
 typedef struct
 {
-	int id;
-	const char *code;
+	int cc_index;
+	const char *alpha2_cc;
 } wifi_country_t;
-
-typedef wifi_country_t wifi_country_list_t[10 + 1];
+#else
+typedef country_codes	wifi_country_t;
+#endif
 
 typedef struct
 {
@@ -71,7 +75,7 @@ typedef void (*wifi_event_cb_t) (int, void *, int);
 
 /**********************************************************************************************/
 
-extern wifi_country_list_t g_wifi_country_list;
+extern const wifi_country_t *g_wifi_country_list;
 
 extern int wifi_api_register_event_callback (wifi_event_cb_t event_cb[]);
 

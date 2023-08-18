@@ -36,9 +36,9 @@
 
 extern struct netif* nrc_netif[MAX_IF];
 extern struct netif eth_netif;
-#if defined(SUPPORT_ETHERNET_ACCESSPOINT)
+#if LWIP_BRIDGE
 extern struct netif br_netif;
-#endif
+#endif /* LWIP_BRIDGE */
 /**
  * In this function, the hardware should be initialized.
  * Called from wlif_init().
@@ -138,7 +138,7 @@ void lwif_input_from_net80211_pbuf(struct pbuf* p)
 void lwif_input(struct nrc_wpa_if* intf, void *buffer, int data_len)
 {
 	struct eth_hdr *ethhdr;
-	struct netif *netif = nrc_netif[0];
+	struct netif *netif = nrc_netif[intf->vif_id];
 	struct pbuf *p = NULL, *q;
 	int remain = data_len;
 	int offset = 0;
@@ -175,25 +175,33 @@ void lwif_input(struct nrc_wpa_if* intf, void *buffer, int data_len)
 		/* IP or ARP packet? */
 		case ETHTYPE_ARP:
 #if defined(SUPPORT_ETHERNET_ACCESSPOINT)
-			if (nrc_eth_get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
-				u32 target_ip_addr;
+			if (!nrc_get_use_4address() &&
+			    (nrc_eth_get_network_mode() == NRC_NETWORK_MODE_BRIDGE)) {
 				arp_hdr = (struct etharp_hdr *)(p->payload + SIZEOF_ETH_HDR);
 				V(TT_NET, "[ARP][%s] ", htons(arp_hdr->opcode) == 1 ? "REQ" : "REP");
 				V(TT_NET, "dst("MACSTR"), src("MACSTR")\n", MAC2STR(ethhdr->dest.addr), MAC2STR(ethhdr->src.addr));
-				target_ip_addr = (arp_hdr->dipaddr.addrw[1] << 16) | arp_hdr->dipaddr.addrw[0];
+				#if LWIP_BRIDGE
+				u32 target_ip_addr = (arp_hdr->dipaddr.addrw[1] << 16) | arp_hdr->dipaddr.addrw[0];
+				#endif /* LWIP_BRIDGE */
 				if (!intf->is_ap) { // br0 mac == wlan0 mac
 					if (htons(arp_hdr->opcode) == 1) { // ARP Request
 						if (!os_memcmp(arp_hdr->shwaddr.addr, netif->hwaddr, 6)) {
 							goto pbuf_free;
 						} else {
-							if (target_ip_addr != br_netif.ip_addr.addr &&
-								!(ethhdr->dest.addr[0] & 1)) {
+							if (!(ethhdr->dest.addr[0] & 1)
+							#if LWIP_BRIDGE
+								&& target_ip_addr != br_netif.ip_addr.addr
+							#endif /* LWIP_BRIDGE */
+								) {
 								memcpy(ethhdr->dest.addr, get_peer_mac()->addr, 6);
 							}
 						}
 					} else { // ARP Reply
-						if (!os_memcmp(arp_hdr->dhwaddr.addr, netif->hwaddr, 6) &&
-							target_ip_addr != br_netif.ip_addr.addr) {
+						if (!os_memcmp(arp_hdr->dhwaddr.addr, netif->hwaddr, 6)
+							#if LWIP_BRIDGE
+							&& target_ip_addr != br_netif.ip_addr.addr
+							#endif /* LWIP_BRIDGE */
+							) {
 							memcpy(ethhdr->dest.addr, get_peer_mac()->addr, 6);
 							memcpy(arp_hdr->dhwaddr.addr, get_peer_mac()->addr, 6);
 						}
@@ -215,12 +223,15 @@ void lwif_input(struct nrc_wpa_if* intf, void *buffer, int data_len)
 			if (nrc_eth_get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
 				ip_hdr = (struct ip_hdr *)(p->payload + SIZEOF_ETH_HDR);
 				if (!intf->is_ap) { // br0 mac == wlan0 mac
-					if (ip_hdr->dest.addr != 0 && ip_hdr->dest.addr != 0xffffffff &&
-						ip_hdr->dest.addr != br_netif.ip_addr.addr) {
+					if (ip_hdr->dest.addr != 0 && ip_hdr->dest.addr != 0xffffffff
+					#if LWIP_BRIDGE
+						&& ip_hdr->dest.addr != br_netif.ip_addr.addr
+					#endif /* LWIP_BRIDGE */
+						) {
 						memcpy(ethhdr->dest.addr, get_peer_mac()->addr, 6);
+						}
 					}
 				}
-			}
 	next:
 #endif
 			/* full packet send to tcpip_thread to process */

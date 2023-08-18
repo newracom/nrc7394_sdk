@@ -33,7 +33,7 @@ static int wpa_ps_check_hook(DRV_PS_HOOK_TYPE type, struct retention_info *ret_i
 		return WPA_PS_HOOK_RET_SUCCESS;
 	}
 
-	if (lmac_is_ap(0)) {
+	if (lmac_is_ap(0) || lmac_is_ap(1)) {
 		V(TT_WPAS, TAG "STA TYPE is AP! \n");
 		return WPA_PS_HOOK_RET_FAIL_NOT_RECOVERED;
 	}
@@ -524,7 +524,9 @@ static int wpa_ps_hook_handle_dhcp(struct retention_info *ret_info, void *param1
 	/* Send Null for informing AP of Awake */
 	ret_info->ps_null_pm0 = 1;
 
+#if defined(INCLUDE_TRACE_WAKEUP)
 	E(TT_WPAS, TAG "%d recovery is done\n", vif_id);
+#endif
 	ret_info->recovered = false;
 
 	return WPA_PS_HOOK_RET_SUCCESS;
@@ -532,7 +534,22 @@ static int wpa_ps_hook_handle_dhcp(struct retention_info *ret_info, void *param1
 
 static int wpa_ps_hook_handle_static(struct retention_info *ret_info, void *param1, void *param2)
 {
+	ASSERT(param1);
+
+	int vif_id = *(int *)param1;
+
+#if defined(INCLUDE_TRACE_WAKEUP)
+	E(TT_WPAS, TAG "%d static_ip\n", vif_id);
+#endif /* INCLUDE_TRACE_WAKEUP */
+
+	/* Send Null for informing AP of Awake */
+	ret_info->ps_null_pm0 = 1;
+
+#if defined(INCLUDE_TRACE_WAKEUP)
+	E(TT_WPAS, TAG "%d recovery is done\n", vif_id);
+#endif
 	ret_info->recovered = false;
+
 	return WPA_PS_HOOK_RET_SUCCESS;
 }
 

@@ -4,32 +4,57 @@
 *
 *******************************************************************
 
+[2023-08-17]
+Change summary for version 1.1:
+
+    New features
+        * AT-CMD feature: continuous TX operation (AT+WCTX)
+
+    Changes
+        * Enhanced RSSI accuracy of system_api_get_rssi()
+
+    Bugfix
+        * Intermittent scan failure on TW channel
+        * AP's association grant for STA with listen interval exceeding BSS max idle period
+        * CCA type of JP 2/4MHz channels
+        * Inability to return to doze state in deep sleep mode for STA with static IP address
+        * Scan failure on K2 channel
+        * Incorrect peer MAC address copy at 4-address enabled W5500 device
+
+    Known Issues
+
+        * The initial connection time for WPA3-SAE/OWE can be quite lengthy (> 15 seconds) due to the substantial computational load required by software for large number operations.
+        * The SoftAP disable/enable sequence on the standalone mode is not supported.
+        * The issue of deauthentication frame delivery failure can occur between PMF-enabled NRC7394 and PMF-enabled NRC7292 devices.
+        * During deep sleep, TCP connections are not maintained. Upon waking up, a new TCP connection must be established.
+        * The AT-CMD throughput over HSPI interface is slightly lower than NRC7292 device due to CPU clock speed variation.
+
 [2023-08-07]
 Change summary for version 1.0:
 
     New features
 
-    * AT-CMD features
-      o WPA3-SAE (v1.0)
-      o OWE (v1.0)
-      o FOTA (v1.0)
-      o SoftAP (v1.0)
-      o Power save TIM mode (v1.0)
-      o Power save non-TIM mode (v1.0)
-    * Regulation features
-      o Duty cycle (v1.0)
-    * System features
-      o Power save – deep sleep (v1.0)
-      o WDT/Recovery (v1.0)
-      o UART/UART-HFC/HSPI interface (v1.0)
-    * Sample applications
-      o Refer to UG-7394-004-Standalone SDK document (v1.0)
-        - Wi-Fi: Wi-Fi state, WPS-PBC, Ethernet bridge, SoftAP, FOTA
-        - Protocol: TCP/UDP
-        - Power save
-        - Peripheral: GPIO, UART, ADC, NVS, PWM, sensors, etc.
-        - Middleware: XML, JSON, AWS, MQTT, HTTP
-        - Scenario: PS schedule, UART data handling
+    •   AT-CMD features
+        o   WPA3-SAE (v1.0)
+        o   OWE (v1.0)
+        o   FOTA (v1.0)
+        o   SoftAP (v1.0)
+        o   Power save TIM mode (v1.0)
+        o   Power save non-TIM mode (v1.0)
+    •   Regulation features
+        o   Duty cycle (v1.0)
+    •   System features
+        o   Power save – deep sleep (v1.0)
+        o   WDT/Recovery (v1.0)
+        o   UART/UART-HFC/HSPI interface (v1.0)
+    •   Sample applications
+        o   Refer to UG-7394-004-Standalone SDK document (v1.0)
+            -   Wi-Fi: Wi-Fi state, WPS-PBC, Ethernet bridge, SoftAP, FOTA
+            -   Protocol: TCP/UDP
+            -   Power save
+            -   Peripheral: GPIO, UART, ADC, NVS, PWM, sensors, etc.
+            -   Middleware: XML, JSON, AWS, MQTT, HTTP
+            -   Scenario: PS schedule, UART data handling
 
     Known Issues
 
