@@ -41,6 +41,7 @@ extern "C" {
 #define GT25Q16A_JEDEC_ID (0xC46015)
 #define GT25Q32A_JEDEC_ID (0xC46016)
 #define FM25W16A_JEDEC_ID (0xA12815)
+#define FM25W32A_JEDEC_ID (0xA12816)
 
 /* ----------------------------------
  * W26XX JEDEC ID
@@ -80,7 +81,8 @@ enum sf_burst_len_e {
 uint32_t nrc_sf_get_size(void);
 static uint32_t half_addr_sf = 0;
 typedef struct {
-	uint32_t MAP_VERSION;
+	uint32_t PROFILE:16;
+	uint32_t MAP_VERSION:16;
 	uint32_t FW;
 	uint32_t FW_INFO;
 	uint32_t CORE_DUMP;
@@ -150,6 +152,7 @@ enum sf_store_area_e {
 
 sf_mem_map_t* nrc_sf_get_mem_map(void);
 static sf_mem_map_t sf_mem_map;
+static bool mem_map_valid = 0;
 #define SF_BOOTLOADER 0x0
 #define SF_MEM_MAP 0xF000
 //#define SF_FW 0x10000
@@ -173,6 +176,8 @@ enum sf_reg_override_ctrl {
 	SF_REG_OVER_CTRL_ENABLE = 1,
 	SF_REG_OVER_CTRL_DISABLE = 0
 };
+
+#define SF_SECTOR_SIZE            4096
 
 #define SYSCONFIG_SECTOR_SIZE               4096
 #define SYSCONFIG_PRE_USER_FACTORY_SIZE      256

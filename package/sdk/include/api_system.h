@@ -186,6 +186,81 @@ char* nrc_get_app_name(void);
  ***********************************************/
 VERSION_T* nrc_get_sdk_version(void);
 
+
+/**********************************************
+ * @fn     nrc_err_t nrc_set_flash_device_info(uint8_t* data, unit16_t len)
+ *
+ * @brief  Write data to the device info page on the flash memory.
+ *
+ * @param  data: the source buffer that holds the data to be written.
+ *
+ * @param  len:  the length of the data in bytes. (max 4096 bytes).
+ *
+ * @return If successful, NRC_SUCCESS is returned. Otherwise, NRC_FAIL is returned;
+ ***********************************************/
+nrc_err_t nrc_set_flash_device_info(uint8_t* data, uint16_t len);
+
+
+/**********************************************
+ * @fn     nrc_err_t nrc_get_flash_device_info(uint8_t* data, unit16_t len)
+ *
+ * @brief  Read data from the device info page on the flash memory.
+ *
+ * @param  data: the destination buffer that the data read from the flash memory will be copied to.
+ *
+ * @param  len:  the length of the data in bytes. (max 4096 bytes).
+ *
+ * @return If successful, NRC_SUCCESS is returned. Otherwise, NRC_FAIL is returned;
+ ***********************************************/
+nrc_err_t nrc_get_flash_device_info(uint8_t* data, uint16_t len);
+
+
+/**********************************************
+ * @fn     uint32_t nrc_get_user_data_area_size(void)
+ *
+ * @brief  Get the size of the user data area in flash memory.
+ *
+ * @param  void
+ *
+ * @return The size of the user data area in bytes.
+ ***********************************************/
+uint32_t nrc_get_user_data_area_size(void);
+
+
+/**********************************************
+ * @fn    nrc_err_t nrc_write_user_data(uint32_t user_data_offset, uint8_t* data, uint32_t size)
+ *
+ * @brief  Write user data to the user data area in flash memory
+ *
+ * @param  user_data_offset : The offset from the user data area's base address. It should be aligned to a 4-byte boundary.
+ *
+ * @param  *data: A pointer to the data to be written.
+ *
+ * @param  size: The size of data to write.
+ *
+ * @return If successful, NRC_SUCCESS is returned. Otherwise, NRC_FAIL is returned.
+ ***********************************************/
+nrc_err_t nrc_write_user_data(uint32_t user_data_offset, uint8_t* data, uint32_t size);
+
+
+
+/**********************************************
+ * @fn     nrc_err_t nrc_read_user_data(uint8_t* buffer, uint32_t user_data_offset, uint32_t size)
+ *
+ * @brief  Read user data from the user data area in flash memory
+ *
+ * @param  *buffer : A pointer to the buffer where the data will be stored.
+ *
+ * @param  user_data_offset : The offset from the user data area's base address. It should be aligned to a 4-byte boundary.
+ *
+ * @param  size: The size of data to read.
+ *
+ * @return If successful, NRC_SUCCESS is returned. Otherwise, NRC_FAIL is returned.
+
+ ***********************************************/
+nrc_err_t nrc_read_user_data(uint8_t* buffer, uint32_t user_data_offset, uint32_t size);
+
+
 #ifdef __cplusplus
 }
 #endif

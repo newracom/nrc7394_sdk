@@ -36,6 +36,14 @@ static void *isr_arg;
 static int interrupt_vector = -1;
 #endif
 
+//#define ETH_LED_TRX_BLINK
+#ifdef ETH_LED_TRX_BLINK
+#define GPIO_RX_LED GPIO_16
+#define GPIO_TX_LED GPIO_17
+#define GPIO_LED_ON 0
+#define GPIO_LED_OFF 1
+#endif /* ETH_LED_TRX_BLINK */
+
 spi_device_t w5500_spi;
 
 typedef struct {
@@ -644,6 +652,9 @@ ATTR_NC  __attribute__((optimize("O3"))) static nrc_err_t emac_w5500_transmit(es
     if (emac->link == ETH_LINK_DOWN) {
         return NRC_FAIL;
     }
+#ifdef ETH_LED_TRX_BLINK
+    nrc_gpio_outputb(GPIO_TX_LED, GPIO_LED_ON);
+#endif /* ETH_LED_TRX_BLINK */
     // check if there're free memory to store this packet
     uint16_t free_size = 0;
     MAC_CHECK(w5500_get_tx_free_size(emac, &free_size), err, "get free size failed\n");
@@ -667,13 +678,18 @@ ATTR_NC  __attribute__((optimize("O3"))) static nrc_err_t emac_w5500_transmit(es
         MAC_CHECK(w5500_read(emac, W5500_REG_SOCK_IR(0), &status, sizeof(status)), err, "read SOCK0 IR failed\n");
         if ((retry++ > 3 && !is_w5500_sane_for_rxtx(emac)) || retry > 10) {
             V(TT_NET, "[%s] error transmission, retry = %d...\n", __func__, retry);
+#ifdef ETH_LED_TRX_BLINK
+            nrc_gpio_outputb(GPIO_TX_LED, GPIO_LED_OFF);
+#endif /* ETH_LED_TRX_BLINK */
             return NRC_FAIL;
         }
     }
     // clear the event bit
     status  = W5500_SIR_SEND;
     MAC_CHECK(w5500_write(emac, W5500_REG_SOCK_IR(0), &status, sizeof(status)), err, "write SOCK0 IR failed\n");
-
+#ifdef ETH_LED_TRX_BLINK
+    nrc_gpio_outputb(GPIO_TX_LED, GPIO_LED_OFF);
+#endif /* ETH_LED_TRX_BLINK */
 err:
     return ret;
 }
@@ -687,6 +703,9 @@ ATTR_NC __attribute__((optimize("O3"))) static nrc_err_t emac_w5500_receive(esp_
     uint16_t remain_bytes = 0;
     emac->packets_remain = false;
 
+#ifdef ETH_LED_TRX_BLINK
+    nrc_gpio_outputb(GPIO_RX_LED, GPIO_LED_ON);
+#endif /*ETH_LED_TRX_BLINK */
     w5500_get_rx_received_size(emac, &remain_bytes);
     if (remain_bytes) {
         // get current read pointer
@@ -710,6 +729,9 @@ ATTR_NC __attribute__((optimize("O3"))) static nrc_err_t emac_w5500_receive(esp_
     }
 
     *length = rx_len;
+#ifdef ETH_LED_TRX_BLINK
+    nrc_gpio_outputb(GPIO_RX_LED, GPIO_LED_OFF);
+#endif /* ETH_LED_TRX_BLINK */
 err:
     return ret;
 }
@@ -790,7 +812,7 @@ static void emac_gpio_interrupt_init()
 #else // NRC7394
     gpio_config.gpio_pin = GPIO_INT_PIN;
     gpio_config.gpio_dir = GPIO_INPUT;
-	gpio_config.gpio_mode = GPIO_PULL_DOWN;
+//    gpio_config.gpio_mode = GPIO_PULL_DOWN;
     gpio_config.gpio_alt = GPIO_FUNC;
     nrc_gpio_config(&gpio_config);
 
@@ -810,6 +832,24 @@ static void emac_gpio_interrupt_init()
     V(TT_NET, "[%s] return ...\n", __func__);
 }
 
+#ifdef ETH_LED_TRX_BLINK
+static void emac_led_init(void)
+{
+    NRC_GPIO_CONFIG gpio_config;
+    gpio_config.gpio_pin = GPIO_TX_LED;
+    gpio_config.gpio_dir = GPIO_OUTPUT;
+    gpio_config.gpio_mode = GPIO_PULL_DOWN;
+    gpio_config.gpio_alt = GPIO_FUNC;
+    nrc_gpio_config(&gpio_config);
+
+    gpio_config.gpio_pin = GPIO_RX_LED;
+    gpio_config.gpio_dir = GPIO_OUTPUT;
+    gpio_config.gpio_mode = GPIO_PULL_DOWN;
+    gpio_config.gpio_alt = GPIO_FUNC;
+    nrc_gpio_config(&gpio_config);
+}
+#endif /* ETH_LED_TRX_BLINK */
+
 static nrc_err_t emac_w5500_init(esp_eth_mac_t *mac)
 {
     nrc_err_t ret = NRC_SUCCESS;
@@ -819,6 +859,10 @@ static nrc_err_t emac_w5500_init(esp_eth_mac_t *mac)
     isr_arg = (void *) emac;
     /* Initialize GPIO for interrupt or polling */
     emac_gpio_interrupt_init();
+
+#ifdef ETH_LED_TRX_BLINK
+    emac_led_init();
+#endif /* ETH_LED_TRX_BLINK */
 
     V(TT_NET, "[%s] call on_state_changed\n", __func__);
     MAC_CHECK(eth->on_state_changed(eth, ETH_STATE_LLINIT, NULL), err, "lowlevel init failed\n");

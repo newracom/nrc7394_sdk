@@ -96,6 +96,7 @@ void 	 system_modem_api_get_capabilities(struct wim_cap_param* param);
 #define system_modem_api_is_mesh_ap(x)			lmac_is_mesh_ap(x)
 #define system_modem_api_is_relay()			lmac_is_relay()
 #define system_modem_api_is_concurrent()		lmac_is_concurrent()
+#define system_modem_api_is_rev()			lmac_is_rev()
 #define system_modem_api_get_mesh_vif_id()		lmac_get_mesh_vif_id()
 #define system_modem_api_set_cca_ignore(x)		lmac_set_cca_ignore(x)
 #define system_modem_api_set_cipher_ignore(x, y)	lmac_set_cipher_ignore(x, y)
@@ -148,11 +149,15 @@ void 	 system_modem_api_get_capabilities(struct wim_cap_param* param);
 #define system_modem_api_ps_set_ret_beacon_interval(x)		lmac_ps_set_bcn_interval(x)
 
 void     system_modem_api_set_ssid(int vif_id , uint8_t *ssid , uint8_t ssid_len);
+void     system_modem_api_set_dtim_period(int vif_id, uint8_t period);
+uint8_t  system_modem_api_get_dtim_period(int vif_id);
 void     system_modem_api_enable_beacon(int vif_id, bool enable);
 void     system_modem_api_update_beacon(int vif_id, uint8_t* ,uint16_t );
 void     system_modem_api_set_beacon_interval(int vif_id, uint16_t beacon_interval);
+uint16_t system_modem_api_get_beacon_interval(int vif_id);
 void     system_modem_api_ap_enable_short_beacon(int vif_id, bool enable, bool fota);
 void     system_modem_api_ap_set_short_beacon_interval(int vif_id, uint16_t short_beacon_interval);
+uint16_t system_modem_api_ap_get_short_beacon_interval(int vif_id);
 void     system_modem_api_set_tim_flag(uint8_t vif_id);
 void     system_modem_api_set_bssid(int vif_id, uint8_t *bssid);
 void     system_modem_api_set_edca_param(int vif_id, struct edca_param* edca);
@@ -173,6 +178,7 @@ bool     system_modem_api_set_gi(int vif_id, uint8_t type);
 void     system_modem_api_set_short_gi(int vif_id, uint8_t short_gi, bool gi_auto_flag);
 bool     system_modem_api_get_short_gi(int vif_id, GenericMacHeader *mqh);
 void     system_modem_api_set_rate_control(int vif_id, bool enable);
+void     system_modem_api_set_rc_mode (uint8_t vif_id, uint8_t mode);
 void     system_api_get_supported_channels(uint16_t **chs, int *n_ch);
 void     system_modem_api_set_txgain(uint32_t txgain);
 void     system_modem_api_set_rxgain(uint32_t rxgain);
@@ -195,7 +201,11 @@ int      system_modem_api_get_cca_threshold(int vif_id);
 void     system_modem_api_set_tx_suppress_dur(uint32_t value);
 void     system_modem_api_set_tx_suppress_cmd(uint32_t value);
 int8_t   system_modem_api_get_ignore_broadcast_ssid_type(void);
-uint32_t system_api_get_version(void);
+uint16_t system_api_get_version(void);
+#if defined(NRC7394)
+uint16_t system_api_get_chip_rev_num(void);
+uint8_t	 system_api_get_xtal_status(void);
+#endif
 uint32_t system_api_get_align(void);
 uint32_t system_api_get_buffer_length(void);
 bool 	 system_api_get_rssi(int vif_id , int8_t* rssi_avg , int8_t* rssi_last);
@@ -204,11 +214,15 @@ bool 	 system_api_get_rssi(int vif_id , int8_t* rssi_avg , int8_t* rssi_last);
 void system_modem_tx_ampdu_control(int vif_id, uint8_t control, uint8_t *addr, uint8_t tid);
 #endif
 bool system_modem_api_set_mcs(uint8_t mcs);
-uint8_t system_modem_api_get_mcs(int vif_id);
+uint8_t system_modem_api_get_tx_mcs(int vif_id);
+uint8_t system_modem_api_get_rx_mcs(int vif_id);
+
+uint8_t system_modem_api_get_tx_power(int vif_id);
+int system_modem_api_set_tx_power(int type, uint8_t txpwr);
 
 #if defined(INCLUDE_BD_SUPPORT)
 bool system_modem_api_set_bd_data(int vif_id, struct wim_bd_param* p);
-void system_modem_api_set_tx_power(int vif_id, uint8_t ch_id);
+void system_modem_api_set_tx_power_by_channel_index(int vif_id, uint8_t ch_id);
 #endif /* defined(INCLUDE_BD_SUPPORT) */
 enum efuse_lot_ver system_api_get_lot_ver(void);
 void system_modem_api_set_channel_width_s1goper(int vif_id, uint8_t prim_ch_width, uint8_t prim_loc, uint8_t prim_ch_number);
@@ -226,6 +240,11 @@ void system_api_set_tx_lpf(uint8_t vif_id);
 #if defined(SF_WRITABLE)
 void system_api_sflash_write(uint32_t address, struct _SYS_BUF *packet, size_t size);
 uint16_t system_api_sflash_read(uint32_t sf_address, struct byte_stream *bs, int size);
+uint32_t system_api_sflash_get_user_data_area_size(void);
+bool system_api_sflash_write_user_data(uint32_t user_data_offset, uint8_t* data, uint32_t size);
+bool system_api_sflash_read_user_data(uint8_t* buffer, uint32_t user_data_offset, uint32_t size);
+bool system_api_sflash_write_device_info(uint8_t* data, uint32_t size);
+bool system_api_sflash_read_device_info(uint8_t* data, uint32_t size);
 #endif /* defined(SF_WRITABLE) */
 uint16_t system_modem_api_get_hw_version();
 bool system_modem_api_set_hw_version(uint16_t version);
@@ -239,6 +258,8 @@ uint32_t system_modem_api_get_current_snr_i(int loc);
 void system_modem_api_init_retention();
 int system_modem_api_ps_set_sleep(uint8_t sleep_mode, uint64_t interval_ms);
 void system_modem_api_ps_cleanup_dl_ring();
+bool system_modem_api_set_listen_interval(int vif_id, uint16_t interval);
+bool system_modem_api_get_listen_interval(int vif_id, uint16_t *interval, uint32_t *interval_ms);
 #if defined(INCLUDE_TWT_SUPPORT)
 void system_modem_api_set_tx_suppress_start(uint32_t setting, uint32_t value);
 void system_modem_api_set_tx_suppress_stop(uint32_t setting);
@@ -296,7 +317,10 @@ void system_modem_api_update_probe_req(int vif_id, uint8_t* ven_ie, uint16_t len
 void system_modem_api_update_probe_rsp(int vif_id, uint8_t* ven_ie, uint16_t len);
 void system_modem_api_update_assoc_req(int vif_id, uint8_t* ven_ie, uint16_t len);
 
+bool system_modem_api_set_support_ch_width(uint8_t sup_ch_width);
+
 #if defined(INCLUDE_MANUAL_CONT_TX_SUPPORT)
 bool system_modem_api_set_cont_tx(bool enable, uint32_t freq_100k, const char* bw, uint8_t mcs, uint8_t txpwr, uint32_t interval);
 #endif
+
 #endif //__SYSTEM_MODEM_API_H__

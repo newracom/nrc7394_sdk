@@ -4,6 +4,7 @@
 #include "lwip/sockets.h"
 #include "lwip/dns.h"
 #include "lwip/mem.h"
+#include "lwip/apps/sntp.h"
 #include "netif/wlif.h"
 #if LWIP_IPV6
 #include "lwip/nd6.h"
@@ -15,8 +16,14 @@
 #if LWIP_DNS && LWIP_DHCPS
 #include "captdns.h"
 #endif
+#include "drv_rtc.h"
+#include "nrc_eth_if.h"
 
 #include "standalone.h"
+
+#ifdef INCLUDE_WIREGUARD
+extern struct netif wg_netif;
+#endif
 
 #ifdef SUPPORT_ETHERNET_ACCESSPOINT
 #include "nrc_eth_if.h"
@@ -64,11 +71,11 @@ struct netif * nrc_netif_get_by_idx(uint8_t idx)
 #if LWIP_BRIDGE
 	} else if(idx == BRIDGE_INTERFACE){
 		return &br_netif;
-#endif /* LWIP_BRIDGE */		
+#endif /* LWIP_BRIDGE */
 #ifdef SUPPORT_ETHERNET_ACCESSPOINT
 	} else if(idx == ETHERNET_INTERFACE){
 		return &eth_netif;
-#endif /* SUPPORT_ETHERNET_ACCESSPOINT */		
+#endif /* SUPPORT_ETHERNET_ACCESSPOINT */
 	} else{
 		return NULL;
 	}
@@ -224,6 +231,33 @@ void reset_ip_address(int vif)
 #endif
 }
 
+bool wifi_get_ip_address(int vif_id, char **ip_addr)
+{
+	struct netif *target_if = NULL;
+
+#if LWIP_IPV4
+	if ((vif_id != 0) && (vif_id != 1))
+		return false;
+
+	if (!ip_addr)
+		return false;
+
+	target_if = nrc_netif[vif_id];
+
+#ifdef SUPPORT_ETHERNET_ACCESSPOINT
+#if LWIP_BRIDGE
+	if (nrc_eth_get_network_mode() == NRC_NETWORK_MODE_BRIDGE)
+		target_if = &br_netif;
+#endif /* LWIP_BRIDGE */
+#endif /* SUPPORT_ETHERNET_ACCESSPOINT */
+
+	*ip_addr = ip4addr_ntoa(netif_ip4_addr(target_if));
+	return true;
+#else
+	return false;
+#endif /* LWIP_IPV4 */
+}
+
 void ifconfig_help_display(void)
 {
 	A("Usage:\n");
@@ -249,7 +283,39 @@ bool ifconfig_display(WIFI_INTERFACE if_index)
 	} else if(if_index == ETHERNET_INTERFACE){
 		A("eth\t");
 #endif
-	} 
+	}
+
+	A("HWaddr ");
+	A(MAC_STR,MAC_VALUE(netif->hwaddr) );
+	A("   MTU:%d\n", netif->mtu);
+#if LWIP_IPV4
+	A("\tinet:");
+	ip_addr_debug_print_val(LWIP_DBG_ON, (netif->ip_addr));
+	A("\tnetmask:");
+	ip_addr_debug_print_val(LWIP_DBG_ON, (netif->netmask));
+	A("\tgateway:");
+	ip_addr_debug_print_val(LWIP_DBG_ON, (netif->gw));
+	A("\n");
+#endif /* LWIP_IPV4 */
+#if LWIP_IPV6
+	for (int i = 0; i < LWIP_IPV6_NUM_ADDRESSES; i++) {
+		A("\tinet6: %s/0x%"X8_F"\n", ip6addr_ntoa(netif_ip6_addr(netif, i)),
+			netif_ip6_addr_state(netif, i));
+	}
+#endif
+	A("\n");
+	return true;
+}
+
+#ifdef INCLUDE_WIREGUARD
+bool ifconfig_display_wg(struct netif *netif)
+{
+	if(netif == NULL){
+		return false;
+	}
+
+	A("wg\t");
+
 
 	A("HWaddr ");
 	A(MAC_STR,MAC_VALUE(netif->hwaddr) );
@@ -272,7 +338,7 @@ bool ifconfig_display(WIFI_INTERFACE if_index)
 	A("\n");
 	return true;
 }
-
+#endif
 
 #ifdef SUPPORT_ETHERNET_ACCESSPOINT
 bool support_ethernet_accesspoint(void)
@@ -295,6 +361,9 @@ static void ifconfig_display_all()
 	for(i = 0; i < MAX_IF; i++) {
 		ifconfig_display(i);
 	}
+#ifdef INCLUDE_WIREGUARD
+	ifconfig_display_wg(&wg_netif);
+#endif
 }
 
 bool wifi_ifconfig(int argc, char *argv[])
@@ -635,10 +704,10 @@ status_callback(struct netif *state_netif)
 
 	if (netif_is_up(state_netif)) {
 #if defined(INCLUDE_TRACE_WAKEUP)
-#if LWIP_BRIDGE		
+#if LWIP_BRIDGE
 		if(state_netif == &br_netif)
 			A("%s br is up.\n", module_name());
-		else	
+		else
 #endif /* LWIP_BRIDGE */
 		A("%s wlan%d is up.\n", module_name(), netif_get_index(state_netif) - 1);
 #endif /* INCLUDE_TRACE_WAKEUP */
@@ -794,7 +863,7 @@ bool wifi_dhcps(int argc, char *argv[])
 			if(if_idx < 0){
 				dhcps_help_display();
 				return false;
-			}			
+			}
 			nif = nrc_netif_get_by_idx(if_idx);
 			A("interface : %s\n", argv[i]);
 		} else if (strcmp(argv[i], "-lt") == 0 && i + 1 < argc) {
@@ -864,7 +933,7 @@ bool wifi_bridge(int argc, char *argv[])
 				bridge_help_display();
 				return false;
 			}
-			bridgeif_add_port(&br_netif, nrc_netif_get_by_idx(if_idx));		
+			bridgeif_add_port(&br_netif, nrc_netif_get_by_idx(if_idx));
 		}
 		return true;
 	}
@@ -922,3 +991,104 @@ bool delete_wifi_bridge_interface(void)
 	return true;
 }
 #endif /* LWIP_BRIDGE */
+
+#include <time.h>
+
+static u64_t diff_rtc_utc_us = 0;
+
+void sntp_set_system_time (unsigned long sec, unsigned long us)
+{
+	u64_t rtc = drv_rtc_get_us();
+	u64_t utc = (u64_t)((u64_t)sec * 1000000) + (u64_t)us;
+
+	diff_rtc_utc_us = utc - rtc;
+}
+
+void sntp_get_system_time (unsigned long *sec, unsigned long *us)
+{
+	u64_t rtc = drv_rtc_get_us();
+	u64_t utc = rtc + diff_rtc_utc_us;
+
+	*sec = (u32_t)(utc / 1000000);
+	*us = (u32_t)(utc % 1000000);
+}
+
+u32_t get_utc_time (void)
+{
+	u32_t sec;
+	u32_t us;
+
+	sntp_get_system_time(&sec, &us);
+
+	return sec;
+}
+
+char *get_utc_time_str (char *buf, int len)
+{
+/* ex) "Wed Jun 30 21:49:08 1993\n" */
+
+	time_t time = get_utc_time();
+
+	if (!buf || len < 26 || !ctime_r(&time, buf))
+		return NULL;
+
+	len = strlen(buf);
+	buf[len - 1] = '\0'; /* remove LF */
+
+	return buf;
+}
+
+/*
+ * initialize_sntp() should be called after establishing a successful WiFi connection
+ * and configuring DHCP to ensure accurate time synchronization.
+ */
+int initialize_sntp(const char *server, u32_t timeout) /* sec */
+{
+#define sntp_init_log(fmt, ...)		/* A(fmt, ##__VA_ARGS__) */
+
+	const char *str_mode[] = { "POLL", "LISTENONLY" };
+	ip_addr_t server_addr;
+	int time;
+
+	if (timeout > 0)
+		timeout *= 1000;
+	else
+		timeout = 10 * 1000;
+
+	sntp_setoperatingmode(SNTP_OPMODE_POLL);
+
+	if (ipaddr_aton(server, &server_addr)) {
+		sntp_setserver(0, &server_addr);
+
+		sntp_init_log("%s: mode=\"%s\" server=\"%s\" timeout=%ums\n", __func__,
+				str_mode[sntp_getoperatingmode()], ipaddr_ntoa(sntp_getserver(0)), timeout);
+	} else {
+#if !SNTP_SERVER_DNS
+		return -1;
+#else
+		if (server)
+			sntp_setservername(0, server);
+		else
+			sntp_setservername(0, "pool.ntp.org");
+
+		sntp_init_log("%s: mode=\"%s\" server=\"%s\" tiemout=%ums\n", __func__,
+			str_mode[sntp_getoperatingmode()], sntp_getservername(0), timeout);
+#endif
+	}
+
+	sntp_init();
+
+	for (time = 0 ; time < timeout ; time += 100) {
+		if (sntp_getreachability(0)) {
+			char buf[32];
+			sntp_init_log("%s: init_time=%dms, UTC %s\n", __func__, time, get_utc_time_str(buf, sizeof(buf)), time);
+			return 0;
+		}
+
+		vTaskDelay(pdMS_TO_TICKS(100));
+	}
+
+	sntp_init_log("%s: timeout=%dms\n", __func__, timeout);
+
+	return -1;
+}

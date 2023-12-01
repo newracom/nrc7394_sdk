@@ -90,7 +90,7 @@ var channel = %%WIFI_CHANNEL%%
 var ip_mode = %%WIFI_IP_MODE%%
 var static_ip = %%WIFI_STATIC_IP%%
 var dhcp_server = %%WIFI_DHCP_SERVER%%
-var bcn_interval = %%WIFI_SHORT_BCN%%
+var bcn_interval = %%WIFI_BEACON_INTERVAL%%
 var txpower = %%WIFI_TXPOWER%%
 var bss_max_idle = %%WIFI_BSS_MAX_IDLE%%
 var bss_retry_cnt = %%WIFI_BSS_RETRY_CNT%%
@@ -254,6 +254,16 @@ document.getElementById('disconn_timeout').value = disconn_timeout;
 function updateTxPowerType(txpower_type) {
 document.getElementById('txpower_type').value = txpower_type;
 }
+function redirectTo(url) {
+window.location.href = url;
+}
+document.addEventListener('DOMContentLoaded', function () {
+var form = document.getElementById('settingsForm');
+form.addEventListener('submit', function (event) {
+event.preventDefault();
+redirectTo('rebooting');
+});
+});
 </script>
 <div id="doc2" class="yui-t2">
 <div id="hd">
@@ -265,7 +275,7 @@ document.getElementById('txpower_type').value = txpower_type;
 <div id="yui-main">
 <div class="yui-b">
 <div class="yui-g">
-<form action="/update_settings" method="get">
+<form id="settingsForm" action="/update_settings" method="get">
 <p style="text-align: left;">Wi-Fi Mode&nbsp;&nbsp;
 <select name="mode" id="mode" onclick="changeMode(this.value)">
 <option value="ap">AP</option>

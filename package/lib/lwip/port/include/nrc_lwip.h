@@ -108,6 +108,7 @@ int wifi_station_dhcpc_status(int vif);
 bool wifi_ifconfig(int argc, char *argv[]);
 enum dhcp_status wifi_softap_dhcps_status(void);
 
+bool wifi_get_ip_address(int vif_id, char **ip_addr);
 uint8_t wifi_get_vif_id(ip_addr_t* dest);
 void set_dhcp_status(bool status);
 bool get_dhcp_status(void);
@@ -127,6 +128,10 @@ int start_dhcps_on_if(struct netif *net_if, int updated_lease_time);
 
 void reset_ip_address(int vif);
 int reset_wifi_ap_mode(int vif);
+
+u32_t get_utc_time(void);
+char *get_utc_time_str (char *buf, int len);
+int initialize_sntp(const char *server, u32_t timeout);
 
 #if LWIP_IPV6
 void wifi_nd6_restart_netif( int vif );

@@ -52,6 +52,13 @@ const wifi_country_t *g_wifi_country_list = _wifi_country_list;
 const wifi_country_t *g_wifi_country_list = _country_codes;
 #endif
 
+const char *str_txpwr_type[TX_POWER_TYPE_MAX] =
+{
+	[TX_POWER_AUTO] = "auto",
+	[TX_POWER_LIMIT] = "limit",
+	[TX_POWER_FIXED] = "fixed",
+};
+
 /**********************************************************************************************/
 
 extern bool lmac_support_lbt (void);
@@ -91,12 +98,12 @@ static void _wifi_api_event_handler (int vif, tWIFI_EVENT_ID id, int data_len, v
 	};
 
 	if (id < 0 || id >= WIFI_EVT_MAX)
-		_atcmd_info("wifi_event: %d (invalid)\n", id);
+		_atcmd_info("wifi_event: %d (invalid)", id);
 	else if (!g_wifi_event_cb[id])
-		_atcmd_info("wifi_event: %d, %s (unused)\n", id, str_event[id]);
+		_atcmd_info("wifi_event: %d, %s (unused)", id, str_event[id]);
 	else
 	{
-		_atcmd_info("wifi_event: %s, data=%p,%d\n", str_event[id], data, data_len);
+		_atcmd_info("wifi_event: %s, data=%p,%d", str_event[id], data, data_len);
 
 		g_wifi_event_cb[id](vif, data, data_len);
 	}
@@ -210,7 +217,7 @@ int wifi_api_get_supported_channels (const char *country, wifi_channels_t *chann
 	if (strlen(country) != 2 || !channels)
 		return -1;
 
-/*	_atcmd_debug("%s: %s\n", __func__, channels->country_code); */
+/*	_atcmd_debug("%s: %s", __func__, channels->country_code); */
 
 	for (i = 0 ; g_wifi_country_list[i].cc_index < COUNTRY_CODE_MAX ; i++)
 	{
@@ -222,7 +229,7 @@ int wifi_api_get_supported_channels (const char *country, wifi_channels_t *chann
 
 			for (j = 0 ; channel_table[j].s1g_freq != 0 ; j++)
 			{
-/*				_atcmd_debug("%s: %d %u %u %u\n", __func__, j,
+/*				_atcmd_debug("%s: %d %u %u %u", __func__, j,
 							channel_table[j].chan_spacing,
 							channel_table[j].s1g_freq,
 							channel_table[j].nons1g_freq); */
@@ -257,7 +264,7 @@ int wifi_api_get_supported_channels (const char *country, wifi_channels_t *chann
 						channels->channel[channels->n_channel].nons1g_freq = nons1g_freq;
 						channels->n_channel++;
 
-/*						_atcmd_debug("%s: %d %u %u %u\n", __func__,
+/*						_atcmd_debug("%s: %d %u %u %u", __func__,
 									channels->n_channel - 1,
 									channels->channel[channels->n_channel - 1].bw,
 									channels->channel[channels->n_channel - 1].scan,
@@ -279,6 +286,34 @@ int wifi_api_get_macaddr (char *macaddr)
 		return -EINVAL;
 
 	if (nrc_wifi_get_mac_address(vif_id, macaddr) != WIFI_SUCCESS)
+		return -1;
+
+	if (strlen(macaddr) != ATCMD_WIFI_MACADDR_LEN)
+		return -1;
+
+	return 0;
+}
+
+int wifi_api_get_macaddr0 (char *macaddr)
+{
+	if (!macaddr)
+		return -EINVAL;
+
+	if (nrc_wifi_get_mac_address(0, macaddr) != WIFI_SUCCESS)
+		return -1;
+
+	if (strlen(macaddr) != ATCMD_WIFI_MACADDR_LEN)
+		return -1;
+
+	return 0;
+}
+
+int wifi_api_get_macaddr1 (char *macaddr)
+{
+	if (!macaddr)
+		return -EINVAL;
+
+	if (nrc_wifi_get_mac_address(1, macaddr) != WIFI_SUCCESS)
 		return -1;
 
 	if (strlen(macaddr) != ATCMD_WIFI_MACADDR_LEN)
@@ -329,29 +364,35 @@ int wifi_api_get_tx_power (uint8_t *power)
 	if (!power)
 		return -EINVAL;
 
-	if (nrc_wifi_get_tx_power(power) != WIFI_SUCCESS)
+	if (nrc_wifi_get_tx_power(vif_id, power) != WIFI_SUCCESS)
 		return -1;
 
 	return 0;
 }
 
-int wifi_api_set_tx_power (uint8_t power, enum TX_POWER_TYPE type)
+int wifi_api_set_tx_power (enum TX_POWER_TYPE type, uint8_t power)
 {
-	if (power == 0)
-		return -EINVAL;
+	tWIFI_TXPOWER_TYPE _type;
 
 	switch (type)
 	{
 		case TX_POWER_AUTO:
+			_type = WIFI_TXPOWER_AUTO;
+			break;
+
 		case TX_POWER_LIMIT:
+			_type = WIFI_TXPOWER_LIMIT;
+			break;
+
 		case TX_POWER_FIXED:
+			_type = WIFI_TXPOWER_FIXED;
 			break;
 
 		default:
 			return -EINVAL;
 	}
 
-	if (nrc_wifi_set_tx_power(power, type) != WIFI_SUCCESS)
+	if (nrc_wifi_set_tx_power(power, _type) != WIFI_SUCCESS)
 		return -1;
 
 	return 0;
@@ -377,7 +418,7 @@ int wifi_api_get_mcs (uint8_t *index)
 	if (!index)
 		return -EINVAL;
 
-	*index = system_modem_api_get_mcs(vif_id);
+	*index = system_modem_api_get_tx_mcs(vif_id);
 
 	return 0;
 }
@@ -526,23 +567,15 @@ int wifi_api_set_lbt (uint16_t cs_duration, uint32_t pause_time, uint32_t tx_res
 
 int wifi_api_get_mic_scan (bool *enable, bool *channel_move, uint32_t *cnt_detected)
 {
-	if (!enable || !channel_move)
+	if (nrc_wifi_get_mic_scan(enable, channel_move, cnt_detected) == WIFI_FAIL)
 		return -EINVAL;
-
-	system_modem_api_get_mic_scan(enable);
-	system_modem_api_get_mic_scan_move(channel_move);
-
-	if (cnt_detected)
-		*cnt_detected = system_modem_api_get_mic_detect_count();
 
 	return 0;
 }
 
 int wifi_api_set_mic_scan (bool enable, bool channel_move)
 {
-	system_modem_api_set_mic_scan(enable);
-	system_modem_api_set_mic_scan_move(channel_move);
-
+	nrc_wifi_set_mic_scan(enable, channel_move);
 	return 0;
 }
 
@@ -568,6 +601,41 @@ int wifi_api_set_bmt (uint32_t threshold)
 		system_modem_api_set_bmt_threshold(vif_id, threshold);
 		system_modem_api_enable_bmt(vif_id, true);
 	}
+
+	return 0;
+}
+
+int wifi_api_get_beacon_interval (uint16_t *beacon_interval)
+{
+	uint16_t listen_interval;
+	uint32_t listen_interval_tu;
+
+	if (!beacon_interval)
+		return -EINVAL;
+
+	if (nrc_wifi_get_listen_interval(vif_id, &listen_interval, &listen_interval_tu) != WIFI_SUCCESS)
+		return -1;
+
+	*beacon_interval = listen_interval_tu / listen_interval;
+
+	return 0;
+}
+
+int wifi_api_get_listen_interval (uint16_t *listen_interval, uint32_t *listen_interval_tu)
+{
+	if (!listen_interval || !listen_interval_tu)
+		return -EINVAL;
+
+	if (nrc_wifi_get_listen_interval(vif_id, listen_interval, listen_interval_tu) != WIFI_SUCCESS)
+		return -1;
+
+	return 0;
+}
+
+int wifi_api_set_listen_interval (uint16_t listen_interval)
+{
+	if (nrc_wifi_set_listen_interval(vif_id, listen_interval) != WIFI_SUCCESS)
+		return -1;
 
 	return 0;
 }
@@ -638,9 +706,9 @@ int wifi_api_remove_network (void)
 	return 0;
 }
 
-int wifi_api_start_scan (uint32_t timeout)
+int wifi_api_start_scan (char *ssid, uint32_t timeout)
 {
-	if (nrc_wifi_scan_timeout(vif_id, timeout, NULL) != WIFI_SUCCESS)
+	if (nrc_wifi_scan_timeout(vif_id, timeout, ssid) != WIFI_SUCCESS)
 		return -1;
 
 	return 0;
@@ -819,7 +887,7 @@ int wifi_api_start_dhcp_client (uint32_t timeout_msec)
 	set_dhcp_status(false);
 
 	if (wifi_api_set_ip_address(str_ip4addr_any, str_ip4addr_any, str_ip4addr_any) != 0)
-		_atcmd_error("failed to reset ip address\n");
+		_atcmd_error("failed to reset ip address");
 
 	if (dhcp_run(vif_id) < 0)
 		return DHCP_FAIL;
@@ -853,7 +921,7 @@ int wifi_api_start_deep_sleep (uint32_t timeout, uint8_t gpio)
 
 		if (nrc_ps_set_gpio_wakeup_pin(debounce, gpio) != NRC_SUCCESS)
 		{
-			_atcmd_error("failed to set wakeup pin\n");
+			_atcmd_error("failed to set wakeup pin");
 			return -1;
 		}
 
@@ -862,7 +930,7 @@ int wifi_api_start_deep_sleep (uint32_t timeout, uint8_t gpio)
 
 	if (nrc_ps_set_wakeup_source(wakeup_source) != NRC_SUCCESS)
 	{
-		_atcmd_error("failed to set wakeup source\n");
+		_atcmd_error("failed to set wakeup source");
 		return -1;
 	}
 
@@ -877,7 +945,7 @@ int wifi_api_start_deep_sleep (uint32_t timeout, uint8_t gpio)
 
 	if (err != NRC_SUCCESS)
 	{
-		_atcmd_error("failed to start deep sleep\n");
+		_atcmd_error("failed to start deep sleep");
 		return -1;
 	}
 
@@ -901,11 +969,11 @@ bool wifi_api_wakeup_done (void)
 
 int wifi_api_start_softap (int bw, int freq, char *ssid,
 							char *security, char *password,
-							uint32_t timeout)
+							int ssid_type, uint32_t timeout)
 {
 	tWIFI_SECURITY sec_mode = WIFI_SEC_MAX;
 
-	if (freq <= 0 || !ssid || !security)
+	if (freq <= 0 || !ssid || !security || (ssid_type < 0 || ssid_type > 2))
 		return -EINVAL;
 
 	if (bw != WIFI_1M && bw != WIFI_2M && bw != WIFI_4M)
@@ -929,7 +997,7 @@ int wifi_api_start_softap (int bw, int freq, char *ssid,
 
 		bw = wifi_bw[bw_index];
 
-		_atcmd_info("%s: bandwidth=%d s1g_freq=%d\n", __func__, bw, freq);
+		_atcmd_info("%s: bandwidth=%d s1g_freq=%d", __func__, bw, freq);
 	}
 
 	if (strcmp(security, "open") == 0)
@@ -949,6 +1017,14 @@ int wifi_api_start_softap (int bw, int freq, char *ssid,
 			return -1;
 	}
 
+	if (nrc_wifi_softap_set_ignore_broadcast_ssid(vif_id, ssid_type) != WIFI_SUCCESS)
+		return -1;
+
+/*	ssid_type = -1;
+	if (nrc_wifi_softap_get_ssid_type(vif_id, &ssid_type) != WIFI_SUCCESS)
+		return -1;
+	_atcmd_debug("%s: ssid_type=%d", __func__, ssid_type); */
+
 	if (nrc_wifi_softap_set_conf(vif_id, ssid, freq, bw, sec_mode, password) != WIFI_SUCCESS)
 		return -1;
 
@@ -966,9 +1042,20 @@ int wifi_api_stop_softap (void)
 	return 0;
 }
 
-int wifi_api_get_max_sta_aid (void)
+int wifi_api_get_max_num_sta (uint8_t *max_num_sta)
 {
-	return MAX_STA;
+	if (nrc_wifi_softap_get_max_num_sta(vif_id, max_num_sta) != WIFI_SUCCESS)
+		return -1;
+
+	return 0;
+}
+
+int wifi_api_set_max_num_sta (uint8_t max_num_sta)
+{
+	if (nrc_wifi_softap_set_max_num_sta(vif_id, max_num_sta) != WIFI_SUCCESS)
+		return -1;
+
+	return 0;
 }
 
 int wifi_api_get_sta_info (int aid, char *maddr, int8_t *rssi, uint8_t *snr, uint8_t *tx_mcs, uint8_t *rx_mcs)
@@ -994,9 +1081,9 @@ int wifi_api_get_sta_info (int aid, char *maddr, int8_t *rssi, uint8_t *snr, uin
 	return 0;
 }
 
-int wifi_api_set_bss_max_idle (int period, int retry_cnt)
+int wifi_api_set_bss_max_idle (uint16_t period, uint8_t retry_cnt)
 {
-	if (period < 0 || retry_cnt < 0)
+	if (retry_cnt == 0)
 		return -EINVAL;
 
 	if (nrc_wifi_softap_set_bss_max_idle(vif_id, period, retry_cnt) != WIFI_SUCCESS)

@@ -161,7 +161,7 @@ typedef struct{
 	uint8_t					efuse0F;
 }st_efuse_t;
 
-void drv_efuse_read(uint32_t addr, uint32_t * data);
+void drv_efuse_read(uint32_t id, uint32_t addr, uint32_t *buf);
 uint8_t drv_efuse_compute_crc7(const uint8_t * data, uint8_t len);
 uint8_t hspi_crc7(char *data, int len);
 

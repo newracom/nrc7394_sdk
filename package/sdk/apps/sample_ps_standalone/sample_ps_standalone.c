@@ -45,7 +45,11 @@ nvs_handle_t nvs_handle;
 /* in ms. STA wakes up if sleep time is expired during deep sleep*/
 #define SLEEP_TIME_MS 0 // ms
 
+#ifdef NRC7292
 //#define WAKEUP_GPIO_PIN 15
+#elif defined(NRC7394)
+//#define WAKEUP_GPIO_PIN 17
+#endif
 
 static void user_operation(uint32_t delay_ms)
 {

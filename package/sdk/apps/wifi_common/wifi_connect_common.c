@@ -31,8 +31,10 @@
 #include "driver_nrc.h"
 #ifdef SUPPORT_ETHERNET_ACCESSPOINT
 #include "nrc_eth_if.h"
-#include "nrc_lwip.h"
 #endif
+
+#include "nrc_lwip.h"
+
 #if LWIP_BRIDGE
 #include "netif/bridgeif.h"
 extern struct netif br_netif;
@@ -59,47 +61,44 @@ static uint32_t conn_wait_ms = 60 * 1000;
 
 static void wifi_event_handler(int vif, tWIFI_EVENT_ID event, int data_len, void *data)
 {
-	int vif_id = vif;
 	char* ip_addr = NULL;
 	tWIFI_STATUS ret = WIFI_FAIL;
 	int cnt = 0;
 	tWIFI_IP_MODE ip_mode;
-	WIFI_CONFIG* wifi_config = nrc_get_global_wifi_config_with_vif(vif);
+	WIFI_CONFIG* wifi_config = nrc_get_global_wifi_config();
 
 	switch(event) {
 		case WIFI_EVT_CONNECT_SUCCESS:
-			nrc_usr_print("[%s] Receive Connection Success Event for Interface %d\n", __func__, vif_id);
-			if (!netif_is_link_up(nrc_netif[vif_id])) {
-				netif_set_link_up(nrc_netif[vif_id]);
+			nrc_usr_print("[%s] Receive Connection Success Event for Interface %d\n", __func__, vif);
+			if (!netif_is_link_up(nrc_netif[vif])) {
+				netif_set_link_up(nrc_netif[vif]);
 			}
 
-#ifdef SUPPORT_ETHERNET_ACCESSPOINT
 #if LWIP_BRIDGE
 			if (wifi_config->network_mode == WIFI_NETWORK_MODE_BRIDGE) {
-				nrc_usr_print("[%s] Adding nrc_netif[%d] to bridge...\n", __func__, vif_id);
-				bridgeif_add_port(&br_netif, nrc_netif[vif_id]);
+				nrc_usr_print("[%s] Adding nrc_netif[%d] to bridge...\n", __func__, vif);
+				bridgeif_add_port(&br_netif, nrc_netif[vif]);
 				if (wifi_config->ip_mode !=  WIFI_STATIC_IP) {
-					wifi_station_dhcpc_start(0);
+					wifi_station_dhcpc_start(vif);
 				}
 				break;
 			}
 #endif /* LWIP_BRIDGE */
-#endif /* SUPPORT_ETHERNET_ACCESSPOINT */
-			nrc_wifi_get_ip_mode(vif_id, &ip_mode);
+			nrc_wifi_get_ip_mode(vif, &ip_mode);
 			if ((ip_mode == WIFI_DYNAMIC_IP) && (!override_ip_to_static)) {
 				while(1){
-					ret = nrc_wifi_set_ip_address(vif_id, ip_mode, NULL, NULL, NULL);
+					ret = nrc_wifi_set_ip_address(vif, ip_mode, NULL, NULL, NULL);
 					if(ret == WIFI_SUCCESS) {
-						sprintf(static_ip4, "%s", ipaddr_ntoa(&nrc_netif[vif_id]->ip_addr));
-						sprintf(static_netmask, "%s", ipaddr_ntoa(&nrc_netif[vif_id]->netmask));
-						sprintf(static_gateway, "%s", ipaddr_ntoa(&nrc_netif[vif_id]->gw));
+						sprintf(static_ip4, "%s", ipaddr_ntoa(&nrc_netif[vif]->ip_addr));
+						sprintf(static_netmask, "%s", ipaddr_ntoa(&nrc_netif[vif]->netmask));
+						sprintf(static_gateway, "%s", ipaddr_ntoa(&nrc_netif[vif]->gw));
 						break;
 					} else {
 						cnt++;
 						nrc_usr_print("[%s] Try to get IP addr(cnt %d)\n", __func__,cnt);
 #if defined(INCLUDE_DHCP_BACKOFF)
 						int backoff_time = 0;
-						nrc_wifi_stop_dhcp_client(vif_id);
+						nrc_wifi_stop_dhcp_client(vif);
 						if(cnt > nrc_get_backoff_start_count())
 							backoff_time = generateRandomBackoff((cnt - nrc_get_backoff_start_count()));
 						for(int i=0; i < backoff_time; i++)
@@ -114,7 +113,7 @@ static void wifi_event_handler(int vif, tWIFI_EVENT_ID event, int data_len, void
 				nrc_usr_print("[%s] netmask : %s\n", __func__, static_netmask);
 				nrc_usr_print("[%s] gateway : %s\n", __func__, static_gateway);
 			} else {
-				ret = nrc_wifi_set_ip_address(vif_id, ip_mode, static_ip4, static_netmask, static_gateway);
+				ret = nrc_wifi_set_ip_address(vif, ip_mode, static_ip4, static_netmask, static_gateway);
 				if(ret != WIFI_SUCCESS) {
 					nrc_usr_print("[%s] Fail to set IP addr(cnt %d)\n", __func__,cnt);
 				}
@@ -139,11 +138,11 @@ static void wifi_event_handler(int vif, tWIFI_EVENT_ID event, int data_len, void
 			if (ipaddr_aton(static_ip6, &addr)) {
 				int8_t index = 0;
 				/* Set static ipv6 address to available slot in netif */
-				if (netif_add_ip6_address(nrc_netif[vif_id], &addr.u_addr.ip6, &index) != ERR_OK) {
+				if (netif_add_ip6_address(nrc_netif[vif], &addr.u_addr.ip6, &index) != ERR_OK) {
 					nrc_usr_print("[%s] adding %s failed\n", __func__, static_ip6);
 					return;
 				}
-				netif_ip6_addr_set_state(nrc_netif[vif_id], index, IP6_ADDR_PREFERRED);
+				netif_ip6_addr_set_state(nrc_netif[vif], index, IP6_ADDR_PREFERRED);
 			}
 #endif
 			break;
@@ -152,8 +151,8 @@ static void wifi_event_handler(int vif, tWIFI_EVENT_ID event, int data_len, void
 			nrc_usr_print("[%s] Receive Disconnection Event\n", __func__);
 #endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
 			/* send netif down indication to LWIP */
-			if (netif_is_link_up(nrc_netif[vif_id])) {
-				netif_set_link_down(nrc_netif[vif_id]);
+			if (netif_is_link_up(nrc_netif[vif])) {
+				netif_set_link_down(nrc_netif[vif]);
 			}
 			break;
 		case WIFI_EVT_SCAN_DONE:
@@ -165,13 +164,13 @@ static void wifi_event_handler(int vif, tWIFI_EVENT_ID event, int data_len, void
 #if !defined(INCLUDE_MEASURE_AIRTIME)
 			nrc_usr_print("[%s] Receive Start Soft AP Event\n", __func__);
 #endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
-#ifdef SUPPORT_ETHERNET_ACCESSPOINT
+
 #if LWIP_BRIDGE
 			if (wifi_config->network_mode == WIFI_NETWORK_MODE_BRIDGE) {
-				bridgeif_add_port(&br_netif, nrc_netif[vif_id]);
+				bridgeif_add_port(&br_netif, nrc_netif[vif]);
 			}
 #endif /* LWIP_BRIDGE */
-#endif /* SUPPORT_ETHERNET_ACCESSPOINT */
+
 			break;
 		case WIFI_EVT_AP_STA_CONNECTED:
 #if !defined(INCLUDE_MEASURE_AIRTIME)
@@ -181,7 +180,7 @@ static void wifi_event_handler(int vif, tWIFI_EVENT_ID event, int data_len, void
 			/* Check STA Info */
 			STA_INFO *sta = nrc_mem_malloc(sizeof(STA_INFO));
 			if (sta) {
-				nrc_wifi_softap_get_sta_by_addr(vif_id, (uint8_t *)data, sta);
+				nrc_wifi_softap_get_sta_by_addr(vif, (uint8_t *)data, sta);
 				nrc_usr_print("STA  - state:%d aid:%d addr:"MACSTR" rssi:%d snr:%u\n",
 					sta->state, sta->aid, MAC2STR(sta->addr), sta->rssi, sta->snr);
 				nrc_mem_free(sta);
@@ -283,11 +282,6 @@ tWIFI_STATUS wifi_init_with_vif(int vif, WIFI_CONFIG *param)
 		nrc_usr_print("[%s] Fail set TX Power\n", __func__);
 		return WIFI_FAIL;
 	}
-	txpower = 0;
-	nrc_wifi_get_tx_power(&txpower);
-#if !defined(INCLUDE_MEASURE_AIRTIME)
-	nrc_usr_print("[%s] TX Power (%d dBm)\n", __func__, txpower);
-#endif /* !defined(INCLUDE_MEASURE_AIRTIME)	*/
 
 	if (nrc_wifi_add_network(vif) < 0) {
 		nrc_usr_print("[%s] Fail to init \n", __func__);
@@ -345,11 +339,6 @@ tWIFI_STATUS wifi_connect_with_vif(int vif, WIFI_CONFIG *param)
 		}
 	}
 
-#if defined(INCLUDE_ESL_PARAM)
-	system_modem_api_ps_set_ret_short_beacon_interval(param->short_bcn_interval);
-	system_modem_api_ps_set_ret_beacon_interval(param->bcn_interval);
-#endif
-
 	/* Set Non-S1G channel */
 	if(param->channel != 0) {
 		if(nrc_wifi_set_channel_freq(vif, param->channel) != WIFI_SUCCESS) {
@@ -381,6 +370,12 @@ tWIFI_STATUS wifi_connect_with_vif(int vif, WIFI_CONFIG *param)
 			return WIFI_FAIL;
 		}
 	}
+
+	if (nrc_wifi_set_listen_interval(vif, param->listen_interval) != WIFI_SUCCESS) {
+		nrc_usr_print("[%s] Fail to set listen interval\n", __func__);
+		return WIFI_FAIL_CONNECT;
+	}
+
 
 	if (nrc_wifi_connect(vif, param->conn_timeout) != WIFI_SUCCESS) {
 		nrc_usr_print("[%s] Fail to Connect\n", __func__);
@@ -425,8 +420,18 @@ tWIFI_STATUS wifi_start_softap_with_vif(int vif, WIFI_CONFIG *param)
 		return WIFI_FAIL;
 	}
 
-	if(nrc_wifi_softap_set_hidden_ssid(vif, param->hidden_ssid) != WIFI_SUCCESS) {
+	if(nrc_wifi_softap_set_ignore_broadcast_ssid(vif, param->ignore_broadcast_ssid) != WIFI_SUCCESS) {
 		nrc_usr_print("[%s] Fail to set hidden ssid\n", __func__);
+		return WIFI_FAIL;
+	}
+
+	if(nrc_wifi_softap_set_max_num_sta(vif,  param->max_num_sta) != WIFI_SUCCESS) {
+		nrc_usr_print("[%s] Fail to set max_num_sta\n", __func__);
+		return WIFI_FAIL;
+	}
+
+	if(nrc_wifi_softap_set_beacon_interval(vif,  param->bcn_interval) != WIFI_SUCCESS) {
+		nrc_usr_print("[%s] Fail to set bcn_interval %d\n", __func__, param->bcn_interval);
 		return WIFI_FAIL;
 	}
 

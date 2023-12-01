@@ -48,8 +48,7 @@ typedef struct  {
 	uint8_t scan_freq_num;
 	uint16_t channel;
 	uint8_t bw;
-	int bcn_interval;
-	int short_bcn_interval;
+	uint16_t bcn_interval;
 	uint8_t ip_mode;
 	char static_ip[MAX_STATIC_IP_LENGTH+1];
 	char netmask[MAX_STATIC_IP_LENGTH+1];
@@ -72,7 +71,9 @@ typedef struct  {
 	uint8_t mcs;
 	uint8_t gi;
 	int8_t cca_thres;
-	uint8_t hidden_ssid;
+	uint8_t ignore_broadcast_ssid;
+	uint8_t max_num_sta;
+	uint16_t listen_interval;
 }WIFI_CONFIG;
 #define WIFI_CONFIG_SIZE	sizeof (WIFI_CONFIG)
 
@@ -97,9 +98,11 @@ typedef struct  {
  *
  * @param wifi configuration ptr
  *
+ * @param rewrite whether to forcefully rewrite configuration
+ *
  * @return nrc_err_t
  **********************************************************************/
-nrc_err_t nrc_save_wifi_config(WIFI_CONFIG* wifi_config);
+nrc_err_t nrc_save_wifi_config(WIFI_CONFIG* wifi_config, int rewrite);
 
 
 /*********************************************************************
@@ -159,72 +162,6 @@ nrc_err_t nrc_erase_all_wifi_nvs(void);
  * @return wifi configuration ptr
  *********************************************************************/
 WIFI_CONFIG* nrc_get_global_wifi_config(void);
-
-
-/*********************************************************************
- * @fn nrc_save_wifi_config_with_vif
- *
- * @brief Save wifi configration to key+value storage with vif
- *
- * @param vif
- *
- * @param wifi configuration ptr
- *
- * @return nrc_err_t
- **********************************************************************/
-nrc_err_t nrc_save_wifi_config_with_vif(int vif, WIFI_CONFIG* wifi_config);
-
-
-/*********************************************************************
- * @fn print_settings_with_vif
- *
- * @brief Print settings to debug serial port with vif
- *
- * @param vif
- *
- * @param wifi configuration ptr
- *
- * @return none
- **********************************************************************/
-void print_settings_with_vif(int vif, WIFI_CONFIG* wifi_config);
-
-
-/*********************************************************************
- * @fn nrc_wifi_set_config_with_vif
- *
- * @brief set wifi configration data with vif
- *
- * @param vif
- *
- * @param wifi configuration ptr
- *
- * @return nrc_err_t
- **********************************************************************/
-nrc_err_t nrc_wifi_set_config_with_vif(int vif, WIFI_CONFIG* wifi_config);
-
-
-/*********************************************************************
- * @fn nrc_erase_all_wifi_nvs
- *
- * @brief Erase all wifi configuration in NVS
- *
- * @param vif
- *
- * @return nrc_err_t
- **********************************************************************/
-nrc_err_t nrc_erase_all_wifi_nvs_with_vif(int vif);
-
-
- /*********************************************************************
- * @fn nrc_get_global_wifi_config_with_vif
- *
- * @brief Get globally accessible configuration parameter
- *
- * @param vif
- *
- * @return wifi configuration ptr
- *********************************************************************/
-WIFI_CONFIG* nrc_get_global_wifi_config_with_vif(int vif);
 
 #ifdef __cplusplus
 }

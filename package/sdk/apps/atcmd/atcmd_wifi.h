@@ -56,9 +56,9 @@
 /*
  * Default Settings
  */
-#define ATCMD_WIFI_INIT_COUNTRY			"US"
-#define ATCMD_WIFI_INIT_TXPOWER			24
-#define ATCMD_WIFI_INIT_TXPOWER_TYPE	24
+/* #define ATCMD_WIFI_INIT_COUNTRY			"US" */
+
+#define ATCMD_WIFI_INIT_TXPOWER_TYPE	TX_POWER_AUTO
 
 #define ATCMD_WIFI_INIT_SSID			"halow"
 #define ATCMD_WIFI_INIT_BSSID			"00:00:00:00:00:00"
@@ -69,7 +69,8 @@
 #define ATCMD_WIFI_INIT_PING_COUNT		5
 #define ATCMD_WIFI_INIT_PING_SIZE		64
 
-#define ATCMD_WIFI_BSS_MAX_IDLE_PERIOD		0
+#define ATCMD_WIFI_BSS_MAX_IDLE_PERIOD_MIN	1
+#define ATCMD_WIFI_BSS_MAX_IDLE_PERIOD_MAX	65535
 #define ATCMD_WIFI_BSS_MAX_IDLE_RETRY_MIN	3
 #define ATCMD_WIFI_BSS_MAX_IDLE_RETRY_MAX	100
 
@@ -77,8 +78,15 @@
 /*
  * RSSI
  */
-#define ATCMD_WIFI_RSSI_MAX		0
 #define ATCMD_WIFI_RSSI_MIN		-128
+#define ATCMD_WIFI_RSSI_MAX		0
+
+
+/*
+ * TX Power
+ */
+#define ATCMD_WIFI_TXPOWER_MIN		WIFI_TX_POWER_MIN
+#define ATCMD_WIFI_TXPOWER_MAX		WIFI_TX_POWER_MAX
 
 
 /*
@@ -113,19 +121,25 @@ enum ATCMD_WIFI_EVENT
 
 /**********************************************************************************************/
 
-typedef uint32_t atcmd_wifi_event_t;
 typedef uint8_t atcmd_wifi_power_t;
-
-typedef char atcmd_wifi_ipaddr_t[ATCMD_WIFI_IPADDR_LEN_MAX + 1];
-typedef char atcmd_wifi_macaddr_t[ATCMD_WIFI_MACADDR_LEN + 1];
-typedef char atcmd_wifi_country_t[ATCMD_WIFI_COUNTRY_LEN + 1];
-typedef char atcmd_wifi_ssid_t[ATCMD_WIFI_SSID_LEN_MAX + 1];
-typedef char atcmd_wifi_bssid_t[ATCMD_WIFI_BSSID_LEN + 1];
-typedef char atcmd_wifi_security_t[ATCMD_WIFI_SECURITY_LEN_MAX + 1];
-typedef char atcmd_wifi_password_t[ATCMD_WIFI_PASSWORD_LEN_MAX + 1];
+typedef uint32_t atcmd_wifi_event_t;
 
 typedef wifi_channel_t atcmd_wifi_channel_t;
 typedef wifi_channels_t atcmd_wifi_channels_t;
+
+typedef char atcmd_wifi_country_t[ATCMD_WIFI_COUNTRY_LEN + 1];
+typedef char atcmd_wifi_macaddr_t[ATCMD_WIFI_MACADDR_LEN + 1];
+typedef char atcmd_wifi_bssid_t[ATCMD_WIFI_BSSID_LEN + 1];
+typedef char atcmd_wifi_ssid_t[ATCMD_WIFI_SSID_LEN_MAX + 1];
+typedef char atcmd_wifi_security_t[ATCMD_WIFI_SECURITY_LEN_MAX + 1];
+typedef char atcmd_wifi_password_t[ATCMD_WIFI_PASSWORD_LEN_MAX + 1];
+typedef char atcmd_wifi_ipaddr_t[ATCMD_WIFI_IPADDR_LEN_MAX + 1];
+
+typedef struct
+{
+	enum TX_POWER_TYPE type;
+	atcmd_wifi_power_t val;	
+} atcmd_wifi_txpower_t;
 
 typedef struct
 {
@@ -167,10 +181,21 @@ typedef struct
 
 	struct
 	{
-		int period;
-		int retry;
+		uint8_t system;
+		uint8_t current;
+	} max_num_sta;
+
+	struct
+	{
+		uint16_t period;
+		uint8_t retry;
 	} bss_max_idle;
 
+#define ATCMD_WIFI_SSID_FULL	WIFI_IGNORE_BROADCAST_SSID_FULL
+#define ATCMD_WIFI_SSID_EMPTY	WIFI_IGNORE_BROADCAST_SSID_EMPTY
+#define ATCMD_WIFI_SSID_CLEAR	WIFI_IGNORE_BROADCAST_SSID_CLEAR
+
+	int ssid_type;
 	atcmd_wifi_ssid_t ssid;
 	atcmd_wifi_security_t security;
 	atcmd_wifi_password_t password;
@@ -185,7 +210,7 @@ typedef struct
 
 	atcmd_wifi_country_t country;
 	atcmd_wifi_channels_t supported_channels;
-	atcmd_wifi_power_t txpower;
+	atcmd_wifi_txpower_t txpower;
 
 	atcmd_wifi_scan_t scan;
 	atcmd_wifi_connect_t connect;

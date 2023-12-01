@@ -48,6 +48,19 @@ static char* html_orig=NULL;
 #define HTML_BUF_LEN 14 * 1024
 #define COMPRESSED_HTML_BUF_LEN 7 * 1024
 
+static const char rebooting_element[] = R"rawliteral(
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Rebooting...</title>
+</head>
+<body>
+	<h1>Rebooting...</h1>
+	<p>Close the browser and reconnect...</p>
+</body>
+</html>
+)rawliteral";
+
 /**
  * @brief insert new string in place of old string within destination string
  *
@@ -157,8 +170,8 @@ subst_wifi_values(char* html, WIFI_CONFIG* wifi_config)
 				case WIFI_DHCPSERVER_SUBST:
 					snprintf(val, sizeof(val) - 1, "%d", wifi_config->dhcp_server);
 					break;
-				case WIFI_SHORT_BCN_SUBST:
-					snprintf(val, sizeof(val) - 1, "%d", wifi_config->short_bcn_interval);
+				case WIFI_BEACON_INTERVAL_SUBST:
+					snprintf(val, sizeof(val) - 1, "%d", wifi_config->bcn_interval);
 					break;
 				case WIFI_TXPOWER_SUBST:
 					snprintf(val, sizeof(val) - 1, "%d", wifi_config->tx_power);
@@ -219,7 +232,7 @@ setup_page_http(httpd_req_t* req)
 	subst_wifi_values(html_buffer, wifi_config);
 
 	ret_httpd_resp = httpd_resp_send(req, html_buffer, strlen(html_buffer));
-	vTaskDelay(pdMS_TO_TICKS(300));
+	_delay_ms(1000);
 
 	if (ret_httpd_resp != ESP_OK) {
 		nrc_usr_print("[%s] Failed to send HTTP response: 0x%04x\n", __func__, ret_httpd_resp);
@@ -343,7 +356,7 @@ update_settings_handler(httpd_req_t* req)
 
 			if (httpd_query_key_value(html_buffer, "bcn_interval", (char*)tmp, sizeof(tmp)) == ESP_OK) {
 				nrc_usr_print("[%s] Found URL query parameter => bcn_interval=%s\n", __func__, tmp);
-				wifi_config->short_bcn_interval = atoi(tmp);
+				wifi_config->bcn_interval= atoi(tmp);
 			}
 
 			if (httpd_query_key_value(html_buffer, "txpower", (char*)tmp, sizeof(tmp)) == ESP_OK) {
@@ -425,11 +438,7 @@ update_settings_handler(httpd_req_t* req)
 		}
 		wifi_config->network_mode = WIFI_NETWORK_MODE_BRIDGE;
 
-		nrc_save_wifi_config(wifi_config);
-
-		_delay_ms(1000);
-
-		nrc_sw_reset();
+		nrc_save_wifi_config(wifi_config, 1);
 
 		return ESP_OK;
 	}
@@ -442,6 +451,23 @@ httpd_uri_t update_settings = {
 	.method = HTTP_GET,
 	.handler = update_settings_handler,
 	.user_ctx = NULL,
+};
+
+static esp_err_t reboot_page_handler(httpd_req_t *req)
+{
+	esp_err_t ret = httpd_resp_send(req, rebooting_element, strlen(rebooting_element));
+
+	_delay_ms(2000);
+	nrc_sw_reset();
+
+	return ESP_OK;
+}
+
+static httpd_uri_t rebooting = {
+	.uri       = "/rebooting",
+	.method    = HTTP_GET,
+	.handler   = reboot_page_handler,
+	.user_ctx  = NULL
 };
 
 /**
@@ -556,6 +582,7 @@ run_http_server(WIFI_CONFIG* wifi_config)
 		httpd_register_uri_handler(http_server, &setup_page);
 		httpd_register_uri_handler(http_server, &update_settings);
 		httpd_register_uri_handler(http_server, &favicon_setup);
+		httpd_register_uri_handler(http_server, &rebooting);
 
 		nrc_usr_print("[%s]: http server started\n", __func__);
 

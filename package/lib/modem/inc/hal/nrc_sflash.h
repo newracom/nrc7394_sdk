@@ -1,6 +1,8 @@
 #if !defined(__NRC_SFLASH_H__)
 #define __NRC_SFLASH_H__
 
+#define SF_SECTOR_SIZE            4096
+
 /* sysconfig BEGIN */
 #define SYSCONFIG_SECTOR_SIZE               4096
 #define SYSCONFIG_PRE_USER_FACTORY_SIZE      256

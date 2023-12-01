@@ -220,7 +220,8 @@ void lwif_input(struct nrc_wpa_if* intf, void *buffer, int data_len)
 		case ETHTYPE_IPV6:
 #endif	//LWIP_IPV6
 #if defined(SUPPORT_ETHERNET_ACCESSPOINT)
-			if (nrc_eth_get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
+			if (!nrc_get_use_4address() &&
+			    (nrc_eth_get_network_mode() == NRC_NETWORK_MODE_BRIDGE)) {
 				ip_hdr = (struct ip_hdr *)(p->payload + SIZEOF_ETH_HDR);
 				if (!intf->is_ap) { // br0 mac == wlan0 mac
 					if (ip_hdr->dest.addr != 0 && ip_hdr->dest.addr != 0xffffffff
@@ -230,8 +231,8 @@ void lwif_input(struct nrc_wpa_if* intf, void *buffer, int data_len)
 						) {
 						memcpy(ethhdr->dest.addr, get_peer_mac()->addr, 6);
 						}
-					}
 				}
+			}
 	next:
 #endif
 			/* full packet send to tcpip_thread to process */

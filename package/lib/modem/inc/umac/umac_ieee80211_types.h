@@ -674,6 +674,13 @@ typedef  struct {
 	uint8_t		asel_capabilities;
 } ie_ht_capabilities;
 
+// EID 48: RSN
+typedef struct {
+	uint8_t		eid;
+	uint8_t		length;
+	uint8_t		data[255];
+} ie_rsn;
+
 // EID 56: TIMEOUT INTERVAL
 typedef struct {
 	uint8_t		eid;
@@ -964,6 +971,13 @@ typedef struct {
 	uint8_t		command[REMOTECMD_COMMAND_MAX_LENGTH];
 } ie_vendor_remotecmd;
 #endif // INCLUDE_VENDOR_REMOTECMD
+
+// EID 244: RSN Extension
+typedef struct {
+	uint8_t		eid;
+	uint8_t		length;
+	uint8_t		data[255];
+} ie_rsn_extension;
 
 #pragma pack(pop)
 #endif

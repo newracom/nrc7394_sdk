@@ -75,6 +75,7 @@ extern int ip4_input_nat(struct pbuf *p, struct netif *inp);
 
 #ifdef CONFIG_IPV6
 #define LWIP_IPV6                   1
+#define LWIP_IPV6_DHCP6             1
 #else
 #define LWIP_IPV6                   0
 #endif
@@ -136,6 +137,7 @@ extern int ip4_input_nat(struct pbuf *p, struct netif *inp);
 #define IP6_DEBUG                  LWIP_DBG_OFF
 #define DHCP6_DEBUG                LWIP_DBG_OFF
 #define RAW_DEBUG                  LWIP_DBG_OFF
+#define SNTP_DEBUG                 LWIP_DBG_OFF
 #endif
 
 #define LWIP_DBG_TYPES_ON (LWIP_DBG_ON|LWIP_DBG_TRACE|\
@@ -419,5 +421,16 @@ a lot of data that needs to be copied, this should be set high. */
 /* validates source IP addresses for incoming IPv4 packets.
  It drops packets with source addresses matching the local IP address */
 #define LWIP_IPV4_CHECK_SRC_ADDR              1
+
+/* To update KEEPALIVE option during operations */
+#define LWIP_TCP_KEEPALIVE_TICK_UPDATE		1
+
+#define SNTP_SERVER_DNS            1
+
+extern void sntp_set_system_time (unsigned long sec, unsigned long us);
+#define SNTP_SET_SYSTEM_TIME_US(sec, us) 	sntp_set_system_time(sec, us)
+
+extern void sntp_get_system_time (unsigned long *sec, unsigned long *us);
+#define SNTP_GET_SYSTEM_TIME(sec, us) 		sntp_get_system_time(sec, us)
 
 #endif /* __LWIPOPTS_H__ */

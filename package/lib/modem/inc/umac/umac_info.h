@@ -4,6 +4,7 @@
 #include "system.h"
 #include "umac_ieee80211_types.h"
 #include "lmac_common.h"
+#include "lmac_rate_control.h"
 #if defined(INCLUDE_DEFRAG)
 #include "util_sysbuf_queue.h"
 #endif
@@ -49,16 +50,20 @@ typedef struct _STA_BASIC_INFO {
 } __attribute__((packed)) STA_BASIC_INFO;
 
 /* QoS Sequence Number Info*/
-typedef struct _TX_QOS_SN {
-	uint16_t tx_sn: 12;
+typedef struct _RX_QOS_SN {
 	uint16_t win_end : 12;
 	uint16_t win_start: 12;
 	uint64_t win_bitmap: 16;
+}__attribute__((packed)) RX_QOS_SN;
+
+typedef struct _TX_QOS_SN {
+	uint16_t tx_sn: 12;
 }__attribute__((packed)) TX_QOS_SN;
 
 /* Sequence Number Info*/
 typedef struct _SN_INFO {
-	TX_QOS_SN qos_sn[MAX_TID];
+	RX_QOS_SN qos_rx_sn[MAX_TID];
+	TX_QOS_SN qos_tx_sn[MAX_TID];
 	uint16_t rx_sn: 12;
 } __attribute__((packed)) SN_INFO;
 
@@ -70,10 +75,10 @@ typedef struct _AMPDU_INFO {
 } __attribute__((packed)) AMPDU_INFO;
 
 /* BSS Max Idle Info */
-typedef struct _BSS_IDLE_INFO {
-	bool idle_period_option;
-	uint16_t max_idle_period;
-} __attribute__((packed)) BSS_IDLE_INFO;
+// typedef struct _BSS_IDLE_INFO {
+// 	bool idle_period_option;
+// 	uint16_t max_idle_period;
+// } __attribute__((packed)) BSS_IDLE_INFO;
 
 /* S1G Capa Info */
 typedef struct _S1G_CAPA {
@@ -90,7 +95,7 @@ typedef struct _S1G_CAPA {
 	uint8_t traveling_pilot_support:1;
 	uint8_t maximum_mpdu_length:1;
 	uint8_t maximum_ampdu_length_exp: 2;
-	uint8_t reserved: 2;
+	uint8_t supported_ch_width: 2;
 	uint8_t color:3;
 	uint8_t minimum_mpdu_start_spacing: 3;
 	uint8_t reserved2: 2;
@@ -124,7 +129,12 @@ typedef struct _CIPHER_INFO {
 typedef struct _KEY_INFO {
 	uint16_t key_aid;
 	uint8_t key_addr[MAC_ADDR_LEN];
+#if defined (INCLUDE_IBSS) && defined(NRC7394)
+    /* Each IBSS STA has own GTK. Array 0, 1 for PTK0/1 and 2,3 for GTK1/2 */
+	CIPHER_INFO cipher_info[4];
+#else
 	CIPHER_INFO cipher_info[MAX_UINFO_KEY_ID];
+#endif
 } __attribute__((packed)) KEY_INFO;
 
 #if defined(INCLUDE_TWT_SUPPORT)
@@ -182,6 +192,7 @@ typedef struct _DEFRAG_INFO {
 }__attribute__((packed)) DEFRAG_INFO;
 #endif/* INCLUDE_DEFRAG */
 
+
 typedef struct _MCS_INFO {
 	uint8_t last_tx_mcs:4;
 	uint8_t last_rx_mcs:4;
@@ -193,7 +204,6 @@ typedef struct _M_SIG_INFO{
 	//int8_t snr_avg;
 	//int8_t snr_last;
 }__attribute__((packed)) M_SIG_INFO;
-
 
 /**************************************************************
 	APINFO (Common)
@@ -213,6 +223,10 @@ typedef struct _APINFO{
 	SECURITY_INFO m_secrurity;
 	KEY_INFO m_key;
 	M_SIG_INFO msig;
+#if defined(INCLUDE_MULTI_STA_RC)
+	//PER_NODE m_rc_node;
+	//PER_NODE *m_rc_node_p;
+#endif
 } __attribute__((packed)) APINFO;
 
 /**************************************************************
@@ -224,7 +238,7 @@ typedef struct _STAINFO {
 	STA_STATE m_state;
 	STA_BASIC_INFO m_binfo;
 	AMPDU_INFO m_ampdu[MAX_AC];
-	BSS_IDLE_INFO m_bssidle;
+	// BSS_IDLE_INFO m_bssidle;
 	S1G_CAPA m_s1g;
 	SN_INFO m_sn;
 	KEY_INFO m_key;
@@ -241,6 +255,15 @@ typedef struct _STAINFO {
 	DEFRAG_INFO m_defrags;
 #endif
 	MCS_INFO m_mcs;
+#if defined(INCLUDE_MULTI_STA_RC)
+#ifndef DYN_NODE_ALLOC
+	PER_NODE m_rc_node;
+#endif
+	PER_NODE *m_rc_node_p;
+#endif
+#if defined(INCLUDE_MANAGE_BLACKLIST)
+	uint8_t tx_retry_limit_cnt;
+#endif
 } __attribute__((packed)) STAINFO;
 
 /**************************************************************
@@ -270,7 +293,7 @@ APINFO * get_apinfo_by_vifid(int8_t vif_id);
 void clear_apinfo(int8_t vif_id);
 
 #if defined(INCLUDE_7393_7394_WORKAROUND)
-uint16_t get_keyinfo_hw_index(int8_t vif_id, uint16_t aid, uint8_t key_id, enum key_type key_type);
+uint16_t get_keyinfo_hw_index(int8_t vif_id, uint16_t aid, uint8_t key_id, enum key_type key_type, uint8_t *addr);
 void set_keyinfo(int8_t vif_id, uint16_t aid, enum key_type key_type, uint8_t key_id, uint32_t *key, uint8_t *addr, uint16_t index);
 #else
 /* (COMMON) Set KEY(PTK/GTK) INFO in stainfo or apinfo */
@@ -280,8 +303,12 @@ void set_keyinfo(int8_t vif_id, uint16_t aid, enum key_type key_type, uint8_t ke
 /* (COMMON) Get KEY(PTK/GTK) INFO in stainfo or apinfo */
 bool get_keyinfo(int8_t vif_id, uint16_t sta_idx, uint8_t key_id, struct cipher_def *lmc, enum key_type key_type, bool is_tx_gtk);
 
+#if defined(NRC7394) && defined(INCLUDE_IBSS)
+void clear_keyinfo(int8_t vif_id, uint16_t aid, enum key_type key_type, uint8_t key_id, uint8_t * addr);
+#else
 /* (COMMON) Clear KEY(PTK/GTK) INFO in stainfo or apinfo */
 void clear_keyinfo(int8_t vif_id, uint16_t aid, enum key_type key_type, uint8_t key_id);
+#endif
 
 bool get_keyinfo_by_addr(int8_t vif_id, uint8_t *addr, uint8_t key_id, struct cipher_def *lmc, enum key_type key_type, bool is_tx_gtk);
 
@@ -300,8 +327,11 @@ uint16_t get_aid_by_addr(int8_t vif_id, uint8_t* addr);
 /*(AP/MESH ONLY) Get stainfo with sta index */
 STAINFO * get_stainfo_by_index(int8_t vif_id, uint16_t sta_idx);
 
-/* (AP/MESH ONLY) Get number of asociated STA*/
+/* (AP/MESH ONLY) Get number of allocated STA*/
 uint16_t get_num_sta(int8_t vif_id);
+
+/* (AP/MESH ONLY) Get number of associated STA*/
+uint16_t get_num_assoc_sta(int8_t vif_id);
 
 /* (AP/MESH ONLY) Get number of stainfo of STA asociated with start/end idx */
 uint16_t get_num_stainfo(int8_t vif_id, uint16_t *start_idx, uint16_t *end_idx);
@@ -334,6 +364,7 @@ static inline APINFO * get_apinfo_by_vifid(int8_t vif_id) {return NULL;};
 static inline uint16_t get_aid_by_stainfo_index(int8_t vif_id, uint16_t sta_idx) {return 0;};
 static inline STAINFO* get_stainfo_by_index(int8_t vif_id, uint16_t sta_idx){return NULL;};
 static inline uint16_t get_num_sta(int8_t vif_id) {return 0;};
+static inline uint16_t get_num_assoc_sta(int8_t vif_id) {return 0;};
 static inline uint16_t get_num_stainfo(int8_t vif_id, uint16_t *start_idx, uint16_t *end_idx) {return 0;};
 #endif /* defined(INCLUDE_UMAC) */
 
@@ -342,4 +373,14 @@ void init_bssid_sta_aid_db(void);
 uint16_t alloc_ibss_sta_aid(uint8_t * addr);
 void dealloc_ibss_sta_aid(uint16_t aid, uint8_t * addr);
 #endif /* INCLUDE_IBSS */
+
+
+#if defined(INCLUDE_MULTI_STA_RC)
+PER_NODE *get_rc_node_from_stainfo_by_aid(uint8_t vif_id, uint16_t aid);
+PER_NODE *get_rc_node_of_stainfo(uint8_t vif_id, uint16_t aid);
+int umac_rc_peer_init (int8_t vif_id, STAINFO *sta);
+void umac_rc_peer_deinit (STAINFO *sta);
+#endif /* INCLUDE_MULTI_STA_RC */
+uint8_t get_rc_mcs_from_stainfo_by_aid (uint8_t vif_id, uint16_t aid);
+
 #endif

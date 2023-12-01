@@ -52,15 +52,21 @@ CONFIG_AVOID_FRAG_ATTACK=n
 
 # Fragmentation on target to support low MCS
 # Disable until SAM FW support assemble of fragmented frame
-CONFIG_DYNAMIC_FRAG=y
+CONFIG_DYNAMIC_FRAG=n
 
 # Support defragmentation at lmac for both HM & SAM mode
 CONFIG_DEFRAG=y
+
+# Support Multi STA Rate Control
+CONFIG_MULTI_STA_RC=y
 
 # WATCHDOG TIMER
 ifeq ($(CONFIG_NEW_TASK_ARCH),y)
 CONFIG_WDT=y
 endif
+
+#Support rate control with RSSI
+CONFIG_RC_W_RSSI=y
 
 # CLI Support (y: Support n: Not Support)
 CONFIG_CLI=y
@@ -97,6 +103,11 @@ ifeq ($(CONFIG_ONLY_STA),n)
 CONFIG_STA_SIG_INFO=y
 # Probe Response Offloading
 CONFIG_UMAC_PRESP=y
+endif
+
+# When Dynamic Frag is on, need to gather STA's RSSI info.
+ifeq ($(CONFIG_DYNAMIC_FRAG),y)
+CONFIG_STA_SIG_INFO=y
 endif
 
 # USE SMALL MEMORY for pool and heap
@@ -144,14 +155,20 @@ CONFIG_SCAN_MODE=y
 # Workaround feature only for NRC7393 and NRC7394
 CONFIG_7393_7394_WORKAROUND=y
 
-# RELEASE FW
-CONFIG_CLI=n
-CONFIG_CLI_MINIMUM=n
-CONFIG_DEBUG=n
-CONFIG_LOG=n
+# (AP only) AP sends 1/2/4M BW probe response according to BW of probe request
+CONFIG_MATCH_OP_BW_PREQ_PRSP=y
+ifeq ($(CONFIG_ONLY_STA),y)
+CONFIG_MATCH_OP_BW_PREQ_PRSP=n
+endif
+
+# Operation with 8MHz Bandwidth AP
+CONFIG_STA_SUPPORT_8M=y
 
 # Duty Cycle
 CONFIG_DUTYCYCLE=y
+
+# Auto triggering to create Tx aggregation session.
+CONFIG_AMPDU_AUTO_TX=y
 
 # AMPDU reordering(draft version : need to tune more)
 CONFIG_AMPDU_REORDER=n
@@ -164,6 +181,9 @@ CONFIG_REMOTECMD=n
 
 # RTC Always On
 CONFIG_RTC_ALWAYS_ON=y
+
+# RTC Dynamic PS timeout
+CONFIG_RTC_DYNAMIC_PS=y
 
 # Scan Debugging (temporary configuration)
 CONFIG_SCAN_DEBUG=n
@@ -204,17 +224,12 @@ CONFIG_SFLASH_PAGE_PROG=y
 # Manual Continuous Tx support
 CONFIG_MANUAL_CONT_TX_SUPPORT=y
 
-# (AP) AP sends 1/2/4M BW probe response according to BW of probe request
-CONFIG_MATCH_OP_BW_PREQ_PRSP=y
-ifeq ($(CONFIG_ONLY_STA),y)
-CONFIG_MATCH_OP_BW_PREQ_PRSP=n
-endif
+# RELEASE FW
+CONFIG_CLI=n
+CONFIG_CLI_MINIMUM=n
+CONFIG_DEBUG=n
+CONFIG_LOG=n
 
-# Operation with 8MHz Bandwidth AP
-CONFIG_STA_SUPPORT_8M=y
-
-# Do RF Recovery when detecting continuous beacon loss
-CONFIG_RF_RECOVERY_BY_BCM=n
 
 #// --------------------------------------------------
 #// 3rd party library
@@ -542,6 +557,8 @@ ASFLAGS	=
 NMFLAGS	= -S --demangle --size-sort -s -r
 
 #// --------------------------------------------------
+#// Others
+#//--------------------------------------------------
 include make/Makefile.feature
 include make/Makefile.feature.lib
 include make/Makefile.common

@@ -3,6 +3,11 @@
 
 /* NVS key used to configure the device */
 
+/* Indicate whether the configuration is written using */
+/* nrc_save_wifi_config_with_vif */
+/* (type u8) */
+#define NVS_CONFIG_WRITTEN "cfg_written"
+
 /* types supported are listed as below */
 /* string : char string */
 /* i32 : int */
@@ -50,14 +55,14 @@
 /* CLI : nvs set_u8 wifi_channel_bw <bandwidth> */
 #define NVS_WIFI_CHANNEL_BW "wifi_channel_bw"
 
-/* IP address mode, uint8_t value 0 for static or 1 for dynamic, uint8_t value */
+/* IP address mode for wlan0, uint8_t value 0 for static or 1 for dynamic, uint8_t value */
 /* (type u8) */
-/* CLI : nvs set_u8 <0-1> */
+/* CLI : nvs set_u8 ip_mode <0-1> */
 #define NVS_IP_MODE "ip_mode"
 
-/* remote device ip address */
-/* (type string) */
-/* CLI : nvs set remote_address <remote address> */
+/* IP address mode for wlan1, uint8_t value 0 for static or 1 for dynamic, uint8_t value */
+/* (type u8) */
+/* CLI : nvs set_u8 wlan1_ip_mode <0-1> */
 #define NVS_REMOTE_ADDRESS "remote_address"
 
 /* remote device port number, uint16_t value */
@@ -125,44 +130,65 @@
 #define NVS_WIFI_DISCONN_TIMEOUT  "disconn_timeout"
 
 /*WIFI beacon interval */
-/* (type i32) */
+/* CLI : nvs set_i32 wifi_bcn <15-65535> */
+/* (type u16) */
 #define NVS_WIFI_BCN_INTERVAL "wifi_bcn"
-
-/*WIFI short beacon interval */
-/* (type i32) */
-#define NVS_WIFI_SHORT_BCN_INTERVAL "wifi_short_bcn"
 
 /* Device mode, the value should be either AP (1) or STA (0) */
 /* If not set, default mode will be AP */
+/* CLI : nvs set_u8 device_mode <0-1> */
 /* (type u8) */
 #define NVS_DEVICE_MODE "device_mode"
 
 /* Network mode for ethernet and wifi configuration (type u8) */
 /* Possible value bridge(0) or nat(1)" */
 /* If not set, default network mode will be nat(1) */
+/* CLI : nvs set_u8 network_mode <0-1> */
 /* (type u8) */
 #define NVS_NETWORK_MODE "network_mode"
 
 /* Wi-Fi Rate Control: Determines whether rate control is enabled or disabled. */
+/* CLI : nvs set_u8 wifi_rc <0-1> */
 /* (type u8) */
 #define NVS_WIFI_RATE_CONTROL "wifi_rc"
 
 /* Wi-Fi MCS (Modulation and Coding Scheme): Specifies the data rate and error correction capability for Wi-Fi transmissions. */
+/* CLI : nvs set_u8 wifi_mcs <0-7,10> */
 /* (type u8) */
 #define NVS_WIFI_MCS "wifi_mcs"
 
 /* Wi-Fi GI (Guard Interval): Specifies the guard interval type for Wi-Fi transmissions. */
+/* CLI : nvs set_u8 wifi_gi <0-1> */
 /* (type u8) */
 #define NVS_WIFI_GI "wifi_gi"
 
 /* Wi-Fi CCA (Clear Channel Assessment) Threshold: Specifies the signal strength threshold for Wi-Fi channel assessment. */
+/* CLI : nvs set_i8 wifi_cca_thres <-100 ~ -35 > */
 /* (type i8) */
 #define NVS_WIFI_CCA_THRES "wifi_cca_thres"
 
-/* Wi-Fi hidden sside mode, uint8_t value 0 for disable or 1 for enable, uint8_t value */
-/* CLI : nvs set_u8 <0-1> */
+/* Wi-Fi ignore_broadcast_ssid - Hide SSID in AP mode */
+/* This setting controls the behavior of the Access Point (AP) regarding SSID broadcast. */
+/* When enabled, the AP will send empty SSID in beacons and ignore probe request frames */
+/* that do not specify the full SSID, thus requiring stations to know the SSID. */
+/* - 0: Probe requests for broadcast SSID are not ignored. It sends the SSID in beacons. (default) */
+/* - 1: Send an empty (length=0) SSID in beacons and ignore probe requests for broadcast SSID. */
+/* - 2: Clear SSID (ASCII 0), but keep the original length. (this may be required */
+/*		with some clients that do not support empty SSID) and ignore probe */
+/*	   requests for broadcast SSID */
+/* CLI : nvs set_u8 ssid_type <0-2> */
 /* (type u8) */
-#define NVS_WIFI_HIDDEN_SSID "hidden_ssid"
+#define NVS_WIFI_IGNORE_BROADCAST_SSID "ssid_type"
+
+/* Maximum number of stations allowed in softAP (upto 10) */
+/* CLI : nvs set_u8 max_num_sta <1-10> */
+/* (type u8) */
+#define NVS_WIFI_SOFTAP_MAX_NUM_STA "max_num_sta"
+
+/* Wi-Fi beacon count for listen interval */
+/* CLI : nvs set_u16 listen_interval */
+/* (type u16) */
+#define NVS_WIFI_LISTEN_INTERVAL "listen_interval"
 
 #ifdef INCLUDE_SCAN_BACKOFF
 

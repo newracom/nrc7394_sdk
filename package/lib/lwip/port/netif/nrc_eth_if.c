@@ -210,10 +210,11 @@ static void nrc_bind_eth_if(esp_eth_mac_t *mac)
 
 #if LWIP_BRIDGE
 	if (network_mode == NRC_NETWORK_MODE_BRIDGE) {
-		if (eth_mode == NRC_ETH_MODE_AP) {
-			memcpy(bridge_data.ethaddr.addr, eth_netif.hwaddr, 6);
+		memcpy(bridge_data.ethaddr.addr, nrc_netif[0]->hwaddr, 6);
+		if (bridge_data.ethaddr.addr[3] < 0xff) {
+			bridge_data.ethaddr.addr[3]++;
 		} else {
-			memcpy(bridge_data.ethaddr.addr, nrc_netif[0]->hwaddr, 6);
+			bridge_data.ethaddr.addr[3] = 0;
 		}
 		bridge_data.max_ports = 2;
 		bridge_data.max_fdb_dynamic_entries = 128;

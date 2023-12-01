@@ -4,62 +4,114 @@
 *
 *******************************************************************
 
+[2023-11-30]
+Change summary for version 1.2:
+
+    New features
+    * RSSI-based rate adaptation (v1.2)
+
+    Changes
+    * Update SDK APIs: refer to UG-7394-005-Standalone SDK API document
+    * Update AT-CMD APIs: refer to UG-7394-006-AT_Command document
+    * Update supported baudrate up to 2Mbps on UART without RTS/CTS (AT-CMD)
+    * Update samples
+      o sample_sntp: Retrieve NTP(Network Time Protocol) data
+      o sample_w5500_eth
+       - Change the default address mode to 3 address
+       - Incorrect peer MAC address copy at 4-address enabled W5500 device
+      o sample_wifi_relay : Runs softap and sta for relay operation
+      o sample_vendor_ie : Receive vendor IE from beacon
+    * Update AUXADC compensation
+    * Duty cycle 2.8% support only for EU STA
+    * Check traveling pilot support field of S1G capabilities element
+    * Set the default listen interval to 0 for wifi_config
+    * 1/2MHz STA support at 4MHz SoftAP
+    * Add auto guard interval control
+    * Add auto RX gain control
+    * SoftAP's disable/enable sequence support
+    * Add API for setting max station number in SoftAP
+    * Hidden SSID support in SoftAP
+    * Support for floating-point values in the ping interval of the ping operation
+    * Add serial flash support: FM25W32A/GD25LQ16C/GD25WQ128E/W25Q16FW/XT25Q08B
+    * Set country code from RF CAL data (AT-CMD)
+    * Update Firwmare Flash Tool v6.3.0 (Multi v7.2.0)
+      o Dynamic XIP boot erase size + max size check    
+    
+    Bugfix
+    * Prevent manipulating source MAC address when 4 address is used for W5500 sample
+    * TX power setting failure when changing from FIXED mode to AUTO mode (AT-CMD)
+    * TX power in LIMIT mode not limited to the set value (AT-CMD)
+    * Fix the recovery of the listen interval setting upon waking from deep sleep
+    * Remove echo check code from lwip
+    * TCP client socket was closed when enabling TCP keep-alive
+    * Invalid secondary CCA on JP 2/4MHz channels
+    * NDP CTS compliance for RTS with response indication (RI) 1 on AP
+    * Set an invalid AID in the AID response element when sending an association response
+    * AT-CMD lwIP keepalive issue: TCP client socket would close when TCP keep-alive was enabled
+    * Handling exceptions for the invalid temperature value of 0
+    * Invalid AID issue when forwarding a frame in the SoftAP
+    * Delayed reconnection issue for the STA without deauthentication
+    * Failure in setting the limit type for 'nrc_wifi_set_tx_power'
+    * PN order mismatch during the packet retransmission
+
+    Known Issues
+    * The issue of deauthentication frame delivery failure can occur between PMF-enabled NRC7394 and PMF-enabled NRC7292 devices.
+    * During deep sleep, TCP connections are not maintained. Upon waking up, a new TCP connection must be established.
+    * The AT-CMD throughput over HSPI interface is slightly lower than NRC7292 device due to CPU clock speed variation.
+
 [2023-08-17]
 Change summary for version 1.1:
 
     New features
-        * AT-CMD feature: continuous TX operation (AT+WCTX)
+    * AT-CMD feature: continuous TX operation (AT+WCTX)
 
     Changes
-        * Enhanced RSSI accuracy of system_api_get_rssi()
+    * Enhanced RSSI accuracy of system_api_get_rssi()
 
     Bugfix
-        * Intermittent scan failure on TW channel
-        * AP's association grant for STA with listen interval exceeding BSS max idle period
-        * CCA type of JP 2/4MHz channels
-        * Inability to return to doze state in deep sleep mode for STA with static IP address
-        * Scan failure on K2 channel
-        * Incorrect peer MAC address copy at 4-address enabled W5500 device
+    * Intermittent scan failure on TW channel
+    * AP's association grant for STA with listen interval exceeding BSS max idle period
+    * CCA type of JP 2/4MHz channels
+    * Inability to return to doze state in deep sleep mode for STA with static IP address
+    * Scan failure on K2 channel
+    * Incorrect peer MAC address copy at 4-address enabled W5500 device
 
     Known Issues
-
-        * The initial connection time for WPA3-SAE/OWE can be quite lengthy (> 15 seconds) due to the substantial computational load required by software for large number operations.
-        * The SoftAP disable/enable sequence on the standalone mode is not supported.
-        * The issue of deauthentication frame delivery failure can occur between PMF-enabled NRC7394 and PMF-enabled NRC7292 devices.
-        * During deep sleep, TCP connections are not maintained. Upon waking up, a new TCP connection must be established.
-        * The AT-CMD throughput over HSPI interface is slightly lower than NRC7292 device due to CPU clock speed variation.
+    * The initial connection time for WPA3-SAE/OWE can be quite lengthy (> 15 seconds) due to the substantial computational load required by software for large number operations.
+    * The SoftAP disable/enable sequence on the standalone mode is not supported.
+    * The issue of deauthentication frame delivery failure can occur between PMF-enabled NRC7394 and PMF-enabled NRC7292 devices.
+    * During deep sleep, TCP connections are not maintained. Upon waking up, a new TCP connection must be established.
+    * The AT-CMD throughput over HSPI interface is slightly lower than NRC7292 device due to CPU clock speed variation.
 
 [2023-08-07]
 Change summary for version 1.0:
 
     New features
-
-    •   AT-CMD features
-        o   WPA3-SAE (v1.0)
-        o   OWE (v1.0)
-        o   FOTA (v1.0)
-        o   SoftAP (v1.0)
-        o   Power save TIM mode (v1.0)
-        o   Power save non-TIM mode (v1.0)
-    •   Regulation features
-        o   Duty cycle (v1.0)
-    •   System features
-        o   Power save – deep sleep (v1.0)
-        o   WDT/Recovery (v1.0)
-        o   UART/UART-HFC/HSPI interface (v1.0)
-    •   Sample applications
-        o   Refer to UG-7394-004-Standalone SDK document (v1.0)
-            -   Wi-Fi: Wi-Fi state, WPS-PBC, Ethernet bridge, SoftAP, FOTA
-            -   Protocol: TCP/UDP
-            -   Power save
-            -   Peripheral: GPIO, UART, ADC, NVS, PWM, sensors, etc.
-            -   Middleware: XML, JSON, AWS, MQTT, HTTP
-            -   Scenario: PS schedule, UART data handling
+    * AT-CMD features
+      o WPA3-SAE (v1.0)
+      o OWE (v1.0)
+      o FOTA (v1.0)
+      o SoftAP (v1.0)
+      o Power save TIM mode (v1.0)
+      o Power save non-TIM mode (v1.0)
+    * Regulation features
+      o Duty cycle (v1.0)
+    * System features
+      o Power save – deep sleep (v1.0)
+      o WDT/Recovery (v1.0)
+      o UART/UART-HFC/HSPI interface (v1.0)
+    * Sample applications
+      o Refer to UG-7394-004-Standalone SDK document (v1.0)
+        - Wi-Fi: Wi-Fi state, WPS-PBC, Ethernet bridge, SoftAP, FOTA
+        - Protocol: TCP/UDP
+        - Power save
+        - Peripheral: GPIO, UART, ADC, NVS, PWM, sensors, etc.
+        - Middleware: XML, JSON, AWS, MQTT, HTTP
+        - Scenario: PS schedule, UART data handling
 
     Known Issues
-
-        * The initial connection time for WPA3-SAE/OWE can be quite lengthy (> 15 seconds) due to the substantial computational load required by software for large number operations.
-        * The SoftAP disable/enable sequence on the standalone mode is not supported.
-        * The issue of deauthentication frame delivery failure can occur between PMF-enabled NRC7394 and PMF-enabled NRC7292 devices.
-        * During deep sleep, TCP connections are not maintained. Upon waking up, a new TCP connection must be established.
-        * The AT-CMD throughput over HSPI interface is slightly lower than NRC7292 device.
+    * The initial connection time for WPA3-SAE/OWE can be quite lengthy (> 15 seconds) due to the substantial computational load required by software for large number operations.
+    * The SoftAP disable/enable sequence on the standalone mode is not supported.
+    * The issue of deauthentication frame delivery failure can occur between PMF-enabled NRC7394 and PMF-enabled NRC7292 devices.
+    * During deep sleep, TCP connections are not maintained. Upon waking up, a new TCP connection must be established.
+    * The AT-CMD throughput over HSPI interface is slightly lower than NRC7292 device.

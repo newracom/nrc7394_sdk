@@ -42,13 +42,6 @@ typedef enum  {
 #endif
 }ADC_CH;
 
-typedef enum {
-	ADC_AVRG_NO = 0,
-	ADC_AVRG_2 ,
-	ADC_AVRG_4 ,
-	ADC_AVRG_8,
-	ADC_AVRG_16
-} ADC_AVRG;
 
 /**********************************************
  * @fn nrc_err_t nrc_adc_init(bool enable)
@@ -102,18 +95,6 @@ void nrc_adc_disable(void);
  * @return ADC value
  ***********************************************/
 uint16_t nrc_adc_get_data(ADC_CH id);
-
-/**********************************************
- * @fn  nrc_err_t nrc_adc_avrg_sel(ADC_AVRG mode)
- *
- * @brief ADC average selection
- *         (NRC7292 is not supported)
- *
- * @param mode: average mode
- *
- * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
- ***********************************************/
-nrc_err_t nrc_adc_avrg_sel(ADC_AVRG mode);
 
 #ifdef __cplusplus
 }
