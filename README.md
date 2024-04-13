@@ -2,8 +2,12 @@
 
 ## Notice
 
-> **Note**
+> [!NOTE]
 > The NRC7394 software package v1.0 includes an upgraded data structure for calibration and sysconfig. Therefore, to calibrate NRC7394 EVK, the v3.3.0 (Test Version 3.2) calibration tool (MFGT) should be used, and the EVK should be run on the NRC7394 software package v1.0 after it has been calibrated with the v3.3.0 (Test Version 3.2) calibration tool (MFGT). You can download this tool from the partner's FTP site.
+
+> [!CAUTION]
+> The software package released here is specifically designed for the NRC7394 EVK, and the accompanying board data file in https://github.com/newracom/nrc7394_sdk/tree/master/package/bdf/nrc7394 is intended solely for this model.
+> If users plan to use this software package with other devices that incorporate the NRC7394 chip, they should utilize the board data file supplied by the device's vendor.
 
 ### Release roadmap
 - v1.2 (2023.11.30)
