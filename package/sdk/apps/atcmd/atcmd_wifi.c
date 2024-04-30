@@ -277,12 +277,17 @@ static void _atcmd_wifi_event_disconnect (int vif, void *data, int len)
 {
 	atcmd_wifi_softap_t *softap = &g_atcmd_wifi_info->softap;
 
-	if (!softap->active)
+/*	if (!softap->active) */
 	{
 		atcmd_wifi_connect_t *connect = &g_atcmd_wifi_info->connect;
 		bool event = true;
 
-		if (connect->disconnecting)
+/*		_atcmd_debug("%s: %d %d %d", __func__,
+				connect->connected, connect->connecting, connect->disconnecting); */
+
+		if (connect->connecting)
+			event = false;
+		else if (connect->disconnecting)
 		{
 			if (!_atcmd_wifi_event_polling(ATCMD_WIFI_EVT_DISCONNECT))
 				event = false;
@@ -290,9 +295,12 @@ static void _atcmd_wifi_event_disconnect (int vif, void *data, int len)
 				_atcmd_wifi_event_polled(ATCMD_WIFI_EVT_DISCONNECT);
 		}
 
-		connect->connected = false;
-		connect->connecting = false;
-		connect->disconnecting = false;
+		if (connect->connected || connect->disconnecting)
+		{
+			connect->connected = false;
+			connect->connecting = false;
+			connect->disconnecting = false;
+		}
 
 		if (event)
 		{
@@ -2064,7 +2072,7 @@ static int _atcmd_wifi_connect_run (int argc, char *argv[])
 		return ATCMD_ERROR_BUSY;
 	}
 
-	_atcmd_info("wifi_connect: %s %s %s", connect->ssid, connect->bssid, connect->security);
+	_atcmd_info("wifi_connect: %s %s %s %u", connect->ssid, connect->bssid, connect->security, timeout_msec);
 
 	if (strlen(connect->ssid) > 0 && wifi_api_set_ssid(connect->ssid) != 0)
 		goto wifi_connect_fail;
@@ -2090,8 +2098,17 @@ static int _atcmd_wifi_connect_run (int argc, char *argv[])
 		_atcmd_wifi_event_polled(ATCMD_WIFI_EVT_CONNECT_SUCCESS);
 	}
 
-	if(wifi_api_connect(timeout_msec) != 0)
-		goto wifi_connect_fail;
+	switch (wifi_api_connect(timeout_msec))
+	{
+		case 0:
+			break;
+
+		case 1:
+			connection_timeout = true;
+
+		default:
+			goto wifi_connect_fail;
+	}
 
 	if (connect->connecting)
 	{

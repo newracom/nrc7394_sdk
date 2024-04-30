@@ -359,9 +359,17 @@ void vPortEndScheduler( void )
 }
 /*-----------------------------------------------------------*/
 
+static uint32_t vBackup_flags = 0;
 void vPortEnterCritical( void )
 {
+#if 0
 	portDISABLE_INTERRUPTS();
+#else
+	if( uxCriticalNesting == 0 )
+	{
+		vBackup_flags = portSET_INTERRUPT_MASK_FROM_ISR();
+	}
+#endif
 	uxCriticalNesting++;
 
 	/* This is not the interrupt safe version of the enter critical function so
@@ -382,10 +390,14 @@ void vPortExitCritical( void )
 	uxCriticalNesting--;
 	if( uxCriticalNesting == 0 )
 	{
+#if 0
 #ifdef NRC_FREERTOS
         asm volatile("cpsie i\n");
 #endif /* NRC_FREERTOS */
 		portENABLE_INTERRUPTS();
+#else
+		portCLEAR_INTERRUPT_MASK_FROM_ISR(vBackup_flags);
+#endif
 	}
 }
 /*-----------------------------------------------------------*/

@@ -14,6 +14,7 @@ typedef struct _RXGAIN_CTRL {
 void lmac_rxgain_ctrl_init();
 uint32_t lmac_rxgain_ctrl_enable(bool enable);
 bool lmac_rxgain_ctrl_set(int adjust_rssi, int restore_rssi, uint32_t target_rxgain);
+void lmac_rxgain_ctrl_set_initial_rxgain(int init_rxgain);
 void lmac_rxgain_ctrl_set_debug(bool enable);
 int lmac_rxgain_ctrl_operation(uint8_t vif_id, int rssi_avg);
 void lmac_rxgain_ctrl_restore_intial_rxgain();
@@ -73,3 +74,6 @@ void get_auth_ctrl_param();
 
 /* Sync to AP about PM */
 bool lmac_notify_pm_to_ap (void);
+int8_t ewma_val(int8_t old, int8_t new, int8_t weight);
+
+

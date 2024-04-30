@@ -4,6 +4,22 @@
 *
 *******************************************************************
 
+[2024-04-30]
+Change summary for version 1.2.1:
+
+  Hotfix
+    * Enhanced RC scheme
+      o Hotfix for slow rate adaptation in specific RF environments
+
+  Bugfix
+    * AT-CMD: wifi_api prototype parameter order bugfix
+    * Issue with corrupted heap free memory linked list
+
+  Changes
+    * BDF update: K1 max power update
+    * Enable RTS/CTS for all data frames
+    * Open the UART port in non-blocking mode within the raspi-atcmd-cli application
+
 [2023-11-30]
 Change summary for version 1.2:
 

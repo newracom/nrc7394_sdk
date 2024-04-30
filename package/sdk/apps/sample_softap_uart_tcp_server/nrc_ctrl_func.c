@@ -86,11 +86,7 @@ int nrc_ctrl_show_config(char *config, size_t *length)
 		sprintf(bw, "%s","N/A");
 	} else if (lmac_get_rc_mode(vif_id) == RC_MODE_1 && lmac_is_sta(vif_id)) {
 		const RC_RATE *rate;
-#if !defined (INCLUDE_RC_W_RSSI)
-		uint8_t rate_index	= lmac_rc_get_rate_index( vif_id , 0 , 0) ;
-#else
-		uint8_t rate_index	= lmac_rc_get_rate_index( vif_id , 0 , 0, 0, 0) ;
-#endif
+		uint8_t rate_index	= lmac_rc_get_rate_index(vif_id, 0, 0, 0) ;
 		rate = lmac_rc_get_rate(rate_index);
 		mcs = rate->mcs;
 		sprintf(bw, "%d Mhz (NRC Auto)", 1 << rate->bw );
@@ -140,7 +136,6 @@ int nrc_ctrl_show_config(char *config, size_t *length)
 			sprintf(config + strlen(config), "  - MCS : %d , bw = %s\n" , mcs , bw);
 		}
 	}
-
 	sprintf(config + strlen(config), " Guard Interval: %s\n", short_gi);
 	sprintf(config + strlen(config), " Security      : %s\n", security);
 	if(get_cipher_en(vif_id)) {

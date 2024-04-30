@@ -10,12 +10,13 @@
 > If users plan to use this software package with other devices that incorporate the NRC7394 chip, they should utilize the board data file supplied by the device's vendor.
 
 ### Release roadmap
+- v1.2.1 (2024.04.30) (hotfix)
 - v1.2 (2023.11.30)
 - v1.1 (2023.08.17)
 - v1.0 (2023.08.07)
 
 ### Latest release
-- [NRC7394_Standalone_SDK_v1.2](https://github.com/newracom/nrc7394_sdk/releases/tag/v1.2)
+- [NRC7394_Standalone_SDK_v1.2.1](https://github.com/newracom/nrc7394_sdk/releases/tag/v1.2.1)
 
 ### Release package contents
 - NRC7394 standalone SDK package for global regulatory domains
