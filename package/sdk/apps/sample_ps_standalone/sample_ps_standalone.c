@@ -220,9 +220,9 @@ check_again:
 	nrc_ps_set_gpio_pullup(0x0);
 #elif defined(NRC7394)
 	/* Below configuration is for NRC7394 EVK Revision board */
-	nrc_ps_set_gpio_direction(0xFFFFFDFF);
-	nrc_ps_set_gpio_out(0x00000100);
-	nrc_ps_set_gpio_pullup(0xFFFFFFFF);
+	nrc_ps_set_gpio_direction(0xFFF7FDC7);
+	nrc_ps_set_gpio_out(0x0);
+	nrc_ps_set_gpio_pullup(0x0);
 #endif
 
 	while (1) {

@@ -336,6 +336,13 @@ struct nrc_wpa_bdf {
 };
 #endif /* defined(INCLUDE_BD_SUPPORT) */
 
+struct nrc_app_event {
+	int8_t vif_id;
+	int8_t event_id;
+	uint8_t *addr;
+	bool add;
+};
+
 SYS_BUF * alloc_sys_buf_try(int hif_len, int nTry);
 
 struct nrc_wpa_if *wpa_driver_get_interface(int vif);
@@ -401,5 +408,9 @@ uint32_t nrc_get_scan_max_interval();
 void nrc_set_backoff_start_count(uint32_t count);
 uint32_t nrc_get_backoff_start_count();
 int generateRandomBackoff(int retry_count) ;
+
+void nrc_add_app_event(uint8_t vif_id, uint8_t e_id, uint8_t *addr);
+struct nrc_app_event* nrc_get_app_event(void);
+void nrc_init_app_event();
 
 #endif // _DRIVER_NRC_H_

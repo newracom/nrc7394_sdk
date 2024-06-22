@@ -4,6 +4,14 @@
 *
 *******************************************************************
 
+[2024-06-21]
+Change summary for version 1.2.2:
+
+  Hotfix
+    * Update GPIO direction setting in deep sleep
+    * Fix issue with setting GTK/iGTK during connection
+    * Fix issue with obtaining DHCP IP address on STA (vif_1)
+
 [2024-04-30]
 Change summary for version 1.2.1:
 
