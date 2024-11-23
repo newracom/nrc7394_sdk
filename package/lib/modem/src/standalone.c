@@ -184,12 +184,23 @@ void get_standalone_macaddr(int vif_id, uint8_t *mac) {
 #error "Consider one method to assign MAC address."
 #endif
 
-	/* Step 1. check mac address in serial flash for vif_id.
+	/* Step 0. check mac address in macsw for vif_id.
+	 * Step 1. check mac address in serial flash for vif_id.
 	 * Step 2. if vif_id's mac address doesn't exist in serial flash,
 	 * then check the other vif_id's mac address.
 	 * Step 3. both mac addresses are not written in serial flash,
 	 * then use FW generated mac address.
 	 * */
+	tmp = system_modem_api_get_mac_address(vif_id);
+	if (system_modem_api_get_mac_address(vif_id)) {
+		const uint16_t *a = (uint16_t *) tmp;
+		if ((a[0] | a[1] | a[2]) != 0) {
+			memcpy(mac, tmp, MAC_ADDR_LEN);
+			return;
+		}
+	}
+	tmp = mac;
+
 	if (lmac_check_sf_macaddr(mac, vif_id)) {
 		I(TT_WPAS, "%s%d MAC address: "MACSTR"\n",
 			module_name(), vif_id, MAC2STR(mac));

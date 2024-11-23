@@ -127,7 +127,7 @@ bool get_mgmt_mcs10_permit();
 #if defined(INCLUDE_BD_SUPPORT)
 void set_txpower_per_mcs(int index, uint8_t power);
 uint8_t get_txpower_per_mcs(int index);
-#if defined (NRC7393) || (NRC7394)
+#if defined(NRC7394)
 void set_lpf_gain_per_mcs(int index, uint16_t lpf_gain);
 uint16_t get_lpf_gain_per_mcs(int index);
 #endif
@@ -154,8 +154,11 @@ void set_dynamic_defrag(bool v);
 bool get_dynamic_defrag(void);
 #endif
 #if defined(INCLUDE_AUTH_CONTROL)
-void set_auth_ctrl(bool v);
-bool get_auth_ctrl(void);
+void set_enable_auth_ctrl(bool v);
+bool get_enable_auth_ctrl(void);
 #endif /* defined(INCLUDE_AUTH_CONTROL) */
+
+void set_group_mcs(int8_t mcs);
+int8_t get_group_mcs();
 
 #endif /* LMAC_CONFIG_H */

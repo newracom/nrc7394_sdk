@@ -24,6 +24,7 @@
  */
 
 #include "nrc_sdk.h"
+#include "nrc_lwip.h"
 #include "wifi_config_setup.h"
 #include "wifi_connect_common.h"
 
@@ -65,18 +66,9 @@ nrc_err_t run_sample_vendor_ie(WIFI_CONFIG *param)
 	}
 
 	/* check if IP is ready */
-	while(1){
-		if (nrc_addr_get_state(0) == NET_ADDR_SET) {
-			nrc_usr_print("[%s] IP ...\n",__func__);
-			break;
-		} else {
-			nrc_usr_print("[%s] IP Address setting State : %d != NET_ADDR_SET(%d) yet...\n",
-						  __func__, nrc_addr_get_state(0), NET_ADDR_SET);
-		}
-		_delay_ms(1000);
+	if (nrc_wait_for_ip(0, param->dhcp_timeout) == NRC_FAIL) {
+		return NRC_FAIL;
 	}
-
-
 
 	while(1){_delay_ms(500);}
 }

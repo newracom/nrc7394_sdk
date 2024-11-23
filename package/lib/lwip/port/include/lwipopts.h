@@ -89,10 +89,10 @@ extern int ip4_input_nat(struct pbuf *p, struct netif *inp);
 #define DNS_MAX_NAME_LENGTH 128
 
 #define LWIP_HAVE_LOOPIF				0
-#define TCP_LISTEN_BACKLOG				10
+#define TCP_LISTEN_BACKLOG				1
 #define LWIP_SO_RCVTIMEO		   		1
 #define LWIP_SO_RCVBUF			 		1
-#define LWIP_SO_SNDRCVTIMEO_NONSTANDARD 1
+#define LWIP_SO_SNDRCVTIMEO_NONSTANDARD 0
 #define LWIP_SO_SNDTIMEO                1
 #define LWIP_TCP_KEEPALIVE              1
 
@@ -283,7 +283,6 @@ a lot of data that needs to be copied, this should be set high. */
 #define TCP_QUEUE_OOSEQ         1
 
 /* TCP Maximum segment size. */
-/* we change the TCP MSS for performance and legacy value is 1460 */
 #if defined(TS8266) || defined(TR6260) || defined(NRC7392)
 #define TCP_MSS			1460
 #else
@@ -305,9 +304,6 @@ a lot of data that needs to be copied, this should be set high. */
 
 /* Maximum number of retransmissions of SYN segments. */
 #define TCP_SYNMAXRTX           4
-
-
-#define TCP_OOSEQ_MAX_BYTES             (2 * TCP_MSS)
 
 /* LWIP_TCP_SACK_OUT==1: TCP will support sending selective acknowledgements (SACKs) */
 #define LWIP_TCP_SACK_OUT               1

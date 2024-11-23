@@ -1,5 +1,5 @@
-#ifndef __HAL_UART_NRC7393_H__
-#define __HAL_UART_NRC7393_H__
+#ifndef __HAL_UART_NRC7394_H__
+#define __HAL_UART_NRC7394_H__
 
 #define PRINT_BUFFER_SIZE		512
 #define INT_CONSOLE_BUFFER_MAX  8192
@@ -71,4 +71,4 @@ void nrc_hsuart_fifo_level(int ch, uint32_t tx_level, uint32_t rx_level);
 	#define system_vprintf	hal_uart_vprintf
 #endif
 
-#endif // __HAL_UART_NRC7393_H__
+#endif // __HAL_UART_NRC7394_H__

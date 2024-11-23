@@ -7,6 +7,7 @@ extern "C" {
 
 #include "system.h"
 
+#include "lwip/netif.h"
 #include "lwip/ip_addr.h"
 
 typedef enum {
@@ -102,26 +103,33 @@ bool wifi_get_ip_info(int vif_id, struct ip_info *info);
 bool wifi_set_ip_info(int vif_id, struct ip_info *info);
 bool wifi_set_dns_server(ip_addr_t *pri_dns, ip_addr_t *sec_dns);
 void wifi_lwip_init( void );
+bool wifi_setup_interface(WIFI_INTERFACE i);
+
+int static_run(int vif);
+
+#if LWIP_IPV4 && LWIP_DHCP
+int dhcp_run(int vif);
+int wifi_dhcpc_start(int vif);
+int wifi_dhcpc_stop(int vif);
+int wifi_dhcpc_status(int vif);
 int wifi_station_dhcpc_start(int vif);
 int wifi_station_dhcpc_stop(int vif);
 int wifi_station_dhcpc_status(int vif);
+int wifi_bridge_dhcpc_start(void);
+int wifi_bridge_dhcpc_stop(void);
+int wifi_bridge_dhcpc_status(void);
+#endif
+
 bool wifi_ifconfig(int argc, char *argv[]);
 enum dhcp_status wifi_softap_dhcps_status(void);
 
 bool wifi_get_ip_address(int vif_id, char **ip_addr);
 uint8_t wifi_get_vif_id(ip_addr_t* dest);
-void set_dhcp_status(bool status);
-bool get_dhcp_status(void);
+bool get_dhcp_status(int vif_id);
 bool wifi_dhcps(int argc, char *argv[]);
 bool wifi_bridge(int argc, char *argv[]);
 bool setup_wifi_bridge_interface(void);
 bool delete_wifi_bridge_interface(void);
-
-#ifdef LWIP_DHCP
-int dhcp_run(int vif);
-#endif /* LWIP_DHCP */
-
-int static_run(int vif);
 
 int setup_wifi_ap_mode(struct netif *net_if, int updated_lease_time);
 int start_dhcps_on_if(struct netif *net_if, int updated_lease_time);

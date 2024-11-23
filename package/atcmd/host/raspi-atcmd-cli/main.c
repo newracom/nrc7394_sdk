@@ -27,6 +27,7 @@
 #include <getopt.h>
 #include <sys/stat.h>
 #include <zlib.h>
+#include <signal.h>
 
 #include "raspi-hif.h"
 #include "nrc-atcmd.h"
@@ -1192,52 +1193,208 @@ static void raspi_cli_run_loop (raspi_cli_hif_t *hif)
 			log_info("  interval  data send interval (msec) (default 0)\n");
 			continue;
 		}
-		else if (memcmp(buf, "update ", 7) == 0) /* update <binary> */
+		else if (memcmp(buf, "update ", 7) == 0) /* update <verify> <binary> */
 		{
-			char *pathname = buf + 7;
-			int pathname_len = strlen(pathname);
+			int verify;
 
-			if (pathname_len <= 4 || strcmp(pathname + pathname_len - 4, ".bin") != 0)
-				log_info("Not binary file\n");
+			if (memcmp(buf + 7, "0 ", 2) == 0)
+				verify = 0;
+			else if (memcmp(buf + 7, "1 ", 2) == 0)
+				verify = 1;
+			else if (memcmp(buf + 7, "2 ", 2) == 0)
+				verify = 2; /* print error info */
+			else 
+				verify = -1;
+
+			if (verify >= 0 && verify <= 2)
+			{
+				char *pathname = buf + 7 + 2;
+				int pathname_len = strlen(pathname);
+
+				if (pathname_len <= 4 || strcmp(pathname + pathname_len - 4, ".bin") != 0)
+					log_info("Not binary file\n");
+				else
+				{
+					struct stat st;
+					int fd = open(pathname, O_RDONLY);
+
+					if (fd < 0)
+					{
+						log_error("open(), %s\n", strerror(errno));
+						continue;
+					}
+
+					if (stat(pathname, &st) == 0)
+					{
+						uint32_t size = st.st_size;
+						uint32_t crc;
+						uint8_t *buf;
+
+						buf = malloc(size);
+						if (!buf)
+						{
+							log_error("malloc(), %s\n", strerror(errno));
+							continue;
+						}
+
+						if (read(fd, buf, size) != size)
+						{
+							log_error("read(), %s\n", strerror(errno));
+							continue;
+						}
+
+						crc = crc32(0L, Z_NULL, 0);
+						crc = crc32(crc, buf, size);
+
+						log_info("UPDATE: size=%u crc32=0x%X\n", size, crc);
+
+						nrc_atcmd_firmware_download((char *)buf, size, crc, verify);
+					}
+
+					close(fd);
+				}
+			}
+
+			continue;
+		}
+		else if (memcmp(buf, "sfuser ", 7) == 0) /* sfuser <mode> [<offset> <length>|"<string>"] */
+		{
+			char *param = buf + 7;
+
+			if (strcmp(param, "size") == 0)
+			{
+				if (nrc_atcmd_send_cmd("AT+SFUSER?") != 0)
+					log_info("FAIL: send_cmd (%d)\n", __LINE__);
+			}
 			else
 			{
-				struct stat st;
-				int fd = open(pathname, O_RDONLY);
+				int argc;
+				char *argv[5];
+				int i;
 
-				if (fd < 0)
+				argc = 1;
+				argv[0] = param;
+				for (i = 1 ; i < 5 ; i++)
+					argv[i] = NULL;
+
+				for (i = 0 ; param[i] != '\0' ; i++)
 				{
-					log_error("open(), %s\n", strerror(errno));
-					continue;
+					if (param[i] == ' ')
+					{
+						param[i] = '\0';
+
+						if (argc < 5)
+							argv[argc] = param + i + 1;
+
+						argc++;
+					}
 				}
 
-				if (stat(pathname, &st) == 0)
+/*				for (i = 0 ; i < argc ; i++)
+					log_info(" - argv[%d] : %s\n", i, argv[i]); */
+
+				if (argc == 1 || argc == 3)
 				{
-					uint32_t size = st.st_size;
-					uint32_t crc;
-					uint8_t *buf;
+					int mode = atoi(argv[0]);
 
-					buf = malloc(size);
-					if (!buf)
+					switch (mode)
 					{
-						log_error("malloc(), %s\n", strerror(errno));
-						continue;
+						case 0: /* read */
+							if (argc == 3)
+							{
+								int offset = atoi(argv[1]);
+								int length = atoi(argv[2]);
+
+								if (nrc_atcmd_send_cmd("AT+SFUSER=0,%d,%d", offset, length) != 0)
+									log_info("FAIL: send_cmd (%d)\n", __LINE__);
+							}
+							break;
+
+						case 1: /* write */
+							if (argc == 3)
+							{
+								int offset = atoi(argv[1]);
+								int length = 0;
+								char *data = NULL;
+
+								if (argv[2][0] != '\"')
+								{
+									length = atoi(argv[2]);								   
+
+									data = malloc(length);
+									if (data)
+									{
+										int i;
+
+										for (i = 0 ; i < length ; i++)
+											data[i] = '0' + (i % 10);
+									}
+										
+/*									log_info("sfuser_write: %p %d\n", data, length); */
+								}
+								else if (argv[2][strlen(argv[2]) - 1] == '\"')
+								{
+									length = strlen(argv[2]) - 2;
+
+									data = argv[2] + 1;
+									data[length] = '\0';
+									
+/*									log_info("sfuser_write: %s (%d)\n", data, length); */
+								}
+
+								if (length > 0 && data)
+								{
+									log_info("sfuser_write: %s (%d)\n", data, length);
+
+									if (nrc_atcmd_send_cmd("AT+SFUSER=1,%d,%d", offset, length) == 0)
+										nrc_atcmd_send_data(data, length);
+									else
+										log_info("FAIL: send_cmd (%d)\n", __LINE__);
+
+									if (data != (argv[2] + 1))
+										free(data);
+								}
+							}
+							break;
+
+						case 2: /* erase */
+							if (argc == 1)
+							{
+								if (nrc_atcmd_send_cmd("AT+SFUSER=2") != 0)
+									log_info("FAIL: send_cmd (%d)\n", __LINE__);
+							}
+							else
+							{
+								int offset = atoi(argv[1]);
+								int length = atoi(argv[2]);
+
+								if (nrc_atcmd_send_cmd("AT+SFUSER=2,%d,%d", offset, length) != 0)
+									log_info("FAIL: send_cmd (%d)\n", __LINE__);
+							}
+
+							break;
+
+
+						default:
+							log_info("FAIL: invalid mode\n");
 					}
-
-					if (read(fd, buf, size) != size)
-					{
-						log_error("read(), %s\n", strerror(errno));
-						continue;
-					}
-
-					crc = crc32(0L, Z_NULL, 0);
-					crc = crc32(crc, buf, size);
-
-					log_info("UPDATE: size=%u crc32=0x%X\n", size, crc);
-
-					nrc_atcmd_firmware_download((char *)buf, size, crc);
 				}
+			}
 
-				close(fd);
+			continue;
+		}
+		else if (memcmp(buf, "reset ", 6) == 0) /* reset [{hspi}] */
+		{
+			char *param = buf + 6;
+
+			if (strlen(param) == 0)
+			{
+				/* HW reset with GPIO output */
+			}
+			else if (strcmp(param, "hspi") == 0)
+			{
+				if (hif->type == RASPI_HIF_SPI)
+					nrc_hspi_reset();
 			}
 
 			continue;
@@ -1267,15 +1424,49 @@ static void raspi_cli_run_loop (raspi_cli_hif_t *hif)
 
 /**********************************************************************************************/
 
+void signal_handler (int signum)
+{
+	switch (signum)
+	{
+		case SIGINT:
+			log_info("SIGINT\n");
+			break;
+
+		case SIGTERM:
+			log_info("SIGTERM\n");
+			break;
+
+		default:
+			log_info("%s: %d\n", __func__, signum);
+			return;
+	}
+	
+	raspi_cli_close();
+
+	exit(0);
+}
+
 int main (int argc, char *argv[])
 {
+	int signum[] = { SIGINT, SIGTERM };
 	raspi_cli_opt_t opt;
+	int i;
 
 	if (raspi_cli_option(argc, argv, &opt) != 0)
 		return -1;
 
 	if (raspi_cli_open(&opt.hif) != 0)
 		return -1;
+
+	for (i = 0 ; i < sizeof(signum) / sizeof(int) ; i++)
+	{
+		if (signal(signum[i], signal_handler) == SIG_ERR)
+		{
+			log_error("signal(), signum[%d]=%d, %s\n", i, signum[i], strerror(errno));
+			raspi_cli_close();
+			return -1;
+		}
+	}
 
 	log_info("\n");
 

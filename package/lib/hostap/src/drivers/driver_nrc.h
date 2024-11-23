@@ -33,7 +33,7 @@ struct nrc_wpa;
 #define NRC_WPA_INTERFACE_NAME_1		("wlan1")
 
 #define NRC_WPA_ROUTE_TIMEOUT_SEC		60*5
-#define NRC_WPA_ROUTE_MAX				20
+#define NRC_WPA_ROUTE_MAX				255
 
 #if defined(MAX_STA)
 #define NRC_WPA_SOFTAP_MAX_STA			MAX_STA
@@ -107,6 +107,7 @@ enum {
 	VEVENT_VENDOR_IE_BCAST_FOTA_2 = 0x9,
 	VEVENT_VENDOR_IE_BCAST_FOTA_3 = 0xA,
 	VEVENT_VENDOR_IE_BCAST_FOTA_4 = 0xB,
+	VEVENT_VENDOR_IE_UTC = 0x1B,
 };
 
 struct nrc_wpa_key {
@@ -227,6 +228,13 @@ struct nrc_wpa_sta {
 #endif
 };
 
+struct nrc_wpa_signal_info {
+	bool 					enabled;
+	int8_t					rssi_last;
+	int8_t 					rssi_threshold;
+	int8_t					rssi_hysteresis;
+};
+
 struct nrc_wpa_bss {
 	uint8_t					bssid[6];
 	uint8_t					ssid[32];
@@ -237,6 +245,7 @@ struct nrc_wpa_bss {
 	bool 					authorized_1x;
 	struct os_time 			last_tx_time;
 	bool					qos;
+	struct nrc_wpa_signal_info	signal_info;
 };
 
 struct nrc_wpa_if {
@@ -272,7 +281,6 @@ struct nrc_rx_data_cb{
 	u8 vif_id;
 	u8 error_mic;           //For michael_mic_verify()
 	u8 center_freq;         //For nrc_wpa_scan_sta_rx(), nrc_wap_mgmt_ap_rx(),nrc_wpa_eapol()
-	u8 rssi;                //For nrc_wpa_scan_sta_rx();
 };
 #endif
 
@@ -312,6 +320,23 @@ struct nrc_wpa_log_event {
 	uint16_t len;
 	int level;
 };
+
+enum nrc_driver_event_type {
+	NRC_DRIVER_EVENT_SUPP           = BIT(0),
+	NRC_DRIVER_EVENT_APP            = BIT(1),
+	NRC_DRIVER_EVENT_ALL            = 0xFF
+};
+
+struct nrc_driver_event {
+	uint8_t mask;
+	uint8_t type;
+	struct nrc_wpa_if *intf;
+	void *addr;
+	void *frame;
+	size_t addr_len;
+	size_t frame_len;
+	union wpa_event_data data;
+} STRUCT_PACKED;
 
 #if defined(INCLUDE_BD_SUPPORT_TARGET_VERSION)
 #define NRC_DRIVER_BD_MAX_CH_LIST		45
@@ -401,6 +426,7 @@ static inline bool is_key_ccmp(struct nrc_wpa_key *key)
 }
 
 bool nrc_update_route(struct nrc_wpa_if* intf, struct nrc_wpa_sta* sta, uint8_t* addr);
+uint8_t* nrc_sta_find_route(struct nrc_wpa_sta* sta, const uint8_t addr[ETH_ALEN]);
 void nrc_set_use_4address(bool value);
 bool nrc_get_use_4address(void);
 void nrc_set_scan_max_interval(uint32_t interval);
@@ -410,7 +436,8 @@ uint32_t nrc_get_backoff_start_count();
 int generateRandomBackoff(int retry_count) ;
 
 void nrc_add_app_event(uint8_t vif_id, uint8_t e_id, uint8_t *addr);
-struct nrc_app_event* nrc_get_app_event(void);
+struct nrc_app_event* nrc_get_app_event();
 void nrc_init_app_event();
+void nrc_driver_event(struct nrc_wpa_if *intf, struct nrc_driver_event *event, uint32_t delay_us);
 
 #endif // _DRIVER_NRC_H_

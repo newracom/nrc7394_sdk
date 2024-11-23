@@ -96,7 +96,7 @@ extern u32_t dhcps_lease_time;
 #define DHCP_OPTION_REQ_LIST     55
 #define DHCP_OPTION_END         255
 
-#define MAX_STATION_NUM      20
+#define MAX_STATION_NUM      75
 
 #define DHCPS_STATE_OFFER 1
 #define DHCPS_STATE_DECLINE 2

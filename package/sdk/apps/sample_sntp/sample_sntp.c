@@ -24,12 +24,12 @@
  */
 
 #include "nrc_sdk.h"
+#include "nrc_lwip.h"
 #include "lwip/sys.h"
 #include "lwip/sockets.h"
 #include "lwip/errno.h"
 #include "wifi_config_setup.h"
 #include "wifi_connect_common.h"
-#include "nrc_lwip.h"
 
 #ifndef MAX_RETRY
 #define MAX_RETRY 30
@@ -48,7 +48,7 @@ nrc_err_t run_sample_sntp(WIFI_CONFIG *param)
 {
 	int count;
 	u64_t utc_time = 0;
-	char buf[26];
+	char utc_buf[26];
 
 	nrc_usr_print("==========================\n");
 	nrc_usr_print("SNTP Test - Client\n");
@@ -76,15 +76,8 @@ nrc_err_t run_sample_sntp(WIFI_CONFIG *param)
 	}
 
 	/* check if IP is ready */
-	while(1){
-		if (nrc_addr_get_state(0) == NET_ADDR_SET) {
-			nrc_usr_print("[%s] IP ...\n",__func__);
-			break;
-		} else {
-			nrc_usr_print("[%s] IP Address setting State : %d != NET_ADDR_SET(%d) yet...\n",
-						  __func__, nrc_addr_get_state(0), NET_ADDR_SET);
-		}
-		_delay_ms(1000);
+	if (nrc_wait_for_ip(0, param->dhcp_timeout) == NRC_FAIL) {
+		return NRC_FAIL;
 	}
 
 	if (initialize_sntp(SNTP_SERVER, SNTP_TIMEOUT) != 0) {
@@ -93,7 +86,7 @@ nrc_err_t run_sample_sntp(WIFI_CONFIG *param)
 	}
 
 	for(int i = 0; i<10; i++) {
-		nrc_usr_print("%s: UTC %s\n", __func__, get_utc_time_str(buf, sizeof(buf)));
+		nrc_usr_print("%s: UTC %s\n", __func__, get_utc_time_str(utc_buf, sizeof(utc_buf)));
 		_delay_ms(2000);
 	}
 

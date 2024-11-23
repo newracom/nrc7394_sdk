@@ -62,7 +62,8 @@
 //======================================================================================================================
 // Function Prototypes
 //======================================================================================================================
-void system_check_xtal_status();
+void system_check_xtal_status(void);
+void schedule_xtal_check_timer(void);
 
 //======================================================================================================================
 // Subsystem delimiter
@@ -596,6 +597,8 @@ typedef struct {
 
 #define RegCPUID			(*((volatile uint32_t *)(0xE000ED00)))
 #define RegICSR				(*((volatile uint32_t *)(0xE000ED04)))
+#define ICSR_PENDSVCLR      (BIT27)
+#define ICSR_PENDSTCLR      (BIT25)
 #define ICSR_VECTACTIVE_MASK (0x3F)
 #define RegCCR 				(*((volatile uint32_t *)(0xE000ED14)))
 #define CCR_STKALIGN		(BIT9)

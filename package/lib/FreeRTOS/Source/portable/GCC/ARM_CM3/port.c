@@ -174,6 +174,17 @@ static UBaseType_t uxCriticalNesting = 0xaaaaaaaa;
  */
 StackType_t *pxPortInitialiseStack( StackType_t *pxTopOfStack, TaskFunction_t pxCode, void *pvParameters )
 {
+#if defined(NRC_FREERTOS)
+	/* Mark stack on bottom to dump to marker */
+	pxTopOfStack--; 
+	*pxTopOfStack = STACK_START_MARKER;
+	pxTopOfStack--; 
+	*pxTopOfStack = STACK_START_MARKER;
+	pxTopOfStack--; 
+	*pxTopOfStack = STACK_START_MARKER;
+	pxTopOfStack--; 
+	*pxTopOfStack = STACK_START_MARKER;
+#endif
 	/* Simulate the stack frame as it would be created by a context switch
 	interrupt. */
 	pxTopOfStack--; /* Offset added to account for the way the MCU uses the stack on entry/exit of interrupts. */
@@ -359,19 +370,10 @@ void vPortEndScheduler( void )
 }
 /*-----------------------------------------------------------*/
 
-static uint32_t vBackup_flags = 0;
 void vPortEnterCritical( void )
 {
-#if 0
 	portDISABLE_INTERRUPTS();
-#else
-	if( uxCriticalNesting == 0 )
-	{
-		vBackup_flags = portSET_INTERRUPT_MASK_FROM_ISR();
-	}
-#endif
 	uxCriticalNesting++;
-
 	/* This is not the interrupt safe version of the enter critical function so
 	assert() if it is being called from an interrupt context.  Only API
 	functions that end in "FromISR" can be used in an interrupt.  Only assert if
@@ -390,14 +392,7 @@ void vPortExitCritical( void )
 	uxCriticalNesting--;
 	if( uxCriticalNesting == 0 )
 	{
-#if 0
-#ifdef NRC_FREERTOS
-        asm volatile("cpsie i\n");
-#endif /* NRC_FREERTOS */
 		portENABLE_INTERRUPTS();
-#else
-		portCLEAR_INTERRUPT_MASK_FROM_ISR(vBackup_flags);
-#endif
 	}
 }
 /*-----------------------------------------------------------*/

@@ -51,8 +51,6 @@
 #define LWIP_SOCKET_TASK_PRIORITY		ATCMD_TASK_PRIORITY
 #define LWIP_SOCKET_TASK_STACK_SIZE		((4 * 1024) / sizeof(StackType_t))
 
-#define LWIP_SOCKET_FDS_MUTEX_TIMEOUT	portMAX_DELAY
-
 /**********************************************************************************************/
 
 typedef union
@@ -123,37 +121,27 @@ extern int _lwip_socket_deinit (void);
 extern int _lwip_socket_open_udp (int *fd, uint16_t local_port, bool ipv6, bool reuse_addr);
 extern int _lwip_socket_open_tcp_server (int *fd, uint16_t local_port, bool ipv6, bool reuse_addr);
 extern int _lwip_socket_open_tcp_client (int *fd, ip_addr_t *remote_addr, uint16_t remote_port,
-										int timeout_msec, bool ipv6, bool reuse_addr);
+								int timeout_msec, bool ipv6, bool reuse_addr);
 extern int _lwip_socket_close (int fd);
 
 extern int _lwip_socket_get_peer (int fd, ip_addr_t *ipaddr, uint16_t *port);
 extern int _lwip_socket_get_local (int fd, ip_addr_t *ipaddr, uint16_t *port);
 
-extern int _lwip_socket_send_request (int fd);
+extern int _lwip_socket_send_request (int fd, uint32_t timeout_ms);
 extern int _lwip_socket_send_done (int fd);
+extern int _lwip_socket_send_udp(int fd, ip_addr_t *remote_addr, uint16_t remote_port,
+								char *data, int len, struct netif *netif);
+extern int _lwip_socket_send_tcp(int fd, char *data, int len);
 
 extern int _lwip_socket_recv_request (int fd);
 extern int _lwip_socket_recv_done (int fd);
 extern int _lwip_socket_recv_len (int fd);
-
-extern int _lwip_socket_send (int fd, ip_addr_t *remote_addr, uint16_t remote_port,
+extern int _lwip_socket_recv_udp(int fd, ip_addr_t *remote_addr, uint16_t *remote_port,
 								char *data, int len);
-extern int _lwip_socket_recv (int fd, ip_addr_t *remote_addr, uint16_t *remote_port,
-								char *data, int len);
-
-#define _lwip_socket_send_udp(fd, remote_addr, remote_port, data, len) \
-								_lwip_socket_send(fd, remote_addr, remote_port, data, len)
-#define _lwip_socket_send_tcp(fd, data, len) \
-								_lwip_socket_send(fd, NULL, 0, data, len)
-
-#define _lwip_socket_recv_udp(fd, remote_addr, remote_port, data, len) \
-								_lwip_socket_recv(fd, remote_addr, remote_port, data, len)
-#define _lwip_socket_recv_tcp(fd, data, len) \
-								_lwip_socket_recv(fd, NULL, 0, data, len)
+extern int _lwip_socket_recv_tcp(int fd, char *data, int len);
 
 extern int _lwip_socket_addr_info_1 (const char *host, char *addr, int addrlen);
 extern int _lwip_socket_addr_info_2 (const char *host, const char *port, char *addr, int addrlen);
 
 /**********************************************************************************************/
 #endif /* #ifndef __LWIP_SOCKET_H__ */
-

@@ -16,6 +16,7 @@ void phy_set_primary_1m_loc(uint8_t loc);
 void phy_nrf_txgain_control(uint32_t nrf_txgain);
 uint32_t phy_get_txgain();
 void phy_nrf_rxgain_control(uint32_t nrf_rxgain);
+void phy_nrf_rxgain_recovery(uint32_t nrf_rxgain);
 uint32_t phy_get_rxgain();
 void phy_nrf_txgain_lut_write(uint32_t ram_type);
 void phy_nrf_rxgain_lut_write(uint32_t ram_type);

@@ -121,6 +121,24 @@ typedef enum {
 	WIFI_SEC_MAX,
 } tWIFI_SECURITY;
 
+/** @brief Wi-Fi sae_pwe */
+typedef enum {
+	WIFI_SAE_PWE_HAP = 0, //hunting-and-pecking loop only
+	WIFI_SAE_PWE_H2E,	//hash-to-element only
+	WIFI_SAE_PWE_BOTH, //both hunting-and-pecking loop and hash-to-element enabled
+	WIFI_SAE_PWE_MAX,
+} tWIFI_SAE_PWE;
+
+/** @brief Wi-Fi EAP type */
+typedef enum {
+	WIFI_EAP_NONE = 0,
+	WIFI_EAP_TLS,
+	WIFI_EAP_TTLS,	/* TTLS-MSCHAPv2 */
+	WIFI_EAP_PEAP,	/* PEAPv0-MSCHAPv2 */
+
+	WIFI_EAP_MAX,
+} tWIFI_EAP;
+
 /** @brief Wi-Fi API operation status	*/
 typedef enum {
 	WIFI_SUCCESS			= 0,
@@ -161,12 +179,15 @@ typedef enum {
 	WIFI_CC_US = 0,
 	WIFI_CC_JP,
 	WIFI_CC_K1,
-	WIFI_CC_TW,
+	WIFI_CC_T8,
 	WIFI_CC_EU,
 	WIFI_CC_CN,
 	WIFI_CC_NZ,
 	WIFI_CC_AU,
 	WIFI_CC_K2,
+	WIFI_CC_S8,
+	WIFI_CC_S9,
+	WIFI_CC_T9,
 
 	WIFI_CC_MAX
 }tWIFI_COUNTRY_CODE;
@@ -192,16 +213,6 @@ typedef enum {
 
 	WIFI_NETWORK_MODE_MAX
 }tWIFI_NETWORK_MODE;
-
-/** @brief Wi-Fi scan mode */
-typedef enum {
-	WIFI_SCAN_NORMAL = 0,
-	WIFI_SCAN_PASSIVE,
-	WIFI_SCAN_FAST,
-	WIFI_SCAN_FAST_PASSIVE,
-
-	WIFI_SCAN_MAX,
-} tWIFI_SCAN;
 
 /** @brief Wi-Fi STA state 	*/
 typedef enum {
@@ -231,6 +242,12 @@ typedef enum {
 	WIFI_IGNORE_BROADCAST_SSID_EMPTY,
 	WIFI_IGNORE_BROADCAST_SSID_CLEAR,
 } tWIFI_IGNORE_BROADCAST_SSID;
+
+/** @brief Wi-Fi scan mode */
+typedef enum {
+	WIFI_SCAN_MODE_ACTIVE,
+	WIFI_SCAN_MODE_PASSIVE,
+} tWIFI_SCAN_MODE;
 
 /** @brief scan item */
 typedef union {
@@ -284,6 +301,13 @@ typedef struct {
 	uint8_t minor;
 	uint8_t patch;
 } VERSION_T;
+
+/** @brief Wi-Fi auth control */
+typedef enum {
+	WIFI_DISABLE_AUTH_CONTROL,
+	WIFI_ENABLE_AUTH_CONTROL,
+} tWIFI_AUTH_CONTROL;
+
 
 typedef void (*intr_handler_fn)(int vector);
 

@@ -30,6 +30,9 @@
 #include "lwip/sockets.h"
 
 //#define NVS_USE 1
+/* If the server echos back the data sent, enable HANDLE_SERVER_ECHO */
+#define HANDLE_SERVER_ECHO 1
+#define CLIENT_DATA_DEBUG 0
 
 #if defined(NVS_USE) && (NVS_USE == 1)
 #include "nrc_sdk.h"
@@ -51,7 +54,11 @@ nvs_handle_t nvs_handle;
 #define TCP_SEND 1 // Send TCP data : 1 or 0 (1:enable, 0:disable)
 #define TCP_SEND_SIZE 128 // Bytes
 
+#ifdef NRC7292
 //#define WAKEUP_GPIO_PIN 15
+#else
+//#define WAKEUP_GPIO_PIN 25
+#endif
 
 static void user_operation(uint32_t delay_ms)
 {
@@ -174,6 +181,47 @@ static int connect_to_server(WIFI_CONFIG *param)
 	return sockfd;
 }
 
+struct client_data {
+	int sockfd;
+	size_t send_size;
+};
+
+#if HANDLE_SERVER_ECHO
+static void echo_client_task(void *pvParameters)
+{
+	struct client_data *client = (struct client_data *) pvParameters;
+	char* buf = NULL;
+	int received = 0;
+	int total = 0;
+
+	buf = (char*)nrc_mem_malloc(client->send_size);
+	if(!buf) {
+		nrc_usr_print("%s: buffer allocation failed! size:%d\n", __func__, client->send_size);
+		return;
+	}
+
+#if CLIENT_DATA_DEBUG
+	nrc_usr_print("Waiting for Echo.\n");
+#endif
+	do {
+		if ((received = recv(client->sockfd , buf + received, client->send_size, 0)) > 0) {
+#if CLIENT_DATA_DEBUG
+			nrc_usr_print("Echo received : %d\n", received);
+#endif
+			total += received;
+		}
+		if (total >= client->send_size) {
+			break;
+		}
+	} while (1);
+#if CLIENT_DATA_DEBUG
+	nrc_usr_print("Finished Echo handling.\n");
+#endif
+	nrc_mem_free(buf);
+	vTaskDelete(NULL);
+}
+#endif
+
 static void send_data_to_server(WIFI_CONFIG *param, uint32_t send_data_size)
 {
 	int sockfd = -1;
@@ -198,6 +246,13 @@ static void send_data_to_server(WIFI_CONFIG *param, uint32_t send_data_size)
 
 	if ((sockfd = connect_to_server(param)) >= 0) {
 		nrc_usr_print ("Sending data to server...\n");
+
+#if HANDLE_SERVER_ECHO
+		struct client_data client = {.sockfd = sockfd, .send_size = send_data_size};
+		xTaskCreate(echo_client_task, "echo_client_task", 4096,
+						(void*)&client, uxTaskPriorityGet(NULL), NULL);
+#endif
+
 		if (send(sockfd, buf, length, 0) < 0) {
 			nrc_usr_print("Error occurred during sending\n");
 		}
@@ -218,6 +273,24 @@ static void send_data_to_server(WIFI_CONFIG *param, uint32_t send_data_size)
 		if(buf)
 			nrc_mem_free(buf);
 	}
+}
+
+void enter_gpio_wakeup_mode(int wakeup_gpio)
+{
+#ifdef NRC7292
+	/* Below configuration is for NRC7292 EVK Revision B board */
+	nrc_ps_set_gpio_direction(0x07FFFF7F);
+#elif defined(NRC7394)
+	/* Below configuration is for NRC7394 EVK Revision board */
+	nrc_ps_set_gpio_direction(0xFFF7FDC7);
+#endif
+	nrc_ps_set_gpio_out(0x0);
+	nrc_ps_set_gpio_pullup(0x0);
+
+	nrc_ps_set_gpio_wakeup_pin(false, wakeup_gpio, true);
+	nrc_ps_set_wakeup_source(WAKEUP_SOURCE_GPIO);
+
+	nrc_ps_sleep_forever();
 }
 
 /******************************************************************************
@@ -305,7 +378,7 @@ check_again:
 	}
 
 #if defined(WAKEUP_GPIO_PIN)
-	nrc_ps_set_gpio_wakeup_pin(false, WAKEUP_GPIO_PIN);
+	nrc_ps_set_gpio_wakeup_pin(false, WAKEUP_GPIO_PIN, true);
 	wakeup_source |= WAKEUP_SOURCE_GPIO;
 #endif /* defined(WAKEUP_GPIO_PIN) */
 
@@ -318,14 +391,12 @@ check_again:
 #ifdef NRC7292
 	/* Below configuration is for NRC7292 EVK Revision B board */
 	nrc_ps_set_gpio_direction(0x07FFFF7F);
-	nrc_ps_set_gpio_out(0x0);
-	nrc_ps_set_gpio_pullup(0x0);
 #elif defined(NRC7394)
 	/* Below configuration is for NRC7394 EVK Revision board */
 	nrc_ps_set_gpio_direction(0xFFF7FDC7);
+#endif
 	nrc_ps_set_gpio_out(0x0);
 	nrc_ps_set_gpio_pullup(0x0);
-#endif
 
 	while (1) {
 		if(ps_mode){

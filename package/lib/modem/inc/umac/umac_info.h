@@ -8,10 +8,12 @@
 #if defined(INCLUDE_DEFRAG)
 #include "util_sysbuf_queue.h"
 #endif
+#if defined(INCLUDE_TWT_SUPPORT)
+#include "lmac_twt_common.h"
+#endif
 
-#define MAX_SCAN_NUM 1 //TBD: scan for multiple ssid
 #if !defined(MAX_STA)
-#if defined(NRC7292) || defined(NRC7393)|| defined(NRC7394)
+#if defined(NRC7292) || defined(NRC7394)
 #define MAX_STA	1000
 #else
 #define MAX_STA	4
@@ -98,7 +100,16 @@ typedef struct _S1G_CAPA {
 	uint8_t supported_ch_width: 2;
 	uint8_t color:3;
 	uint8_t minimum_mpdu_start_spacing: 3;
+#if defined(INCLUDE_AUTH_CONTROL)
+	uint8_t centralized_auth_control: 1;
+	uint8_t distributed_auth_control: 1;
+#else
 	uint8_t reserved2: 2;
+#endif
+#if (dot11TWTGroupingSupport == 1)
+	uint8_t twtgrouping_support:1;
+	uint8_t reserved3: 7;
+#endif
 	uint8_t rx_s1gmcs_map:8;
 } __attribute__((packed)) S1G_CAPA;
 
@@ -140,8 +151,9 @@ typedef struct _KEY_INFO {
 #if defined(INCLUDE_TWT_SUPPORT)
 /* TWT Info */
 typedef struct _TWT_INFO {
-	uint32_t twt_service_period;
-	uint32_t twt_wake_interval;
+	struct dl_list list;
+	uint8_t bitmap;
+	uint8_t dial_token;
 } __attribute__((packed)) TWT_INFO;
 #endif /* INCLUDE_TWT_SUPPORT */
 
@@ -201,6 +213,7 @@ typedef struct _MCS_INFO {
 typedef struct _M_SIG_INFO{
 	int8_t rssi_avg;
 	int8_t rssi_last;
+	int8_t noise_last;
 	//int8_t snr_avg;
 	//int8_t snr_last;
 }__attribute__((packed)) M_SIG_INFO;
@@ -220,7 +233,7 @@ typedef struct _APINFO{
 #if defined(INCLUDE_TWT_SUPPORT)
 	TWT_INFO m_twt;
 #endif /* defined(INCLUDE_TWT_SUPPORT) */
-	SECURITY_INFO m_secrurity;
+	SECURITY_INFO m_security;
 	KEY_INFO m_key;
 	M_SIG_INFO msig;
 #if defined(INCLUDE_MULTI_STA_RC)
@@ -246,7 +259,9 @@ typedef struct _STAINFO {
 	PN_INFO m_pn;
 #endif
 #if defined(INCLUDE_TWT_SUPPORT)
+#if (TWT_AP_TARGET_SUPPORT != 0)
 	TWT_INFO m_twt;
+#endif
 #endif
 #if defined(INCLUDE_STA_SIG_INFO)
 	SIGNAL_INFO m_signal;
@@ -266,14 +281,6 @@ typedef struct _STAINFO {
 #endif
 } __attribute__((packed)) STAINFO;
 
-/**************************************************************
-	SCANINFO (only for STA)
-		- STA : scan info (preallocated)
-**************************************************************/
-typedef struct _SCANINFO {
-	uint8_t ssid[IEEE80211_MAX_SSID_LEN];
-	uint8_t ssid_len;
-} __attribute__((packed)) SCANINFO;
 
 //// functions 
 #if defined(INCLUDE_UMAC)
@@ -348,14 +355,12 @@ STAINFO * get_stainfo_by_vifid(int8_t vif_id);
 /* (STA ONLY) clear stainfo by vif_id */
 void clear_stainfo(int8_t vif_id);
 
-/*(STA ONLY) Get scaninfo */
-SCANINFO* get_scaninfo(int8_t vif_id, int8_t index);
+/* (STA ONLY) clear tx sn by vif_id */
+void clear_sta_txsn(int8_t vif_id);
 
-/*(STA ONLY) Reset scaninfo */
-void reset_scaninfo(int8_t vif_id, int8_t index);
+/* (STA ONLY) clear rx sn by vif_id */
+void clear_sta_rxsn(int8_t vif_id);
 
-/*(STA ONLY) Set scaninfo */
-void set_scaninfo(int8_t vif_id, int8_t index, uint8_t *ssid, uint8_t ssid_len);
 #else /* defined(INCLUDE_UMAC) */
 static inline STAINFO* get_stainfo_by_addr(int8_t vif_id, uint8_t *addr, bool create) {return NULL;};
 static inline STAINFO* get_stainfo_by_aid(int8_t vif_id, uint16_t aid) {return NULL;};
@@ -382,5 +387,11 @@ int umac_rc_peer_init (int8_t vif_id, STAINFO *sta);
 void umac_rc_peer_deinit (STAINFO *sta);
 #endif /* INCLUDE_MULTI_STA_RC */
 uint8_t get_rc_mcs_from_stainfo_by_aid (uint8_t vif_id, uint16_t aid);
+
+void umac_init (void);
+void umac_info_lock_init (void);
+void umac_info_lock (void);
+void umac_info_unlock (void);
+
 
 #endif

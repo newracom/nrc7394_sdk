@@ -44,6 +44,7 @@
   #define __WEAK                                 __attribute__((weak))
 #endif
 #define RELEASE_CONST const
+#if 0
 enum drv_efuse_id_t{
 	drv_efuse_id0,
 	drv_efuse_id_max,
@@ -52,5 +53,5 @@ enum drv_pmsspi_id_t{
 	drv_pmsspi_id0,
 	drv_pmsspi_id_max,
 };
-
+#endif
 #endif //__DRV_PORT_H__

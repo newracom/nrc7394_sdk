@@ -61,6 +61,25 @@ static const char rebooting_element[] = R"rawliteral(
 </html>
 )rawliteral";
 
+static const char setup_complete[] = R"rawliteral(
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Configuration complete</title>
+</head>
+<body>
+	<h1>Setup completed!</h1>
+    <p> <button value="submit" type="submit" onclick="reboot()">Reboot</button> </p>
+
+    <script>
+        function reboot() {
+            window.location.href = '/rebooting';
+        }
+    </script>
+</body>
+</html>
+)rawliteral";
+
 /**
  * @brief insert new string in place of old string within destination string
  *
@@ -247,7 +266,7 @@ httpd_uri_t setup_page = {
 	.uri = "/",
 	.method = HTTP_GET,
 	.handler = setup_page_http,
-	.user_ctx = NULL
+	.user_ctx = (char *) setup_complete
 };
 
 /**
@@ -438,8 +457,10 @@ update_settings_handler(httpd_req_t* req)
 		}
 		wifi_config->network_mode = WIFI_NETWORK_MODE_BRIDGE;
 
+		nrc_usr_print("[%s] Saving configuration...\n", __func__);
 		nrc_save_wifi_config(wifi_config, 1);
 
+		httpd_resp_send(req, setup_complete, strlen(setup_complete));
 		return ESP_OK;
 	}
 
@@ -450,7 +471,7 @@ httpd_uri_t update_settings = {
 	.uri = "/update_settings",
 	.method = HTTP_GET,
 	.handler = update_settings_handler,
-	.user_ctx = NULL,
+	.user_ctx = NULL
 };
 
 static esp_err_t reboot_page_handler(httpd_req_t *req)

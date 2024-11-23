@@ -4,6 +4,46 @@
 *
 *******************************************************************
 
+[2024-11-22]
+Change summary for version 1.3:
+
+  New features
+    * AT-CMD feature
+      o Relay  (AT+WRELAY)
+      o Background scan for roaming (AT+WBGSCAN)
+      o Wi-Fi Protected Setup(WPS) (AT+WWPS)
+    * Support WPA3-SAE/WAP3-OWE in SoftAP
+    * WPA3-SAE H2E support
+    * Support Distributed Auth Control (Experimental)
+
+  Bugfix
+    * Modify the short guard interval to apply only in 4M bandwidth and high modulation states (always).
+    * Issue where EAPOL fails during WPA2/WPA3 implementation, resulting in failure to generate PTK/GTK (non-periodic).
+    * Memory leak issue occurring during repeated connect/disconnect actions (non-periodic).
+    * Performance degradation in UDP/TCP (always).
+    * CCA threshold being set to -60 upon waking up from deep sleep (always).
+    * Failure of downlink (AP->STA) block acknowledgment session (for aggregation) (always).
+    * Intermittent dropping of management frames by the AP for duplicated sequence number (non-periodic).
+    * Beacon monitoring functionality not working properly when RELAY STA is assigned to vif1 (always).
+    * Intermittent RX stoppage in the system (non-periodic).
+    * Inaccurate scan results after scan completion (non-periodic).
+    * System freezing during scanning (non-periodic).
+    * Issues with interoperability with third-party APs at specific bandwidths and channels (always).
+
+  Changes
+    * Update SDK APIs
+      o Update SDK APIs: refer to UG-7394-005-Standalone SDK API document
+    * Update AT-CMD
+      o Update AT commands: refer to UG-7394-006-AT_Command document
+    * Extend STA support of SoftAP (up to 70)
+    * RTS default disable
+    * Apply the additional duty cycle condition which is defined in ARIB Standard, chapter 3.4.1
+    * SoftAP can support a bridged STA which uses 4-address
+    * Added sflash IS25XX series/MX25R8035F
+    * Support additional GPIO for waking-up from deep sleep. two differenct GPIOs can be used from now
+    * Support frame defrgamentation
+    * optimizing the wake-up time after deep sleep
+
 [2024-06-21]
 Change summary for version 1.2.2:
 
@@ -31,10 +71,10 @@ Change summary for version 1.2.1:
 [2023-11-30]
 Change summary for version 1.2:
 
-    New features
+  New features
     * RSSI-based rate adaptation (v1.2)
 
-    Changes
+  Changes
     * Update SDK APIs: refer to UG-7394-005-Standalone SDK API document
     * Update AT-CMD APIs: refer to UG-7394-006-AT_Command document
     * Update supported baudrate up to 2Mbps on UART without RTS/CTS (AT-CMD)
@@ -61,7 +101,7 @@ Change summary for version 1.2:
     * Update Firwmare Flash Tool v6.3.0 (Multi v7.2.0)
       o Dynamic XIP boot erase size + max size check    
     
-    Bugfix
+  Bugfix
     * Prevent manipulating source MAC address when 4 address is used for W5500 sample
     * TX power setting failure when changing from FIXED mode to AUTO mode (AT-CMD)
     * TX power in LIMIT mode not limited to the set value (AT-CMD)
@@ -78,7 +118,7 @@ Change summary for version 1.2:
     * Failure in setting the limit type for 'nrc_wifi_set_tx_power'
     * PN order mismatch during the packet retransmission
 
-    Known Issues
+  Known Issues
     * The issue of deauthentication frame delivery failure can occur between PMF-enabled NRC7394 and PMF-enabled NRC7292 devices.
     * During deep sleep, TCP connections are not maintained. Upon waking up, a new TCP connection must be established.
     * The AT-CMD throughput over HSPI interface is slightly lower than NRC7292 device due to CPU clock speed variation.
@@ -86,13 +126,13 @@ Change summary for version 1.2:
 [2023-08-17]
 Change summary for version 1.1:
 
-    New features
+  New features
     * AT-CMD feature: continuous TX operation (AT+WCTX)
 
-    Changes
+  Changes
     * Enhanced RSSI accuracy of system_api_get_rssi()
 
-    Bugfix
+  Bugfix
     * Intermittent scan failure on TW channel
     * AP's association grant for STA with listen interval exceeding BSS max idle period
     * CCA type of JP 2/4MHz channels
@@ -100,7 +140,7 @@ Change summary for version 1.1:
     * Scan failure on K2 channel
     * Incorrect peer MAC address copy at 4-address enabled W5500 device
 
-    Known Issues
+  Known Issues
     * The initial connection time for WPA3-SAE/OWE can be quite lengthy (> 15 seconds) due to the substantial computational load required by software for large number operations.
     * The SoftAP disable/enable sequence on the standalone mode is not supported.
     * The issue of deauthentication frame delivery failure can occur between PMF-enabled NRC7394 and PMF-enabled NRC7292 devices.
@@ -110,7 +150,7 @@ Change summary for version 1.1:
 [2023-08-07]
 Change summary for version 1.0:
 
-    New features
+  New features
     * AT-CMD features
       o WPA3-SAE (v1.0)
       o OWE (v1.0)
@@ -133,7 +173,7 @@ Change summary for version 1.0:
         - Middleware: XML, JSON, AWS, MQTT, HTTP
         - Scenario: PS schedule, UART data handling
 
-    Known Issues
+  Known Issues
     * The initial connection time for WPA3-SAE/OWE can be quite lengthy (> 15 seconds) due to the substantial computational load required by software for large number operations.
     * The SoftAP disable/enable sequence on the standalone mode is not supported.
     * The issue of deauthentication frame delivery failure can occur between PMF-enabled NRC7394 and PMF-enabled NRC7292 devices.

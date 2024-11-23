@@ -48,7 +48,8 @@ nvs_handle_t nvs_handle;
 #ifdef NRC7292
 //#define WAKEUP_GPIO_PIN 15
 #elif defined(NRC7394)
-//#define WAKEUP_GPIO_PIN 17
+//#define WAKEUP_GPIO_PIN 20
+//#define WAKEUP_GPIO_PIN2 17
 #endif
 
 static void user_operation(uint32_t delay_ms)
@@ -203,7 +204,8 @@ check_again:
 	}
 
 #if defined(WAKEUP_GPIO_PIN)
-	nrc_ps_set_gpio_wakeup_pin(false, WAKEUP_GPIO_PIN);
+	nrc_ps_set_gpio_wakeup_pin(false, WAKEUP_GPIO_PIN, true);
+	// nrc_ps_set_gpio_wakeup_pin2(false, WAKEUP_GPIO_PIN2, true);
 	wakeup_source |= WAKEUP_SOURCE_GPIO;
 #endif /* defined(WAKEUP_GPIO_PIN) */
 
@@ -284,7 +286,10 @@ WIFI_CONFIG* param = &wifi_config;
 void user_init(void)
 {
 	nrc_uart_console_enable(true);
-
+	uint8_t reason = 0;
+	if (nrc_ps_wakeup_gpio_ext(&reason) == NRC_SUCCESS) {
+		nrc_usr_print("#### Wokeup by GPIO ext%d\n", reason);
+	}
 	memset(param, 0x0, WIFI_CONFIG_SIZE);
 
 	nrc_wifi_set_config(param);

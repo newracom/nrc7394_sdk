@@ -254,16 +254,6 @@ document.getElementById('disconn_timeout').value = disconn_timeout;
 function updateTxPowerType(txpower_type) {
 document.getElementById('txpower_type').value = txpower_type;
 }
-function redirectTo(url) {
-window.location.href = url;
-}
-document.addEventListener('DOMContentLoaded', function () {
-var form = document.getElementById('settingsForm');
-form.addEventListener('submit', function (event) {
-event.preventDefault();
-redirectTo('rebooting');
-});
-});
 </script>
 <div id="doc2" class="yui-t2">
 <div id="hd">
@@ -343,7 +333,7 @@ type="text">.
 type="text">. <input name="netmask2" id="netmask2" value="255" maxlength="3" size="3"
 type="text">.
 <input name="netmask3" id="netmask3" value="255" maxlength="3" size="3" type="text">.
-<input name="netmask4" id="netmask4" value="1" maxlength="3" size="3" type="text">
+<input name="netmask4" id="netmask4" value="0" maxlength="3" size="3" type="text">
 </p>
 </div>
 <div id="gateway_div" class="gateway_div">

@@ -126,3 +126,18 @@ v6.2.0 (6/22/2023)
 v6.3.0 / v7.2.0 (11/28/2023)
 - XIP boot/firmware max size check.
 - XIP boot dynamic erase size.
+
+v6.3.0 / v7.2.0 (10/25/2024)
+- boot.bin Binary update.
+
+v6.3.0 / v7.2.0 (10/29/2024)
+- boot.bin Binary update
+- Support MX25R8035F
+
+v6.3.0 / v7.2.0 (11/05/2024)
+- boot.bin Binary update
+- Support ZB25WQ16A
+
+v6.3.0 / v7.2.0 (11/20/2024)
+- boot.bin Binary update
+- Fixed FWDN failed in exception case

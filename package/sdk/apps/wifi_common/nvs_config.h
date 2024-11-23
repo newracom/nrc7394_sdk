@@ -129,6 +129,10 @@
 /* (type i32) */
 #define NVS_WIFI_DISCONN_TIMEOUT  "disconn_timeout"
 
+/* DHCP timeout */
+/* (type i32) */
+#define NVS_DHCP_TIMEOUT "dhcp_timeout"
+
 /*WIFI beacon interval */
 /* CLI : nvs set_i32 wifi_bcn <15-65535> */
 /* (type u16) */
@@ -190,9 +194,64 @@
 /* (type u16) */
 #define NVS_WIFI_LISTEN_INTERVAL "listen_interval"
 
+/* SCAN MODE */
+/* CLI : nvs set_u8 scan_mode [scan_mode] */
+/* [scan_mode] WIFI_SCAN_NORMAL = 0, WIFI_SCAN_PASSIVE = 1 */
+/* (type u8) */
+#define NVS_WIFI_SCAN_MODE "scan_mode"
+
+/* Background Scan Enable */
+/* CLI : nvs set_u8 bgscan_enable [0 or 1] */
+/* Enables or disables background scanning.
+ *    0 = Disabled (default)
+ *    1 = Enabled
+ */
+#define NVS_BGSCAN_ENABLE "bgscan_enable"
+
+/* Background Scan Short Interval */
+/* CLI : nvs set_u16 bgscan_short [seconds] */
+/* Defines the interval (in seconds) for background scans when the signal strength
+ * of the current access point is weaker than the specified threshold.
+ * Shorter intervals ensure that the device can search for a better connection more frequently.
+ */
+#define NVS_BGSCAN_SHORT_INTERVAL "bgscan_short"
+
+/* Background Scan Signal Strength Threshold */
+/* CLI : nvs set_i8 bgscan_thres [dBm] */
+/* Defines a signal strength threshold (in dBm) that determines whether the short or long
+ * interval will be used for background scans:
+ *    - If the signal is weaker than this threshold, the short interval will apply.
+ *    - If the signal is stronger, the long interval will apply.
+ */
+#define NVS_BGSCAN_THRESHOLD "bgscan_thresh"
+
+/* Background Scan Long Interval */
+/* CLI : nvs set_u16 bgscan_long [seconds] */
+/* Defines the interval (in seconds) for background scans when the signal strength
+ * of the current access point is stronger than the specified threshold.
+ * Longer intervals reduce scan frequency to save power when the connection is stable.
+ */
+#define NVS_BGSCAN_LONG_INTERVAL "bgscan_long"
+
+/* AUTH MODE */
+/* CLI : nvs set_u8 auth_ctrl [auth_mode] */
+/* [scan_mode] WIFI_DISABLE_AUTH_CONTROL = 0, WIFI_ENABLE_AUTH_CONTROL = 1 */
+/* (type u8) */
+#define NVS_WIFI_AUTH_CTRL "auth_ctrl"
+
 #ifdef INCLUDE_SCAN_BACKOFF
 
 #define NVS_SCAN_BACKOFF_START_COUNT "backoff_cnt"
 #define NVS_SCAN_MAX_INTERVAL "backoff_max"
 #endif
+
+#define NVS_EAP_TYPE "eap_type"
+#define NVS_EAP_IDENTITY "eap_id"
+#define NVS_EAP_PRIVATE_KEY_PASSWORD "eap_pri_key_pw"
+#define NVS_EAP_CA_CERT "eap_ca_cert"
+#define NVS_EAP_CLIENT_CERT "eap_client_cert"
+#define NVS_EAP_PRIVATE_KEY "eap_pri_key"
+
+#define NVS_SAE_PWE "sae_pwe"
+
 #endif

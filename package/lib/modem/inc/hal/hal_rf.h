@@ -43,6 +43,7 @@ void hal_rf_pll_frequency(uint32_t channel_freq);
 void hal_rf_update_txpwr(void);
 uint8_t hal_rf_set_txpwr(uint8_t txpwr);
 uint8_t hal_rf_get_txpwr(void);
+uint8_t hal_rf_recover_txpwr(uint8_t txpwr);
 
 #if defined(INCLUDE_RF_DEBUG)
 //TBD will be removed

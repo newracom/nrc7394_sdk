@@ -63,7 +63,13 @@ enum ATCMD_EVENT
 
 	ATCMD_BEVENT_FWBINDL_IDLE = ATCMD_EVENT_START,
 	ATCMD_BEVENT_FWBINDL_DROP,
+	ATCMD_BEVENT_FWBINDL_FAIL,
 	ATCMD_BEVENT_FWBINDL_DONE,
+
+	ATCMD_BEVENT_SFUSER_IDLE,
+	ATCMD_BEVENT_SFUSER_DROP,
+	ATCMD_BEVENT_SFUSER_FAIL,
+	ATCMD_BEVENT_SFUSER_DONE,
 
 	/* Wi-Fi Events */
 	ATCMD_WEVENT_CONNECT_SUCCESS,
@@ -105,14 +111,33 @@ enum ATCMD_CB_TYPE
 	ATCMD_CB_RXD
 };
 
+enum ATCMD_RXD_TYPE
+{
+	ATCMD_RXD_SOCKET = 0,
+	ATCMD_RXD_SFUSER,
+	ATCMD_RXD_SFSYSUSER
+};
+
 typedef struct
 {
-	bool verbose;
+	enum ATCMD_RXD_TYPE type;
+	int length;
 
-	int id;
-	int len;
-	char remote_addr[ATCMD_IPADDR_LEN_MAX + 1];
-	int remote_port;
+	union
+	{
+		struct
+		{
+			int id;
+			char remote_addr[ATCMD_IPADDR_LEN_MAX + 1];
+			int remote_port;
+			bool verbose;
+		}; /* socket */
+
+		struct
+		{
+			int offset;
+		}; /* sfuser & sfsysuser */
+	};
 } atcmd_rxd_t;
 
 typedef int (*atcmd_info_cb_t) (enum ATCMD_INFO info, int argc, char *argv[]);
@@ -138,7 +163,7 @@ extern bool nrc_atcmd_log_is_on (void);
 extern void nrc_atcmd_data_info (uint64_t *send, uint64_t *recv);
 extern void nrc_atcmd_data_reset (void);
 
-extern int nrc_atcmd_firmware_download (char *bin_data, int bin_size, uint32_t bin_crc32);
+extern int nrc_atcmd_firmware_download (char *bin_data, int bin_size, uint32_t bin_crc32, int verify);
 
 /**********************************************************************************************/
 #endif /* #ifndef __NRC_H__ */

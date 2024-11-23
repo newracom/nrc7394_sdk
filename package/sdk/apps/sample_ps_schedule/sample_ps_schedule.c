@@ -57,7 +57,8 @@
 #define REMOTE_TCP_PORT 8099
 #define MAX_RETRY 10
 
-//#define WAKEUP_GPIO_PIN 15
+//#define WAKEUP_GPIO_PIN 25
+//#define WAKEUP_GPIO_PIN2 17
 
 static nvs_handle_t nvs_handle;
 static uint64_t time_woken = 0;
@@ -297,7 +298,8 @@ nrc_err_t schedule_deep_sleep()
 {
 #if defined(WAKEUP_GPIO_PIN)
 	/* set check_bounce to true to use a switch to toggle GPIO interrupt */
-	nrc_ps_set_gpio_wakeup_pin(true, WAKEUP_GPIO_PIN);
+	nrc_ps_set_gpio_wakeup_pin(true, WAKEUP_GPIO_PIN, true);
+	//nrc_ps_set_gpio_wakeup_pin2(true, WAKEUP_GPIO_PIN2, true);
 	nrc_ps_set_wakeup_source(WAKEUP_SOURCE_RTC|WAKEUP_SOURCE_GPIO);
 #else
 	nrc_ps_set_wakeup_source(WAKEUP_SOURCE_RTC);
@@ -306,11 +308,6 @@ nrc_err_t schedule_deep_sleep()
 	/* Set GPIO pullup/output/direction mask */
 	/* The GPIO configuration should be customized based on the target board layout */
 	/* If values not set correctly, the board may consume more power during deep sleep */
-#if defined(SUPPORT_DEVICEWORX)
-	nrc_ps_set_gpio_direction(0x3FFFFFCF);
-	nrc_ps_set_gpio_out(0x20004200);
-	nrc_ps_set_gpio_pullup(0x00000000);
-#else
 #ifdef NRC7292
 	/* Below configuration is for NRC7292 EVK Revision B board */
 	nrc_ps_set_gpio_direction(0x07FFFF7F);
@@ -321,7 +318,6 @@ nrc_err_t schedule_deep_sleep()
 	nrc_ps_set_gpio_direction(0xFFF7FDC7);
 	nrc_ps_set_gpio_out(0x0);
 	nrc_ps_set_gpio_pullup(0x0);
-#endif
 #endif
 
 	/* set the callbacks for scheduled callbacks */

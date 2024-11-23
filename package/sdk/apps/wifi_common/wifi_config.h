@@ -78,6 +78,18 @@
 
 
 /**
+ * SAE PWE  settings for Wi-Fi networks (only for WIFI_SEC_WPA3_SAE)
+ * The available security options are:
+ *     WIFI_SAE_PWE_HAP: hunting-and-pecking loop only
+ *     WIFI_SAE_PWE_H2E: hash-to-element only
+ *     WIFI_SAE_PWE_BOTH: both hunting-and-pecking loop and hash-to-element enabled
+ */
+#ifndef NRC_WIFI_SAE_PWE
+#define NRC_WIFI_SAE_PWE WIFI_SAE_PWE_BOTH
+#endif /* NRC_WIFI_SAE_PWE */
+
+
+/**
  * IP Address settings for Wi-Fi connections can be specified as either static or dynamic (DHCP).
  * The available options are:
  *     WIFI_STATIC_IP: the device will use a manually specified IP address, subnet mask,
@@ -108,6 +120,35 @@
 #ifndef NRC_REMOTE_PORT
 #define NRC_REMOTE_PORT		8099
 #endif /* NRC_REMOTE_PORT */
+
+
+/**
+ * scan type
+ *  normal(0): do normal scan procedure to find AP
+  */
+#ifndef NRC_WIFI_SCAN_TYPE
+#define NRC_WIFI_SCAN_TYPE 0
+
+/**
+ *define parameters for fast scan here (only valid when scan type is fast scan)
+ */
+#ifndef FAST_SCAN_BSSID
+#define FAST_SCAN_BSSID "88:57:1d:f1:e1:26"
+#endif
+#ifndef FAST_SCAN_FREQ
+#define FAST_SCAN_FREQ 9170
+#endif
+#endif /* NRC_WIFI_SCAN_LIST */
+
+
+/**
+ * scan mode : active (Default) or passive
+ *  active : send probe requests on each scanning channel to find AP
+ *  passive : just listen to beacons on each scanning channel to find AP
+ */
+#ifndef NRC_WIFI_SCAN_MODE
+#define NRC_WIFI_SCAN_MODE WIFI_SCAN_MODE_ACTIVE
+#endif /* NRC_WIFI_SCAN_LIST */
 
 
 /**
@@ -259,22 +300,6 @@
 #define NRC_AP_SET_CHANNEL_BW 0
 #endif /* NRC_AP_SET_CHANNEL_BW */
 
-
-/**
- * This code snippet defines the default scan mode used for WiFi scanning.
- * WiFi scanning allows a device to discover nearby WiFi access points (APs) and
- * retrieve their information such as SSID, signal strength, security protocols, and more.
- * The scan method is set to WIFI_SCAN_NORMAL by default, which performs a standard WiFi scan.
- * Other available options include WIFI_SCAN_PASSIVE, which performs a passive scan with lower
- * power consumption, and WIFI_SCAN_FAST, which performs a faster scan with less accuracy.
- * By setting a default scan mode, the device can perform WiFi scans automatically
- * without requiring the user to specify the scan mode each time.
- */
-#ifndef WIFI_SCAN_MODE
-#define WIFI_SCAN_MODE	WIFI_SCAN_NORMAL
-#endif /* WIFI_SCAN_MODE */
-
-
 /**
  * This code block defines the timeout period for WiFi connection attempts. The value of
  * WIFI_CONN_TIMEOUT is set to 0, which means that the connection attempts will continue
@@ -295,6 +320,16 @@
 #ifndef WIFI_DISCONN_TIMEOUT
 #define WIFI_DISCONN_TIMEOUT	0 /* infinite */
 #endif /* WIFI_DISCONN_TIMEOUT */
+
+/**
+ * This code block defines the timeout period for DHCP client. The value of
+ * DHCP is set to 0, which means that the disconnection attempts will continue
+ * indefinitely until a successful disconnection is made or an error occurs.
+ * NRC_DHCP_TIMEOUT value in second.
+ */
+#ifndef NRC_DHCP_TIMEOUT
+#define NRC_DHCP_TIMEOUT	60
+#endif /* NRC_DHCP_TIMEOUT */
 
 /**
  * In wireless networking, an AP is considered idle if there are no active connections to it.
@@ -441,10 +476,10 @@
 #endif /* NRC_WIFI_IGNORE_BROADCAST_SSID_DEFAULT */
 
 /**
- * Maximum number of stations allowed in softAP (upto 10)
+ * Maximum number of stations allowed in softAP (upto 75)
  */
 #ifndef NRC_WIFI_SOFTAP_MAX_NUM_STA_DEFAULT
-#define NRC_WIFI_SOFTAP_MAX_NUM_STA_DEFAULT 10
+#define NRC_WIFI_SOFTAP_MAX_NUM_STA_DEFAULT 75
 #endif /* NRC_WIFI_SOFTAP_MAX_NUM_STA_DEFAULT */
 
 /**
@@ -454,9 +489,95 @@
  * and listen interval time must be larger than sleep duratioon
  */
 #ifndef NRC_WIFI_LISTEN_INTERVAL_DEFAULT
-#define NRC_WIFI_LISTEN_INTERVAL_DEFAULT 0
+#define NRC_WIFI_LISTEN_INTERVAL_DEFAULT 1000
 #endif /* NRC_WIFI_LISTEN_INTERVAL_DEFAULT*/
 
+
+/**
+ * Background Scan Enable
+ * Enables or disables background scanning.
+ * When set to 1, background scanning is enabled; when set to 0, it is disabled.
+ */
+#ifndef NRC_WIFI_BGSCAN_ENABLE
+#define NRC_WIFI_BGSCAN_ENABLE 0
+#endif /* NRC_WIFI_BGSCAN_ENABLE */
+
+/**
+ * Background Scan Short Interval
+ * Defines the interval between background scans (in seconds) if the actual signal strength
+ * of the currently connected access point is worse than the defined threshold.
+ * This frequent scanning helps to locate a stronger AP when the signal is poor.
+ */
+#ifndef NRC_WIFI_BGSCAN_SHORT_INTERVAL
+#define NRC_WIFI_BGSCAN_SHORT_INTERVAL 30
+#endif /* NRC_WIFI_BGSCAN_SHORT_INTERVAL */
+
+/**
+ * Background Scan Signal Strength Threshold
+ * Defines a threshold (in dBm) that determines which one of the following two parameters
+ * (i.e., Short Interval or Long Interval) will be effective.
+ * When the actual signal strength of the currently connected AP is better than this threshold,
+ * the Long Interval setting will apply.
+ * When the signal strength is worse, the Short Interval setting will apply.
+ */
+#ifndef NRC_WIFI_BGSCAN_THRSHOLD
+#define NRC_WIFI_BGSCAN_THRSHOLD -60
+#endif /* NRC_WIFI_BGSCAN_THRSHOLD */
+
+/**
+ * Background Scan Long Interval
+ * Defines the interval between background scans (in seconds) if the actual signal strength
+ * of the currently connected access point is better than the defined threshold.
+ * This longer interval reduces scan frequency to conserve power when the signal is stable and strong.
+ */
+#ifndef NRC_WIFI_BGSCAN_LONG_INTERVAL
+#define NRC_WIFI_BGSCAN_LONG_INTERVAL 300
+#endif /* NRC_WIFI_BGSCAN_LONG_INTERVAL */
+
+
+/**
+ * EAP type settings for Wi-Fi networks can be specified only Station (STA) modes.
+ * The available EAP type options are:
+ *     WIFI_EAP_NONE: No EAP
+ *     WIFI_EAP_TLS: EAP-TLS (client and server certificate)
+ *     WIFI_EAP_TTLS: EAP-PEAP (with tunnelled MSCHAPV2 authentication)
+ *     WIFI_EAP_PEAP: EAP-TTLS (with tunnelled MSCHAPV2 authentication)
+ */
+#ifndef NRC_WIFI_EAP_TYPE
+#define NRC_WIFI_EAP_TYPE WIFI_EAP_NONE
+#endif /* NRC_WIFI_EAP_TYPE*/
+
+/**
+ * The NRC_WIFI_IDENTITY configuration setting specifies the Wi-Fi identity to use
+ * when connecting to a enterprise network.
+ * the default identity of "halow" will be used.
+ */
+#ifndef NRC_WIFI_IDENTITY
+#define NRC_WIFI_IDENTITY "halow"
+#endif /* NRC_WIFI_IDENTITY*/
+
+#ifndef NRC_WIFI_PRIVATE_KEY_PASSWORD
+#define NRC_WIFI_PRIVATE_KEY_PASSWORD  "whatever"
+#endif /* NRC_WIFI_PRIVATE_KEY_PASSWORD */
+
+#ifndef NRC_WIFI_EAP_CA_CERT
+#define NRC_WIFI_EAP_CA_CERT	""
+#endif /* NRC_WIFI_EAP_CA_CERT */
+
+#ifndef NRC_WIFI_EAP_CLIENT_CERT
+#define NRC_WIFI_EAP_CLIENT_CERT ""
+#endif /* NRC_WIFI_EAP_CLIENT_CERT */
+
+#ifndef NRC_WIFI_EAP_PRIVATE_KEY
+#define NRC_WIFI_EAP_PRIVATE_KEY ""
+#endif /* NRC_WIFI_EAP_PRIVATE_KEY */
+
+/**
+ * Wi-Fi Auth Control
+ */
+#ifndef NRC_WIFI_AUTH_CONTROL
+#define NRC_WIFI_AUTH_CONTROL WIFI_DISABLE_AUTH_CONTROL
+#endif /* NRC_WIFI_AUTH_CONTROL */
 
 /*************************************************************
  * VIF1 configurations

@@ -1929,6 +1929,12 @@ dhcp_create_msg(struct netif *netif, struct dhcp *dhcp, u8_t message_type, u16_t
   msg_out->htype = LWIP_IANA_HWTYPE_ETHERNET;
   msg_out->hlen = netif->hwaddr_len;
   msg_out->xid = lwip_htonl(dhcp->xid);
+
+#ifdef NRC_DHCP_SET_BROADCAST_FLAG
+// Set the broadcast bit in flags.
+  msg_out->flags = htons(0x8000);  // Set the broadcast flag
+#endif
+
   /* we don't need the broadcast flag since we can receive unicast traffic
      before being fully configured! */
   /* set ciaddr to netif->ip_addr based on message_type and state */

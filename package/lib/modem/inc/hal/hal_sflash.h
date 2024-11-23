@@ -2,7 +2,7 @@
 #define __HAL_SFLASH_NRC7394_H__
 
 #include "system.h"
-#include "system_sflash.h"
+#include "system_sflash_.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,6 +32,7 @@ extern "C" {
 #define MX25U1633F_JEDEC_ID (0xC22535)
 #define MX25R3235F_JEDEC_ID (0xC22816)
 #define MX25R1635F_JEDEC_ID (0xC22815)
+#define MX25R8035F_JEDEC_ID (0xC22814)
 #define EN25QW32A_JEDEC_ID (0x1C6116)
 #define EN25S32A_JEDEC_ID (0x1C3816)
 #define EN25SE32A_JEDEC_ID (0x1C4816)
@@ -99,53 +100,34 @@ typedef struct {
 } sf_mem_map_t;
 
 enum sf_store_area_e {
-#if defined(SUPPORT_DEVICEWORX)
-	SF_BOOTLOADER_4MB = 0x0,
-	SF_FW_4MB = 0x10000,
-	SF_FW_INFO_4MB = 0x190000,
-	SF_CORE_DUMP_4MB = 0x191000,
-	SF_USER_CONFIG_1_4MB = 0x195000,/*200KB*/
-	SF_USER_CONFIG_2_4MB = 0x1C7000,/*200KB*/
-	SF_USER_CONFIG_3_4MB = 0x1F9000,/*200KB*/
-	SF_USER_CONFIG_4_4MB = 0x22B000,/*200KB*/
-	SF_DEVICE_INFO_4MB = 0x25D000,/*4KB*/
-	SF_USER_DATA_4MB = 0x25E000,/*120KB*/
-	SF_SYSTEM_CONFIG_4MB = 0x27C000,
-	SF_MAC_ADDR_4MB = 0x27C000, /*not used*/
-	SF_MAC_ADDR_MC_4MB = 0x27C008,/*not used*/
-	SF_RF_CAL_4MB = 0x27D000,
-	SF_FOTA_4MB = 0x27E000,
-	SF_FOTA_INFO_4MB = 0x3FE000,
-#else
 	SF_BOOTLOADER_4MB = 0x0,
 	/*SF_FW_4MB = 0x10000,*/
 	SF_USER_DATA_4MB = 0x3DA000,/*100KB*/
 	/*SF_FW_INFO_4MB = 0x3FE000,*/
 	/*SF_CORE_DUMP_4MB = 0x3F3000,*/
 	/* SF_USER_CONFIG_1_4MB = 0x3F7000,*/
-	SF_USER_CONFIG_2_4MB = 0x3F8000,/*4KB*/
-	SF_USER_CONFIG_3_4MB = 0x3F9000,/*4KB*/
-	SF_USER_CONFIG_4_4MB = 0x3FA000,/*4KB*/
-	SF_DEVICE_INFO_4MB = 0x3FB000,/*4KB*/
+	//SF_USER_CONFIG_2_4MB = 0x3F8000,/*4KB*/
+	//SF_USER_CONFIG_3_4MB = 0x3F9000,/*4KB*/
+	//SF_USER_CONFIG_4_4MB = 0x3FA000,/*4KB*/
+	//SF_DEVICE_INFO_4MB = 0x3FB000,/*4KB*/
 	/*SF_SYSTEM_CONFIG_4MB = 0x3FC000,*/
 	/*SF_RF_CAL_4MB = 0x3FD000,*/
 	/*SF_FOTA_4MB = 0x1F5000,*/
 	/*SF_FOTA_INFO_4MB = 0x3FF000,*/
-#endif
 	SF_BOOTLOADER_2MB = 0x0,
 	/*SF_FW_2MB = 0x10000,*/
 	/*SF_FW_INFO_2MB = 0xF5000,*/
 	/*SF_CORE_DUMP_2MB = 0xF6000,*/
 	/* SF_USER_CONFIG_1_2MB = 0xFA000, */
-	SF_USER_CONFIG_2_2MB = 0xFB000,
-	SF_USER_CONFIG_3_2MB = 0xFC000,
-	SF_USER_CONFIG_4_2MB = 0xFD000,
+	//SF_USER_CONFIG_2_2MB = 0xFB000,
+	//SF_USER_CONFIG_3_2MB = 0xFC000,
+	//SF_USER_CONFIG_4_2MB = 0xFD000,
 	/*SF_SYSTEM_CONFIG_2MB = 0xFE000,*/
 	SF_MAC_ADDR_2MB = 0xFE000,
 	SF_MAC_ADDR_MC_2MB = 0xFE008,
 	/*SF_RF_CAL_2MB = 0xFF000,*/
 	/*SF_FOTA_2MB = 0x100000,*/
-	SF_DEVICE_INFO_2MB = 0x1E5000,
+	//SF_DEVICE_INFO_2MB = 0x1E5000,
 	SF_USER_DATA_2MB = 0x1E6000
 	/*SF_FOTA_INFO_2MB = 0x1FF000*/
 };
@@ -159,15 +141,15 @@ static bool mem_map_valid = 0;
 //#define SF_FW_INFO nrc_sf_get_mem_map()->FW_INFO
 //#define SF_CORE_DUMP nrc_sf_get_mem_map()->CORE_DUMP
 //#define SF_USER_CONFIG_1 nrc_sf_get_mem_map()->USER_CONFIG_1
-#define SF_USER_CONFIG_2 nrc_sf_get_mem_map()->USER_CONFIG_2
-#define SF_USER_CONFIG_3 nrc_sf_get_mem_map()->USER_CONFIG_3
-#define SF_USER_CONFIG_4 nrc_sf_get_mem_map()->USER_CONFIG_4
+//#define SF_USER_CONFIG_2 nrc_sf_get_mem_map()->USER_CONFIG_2
+//#define SF_USER_CONFIG_3 nrc_sf_get_mem_map()->USER_CONFIG_3
+//#define SF_USER_CONFIG_4 nrc_sf_get_mem_map()->USER_CONFIG_4
 #define SF_MAC_ADDR half_addr_sf - 0x2000
 //#define SF_SYSTEM_CONFIG nrc_sf_get_mem_map()->SYS_CONFIG
 #define SF_MAC_ADDR_MC half_addr_sf - 0x1FF8
 //#define SF_RF_CAL nrc_sf_get_mem_map()->RF_CAL
 //#define SF_FOTA nrc_sf_get_mem_map()->FOTA
-#define SF_DEVICE_INFO nrc_sf_get_mem_map()->DEVICE_INFO
+//#define SF_DEVICE_INFO nrc_sf_get_mem_map()->DEVICE_INFO
 //#define SF_FOTA_INFO nrc_sf_get_mem_map()->FOTA_INFO
 #define SF_USER_DATA nrc_sf_get_mem_map()->USER_DATA
 
@@ -182,13 +164,6 @@ enum sf_reg_override_ctrl {
 #define SYSCONFIG_SECTOR_SIZE               4096
 #define SYSCONFIG_PRE_USER_FACTORY_SIZE      256
 #define SYSCONFIG_USER_FACTORY_SIZE          512
-
-typedef struct {
-	uint32_t BI;
-	uint32_t T_SLOT;
-	uint32_t TI_MIN;
-	uint32_t TI_MAX;
-} sf_auth_ctrl_t;
 
 typedef struct {
 	uint32_t fw_size;
@@ -230,7 +205,6 @@ uint32_t nrc_sf_read_id(void);
 uint32_t nrc_sf_read_jedec(void);
 bool nrc_sf_check_slot_sig(uint32_t* signature);
 bool nrc_sf_update_slot(uint32_t address, uint8_t *data, size_t size);
-bool nrc_sf_read_slot_info(uint32_t address, sf_slot_t *data);
 bool nrc_sf_read_slot_data(uint32_t address, size_t size, uint8_t *buffer);
 bool nrc_sf_update_version(uint32_t version);
 bool nrc_sf_update_macaddr(uint8_t *macaddr, uint8_t interface);
@@ -248,10 +222,6 @@ bool nrc_sf_update_hw_version(uint16_t version);
 bool nrc_sf_update_memory_map(sf_mem_map_t *mem_map);
 bool nrc_sf_set_etag_id(uint16_t etag_id);
 uint16_t nrc_sf_get_etag_id(void);
-#if defined(INCLUDE_AUTH_CONTROL)
-bool nrc_sf_set_auth_ctrl(sf_auth_ctrl_t  *auth_ctrl);
-bool nrc_sf_get_auth_ctrl(sf_auth_ctrl_t  *auth_ctrl);
-#endif /* defined(INCLUDE_AUTH_CONTROL) */
 uint32_t nrc_sf_get_module_name(void);
 bool nrc_sf_update_module_name(uint32_t name);
 uint32_t nrc_sf_get_module_feature(void);
@@ -268,6 +238,16 @@ bool nrc_sf_update_cfo_valid(bool cfo_valid);
 bool nrc_sf_get_cfo_valid(void);
 bool nrc_sf_get_user_factory(char* data, uint16_t buf_len);
 bool nrc_sf_update_user_factory(char* data, uint16_t len);
+enum sf_migration_res_e {
+	SF_MIGRATION_RES_OK = 0,
+	SF_MIGRATION_RES_ALREADY = 1,
+	SF_MIGRATION_RES_ORG_FAIL = 2,
+	SF_MIGRATION_RES_INVALID_SIZE = 3,
+	SF_MIGRATION_RES_ERROR = 4
+};
+uint8_t nrc_sf_migration_1m_to_2m(void);
+
+void nrc_sf_set_slot_sig(uint32_t* signature);
 
 #define NRC_SF_VERIFY_SLOT_OKAY           0
 #define NRC_SF_VERIFY_SLOT_MIN_SIZE_FAIL  1
