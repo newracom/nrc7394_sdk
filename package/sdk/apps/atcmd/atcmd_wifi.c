@@ -26,6 +26,9 @@
 
 #include "atcmd.h"
 
+
+/* #define CONFIG_SHOW_WIFI_PASSWORD */
+
 /**********************************************************************************************/
 
 extern uint32_t _atcmd_timeout_value (const char *cmd);
@@ -1740,15 +1743,15 @@ static int _atcmd_wifi_scan_result_report (SCAN_RESULTS *results, const char *ss
 			{
 				if (strcmp(ssid, result->ssid) == 0)
 				{
-					ATCMD_MSG_INFO("WSCANSSID", "\"%s\",%.1f,%d,\"%s\",\"%s\"",
-							result->bssid, s1g_freq / 10., (int8_t)atoi(result->sig_level),
+					ATCMD_MSG_INFO("WSCANSSID", "\"%s\",%.1f@%d,%d,\"%s\",\"%s\"",
+							result->bssid, s1g_freq / 10., result->bandwidth, (int8_t)atoi(result->sig_level),
 							result->flags, result->ssid);
 				}
 			}
 			else
 			{
-				ATCMD_MSG_INFO("WSCAN", "\"%s\",%.1f,%d,\"%s\",\"%s\"",
-						result->bssid, s1g_freq / 10., (int8_t)atoi(result->sig_level),
+				ATCMD_MSG_INFO("WSCAN", "\"%s\",%.1f@%d,%d,\"%s\",\"%s\"",
+						result->bssid, s1g_freq / 10., result->bandwidth, (int8_t)atoi(result->sig_level),
 						result->flags, result->ssid);
 			}
 		}
@@ -2636,16 +2639,12 @@ static int _atcmd_wifi_connect_get (int argc, char *argv[])
 			else
 				status = "disconnected";
 
-#if 0
-			ATCMD_MSG_INFO("WCONN", "\"%s\",\"%s\",\"%s\",\"\",\"%s\"",
-								connect->ssid, connect->bssid,
-								connect->security, status);
-#else
+#if defined(CONFIG_SHOW_WIFI_PASSWORD)
 			if (strlen(connect->password) <= 16)
 			{
 				ATCMD_MSG_INFO("WCONN", "\"%s\",\"%s\",\"%s\",\"%s\",\"%s\"",
-								connect->ssid, connect->bssid,
-								connect->security, connect->password,
+								connect->ssid, connect->bssid, 
+								connect->security, connect->password, 
 								status);
 			}
 			else
@@ -2656,10 +2655,14 @@ static int _atcmd_wifi_connect_get (int argc, char *argv[])
 				password[16] = '\0';
 
 				ATCMD_MSG_INFO("WCONN", "\"%s\",\"%s\",\"%s\",\"%s...%d\",\"%s\"",
-								connect->ssid, connect->bssid,
-								connect->security, password, strlen(connect->password),
+								connect->ssid, connect->bssid, 
+								connect->security, password, strlen(connect->password), 
 								status);
 			}
+#else		
+			ATCMD_MSG_INFO("WCONN", "\"%s\",\"%s\",\"%s\",\"%s\",\"%s\"",
+							connect->ssid, connect->bssid, connect->security, 
+							connect->recovery ? "*" : "", status);
 #endif
 			break;
 		}
@@ -2905,7 +2908,8 @@ static int _atcmd_wifi_ipaddr_get (int argc, char *argv[])
 {
 	switch (argc)
 	{
-		case 3: /* DHCP */
+		case 4: /* DHCP client */
+		case 3: /* DHCP server */
 		case 0:
 		{
 			atcmd_wifi_ipaddr_t str_ip4addr[3];
@@ -2918,11 +2922,14 @@ static int _atcmd_wifi_ipaddr_get (int argc, char *argv[])
 				ATCMD_MSG_INFO("WIPADDR", "\"%s\",\"%s\",\"%s\"",
 								str_ip4addr[0], str_ip4addr[1], str_ip4addr[2]);
 			}
-			else
+			else /* DHCP */
 			{
 				strcpy(argv[0], str_ip4addr[0]);
 				strcpy(argv[1], str_ip4addr[1]);
 				strcpy(argv[2], str_ip4addr[2]);
+
+				if (argc == 4)
+					*(int *)argv[3] = wifi_api_get_dhcp_lease_time();
 			}
 
 			break;
@@ -3247,20 +3254,21 @@ static int _atcmd_wifi_dhcp_run (int argc, char *argv[])
 	if (ret == ATCMD_SUCCESS)
 	{
 		char param_ip4addr[3][ATCMD_STR_PARAM_SIZE(sizeof(atcmd_wifi_ipaddr_t))];
-		char *argv[3] = { param_ip4addr[0], param_ip4addr[1], param_ip4addr[2] };
+		int lease_time = 0;
+		char *argv[4] = { param_ip4addr[0], param_ip4addr[1], param_ip4addr[2], (char *)&lease_time };
 
-		if (_atcmd_wifi_ipaddr_get(3, argv) != ATCMD_SUCCESS)
+		if (_atcmd_wifi_ipaddr_get(4, argv) != ATCMD_SUCCESS)
 			_atcmd_info("wifi_dhcp: failed to get ip address");
 
 		if (task_run)
 		{
-			ATCMD_MSG_WEVENT("\"DHCP_SUCCESS\",\"%s\",\"%s\",\"%s\"",
-					param_ip4addr[0], param_ip4addr[1], param_ip4addr[2]);
+			ATCMD_MSG_WEVENT("\"DHCP_SUCCESS\",\"%s\",\"%s\",\"%s\",%d",
+					param_ip4addr[0], param_ip4addr[1], param_ip4addr[2], lease_time);
 		}
 		else
 		{
-			ATCMD_MSG_INFO("WDHCP", "\"%s\",\"%s\",\"%s\"",
-					param_ip4addr[0], param_ip4addr[1], param_ip4addr[2]);
+			ATCMD_MSG_INFO("WDHCP", "\"%s\",\"%s\",\"%s\",%d",
+					param_ip4addr[0], param_ip4addr[1], param_ip4addr[2], lease_time);
 		}
 	}
 
@@ -4308,6 +4316,7 @@ static int _atcmd_wifi_softap_get (int argc, char *argv[])
 
 			if (softap->active)
 			{
+#if defined(CONFIG_SHOW_WIFI_PASSWORD)
 				_atcmd_info("wifi_softap_get: channel=%u,%u ssid=%s security=%s password=%s",
 						softap->channel_bw, softap->channel_freq,
 						softap->ssid, softap->security, softap->password);
@@ -4324,6 +4333,24 @@ static int _atcmd_wifi_softap_get (int argc, char *argv[])
 							softap->channel_bw, softap->channel_freq / 10.,
 							softap->ssid, softap->security, softap->password);
 				}
+#else
+				_atcmd_info("wifi_softap_get: channel=%u,%u ssid=%s security=%s",
+						softap->channel_bw, softap->channel_freq,
+						softap->ssid, softap->security);
+
+				if (softap->dhcp_server)
+				{
+					ATCMD_MSG_INFO("WSOFTAP", "%u,%.1f,\"%s\",\"%s\",\"\",\"dhcp\"",
+							softap->channel_bw, softap->channel_freq / 10.,
+							softap->ssid, softap->security, softap->password);
+				}
+				else
+				{
+					ATCMD_MSG_INFO("WSOFTAP", "%u,%.1f,\"%s\",\"%s\",\"\"",
+							softap->channel_bw, softap->channel_freq / 10.,
+							softap->ssid, softap->security, softap->password);
+				}
+#endif				
 			}
 			else
 			{
@@ -4909,11 +4936,16 @@ static int _atcmd_wifi_relay_get (int argc, char *argv[])
 				{
 					if (strcmp(softap->password, connect->password) != 0)
 					{
+#if defined(CONFIG_SHOW_WIFI_PASSWORD)
 						_atcmd_error("%s password mismatch, ap=%s sta=%s",
 								softap->security, softap->password, connect->password);
+#else
+						_atcmd_error("%s password mismatch", softap->security);
+#endif						
 					}
 				}
 
+#if defined(CONFIG_SHOW_WIFI_PASSWORD)
 				_atcmd_info("wifi_relay_get: channel=%u,%u, ssid=%s,%s security=%s,%s",
 						softap->channel_bw, softap->channel_freq,
 						softap->ssid, connect->ssid,
@@ -4923,6 +4955,15 @@ static int _atcmd_wifi_relay_get (int argc, char *argv[])
 						softap->channel_bw, softap->channel_freq / 10.,
 						softap->ssid, connect->ssid,
 						connect->security, connect->password);
+#else
+				_atcmd_info("wifi_relay_get: channel=%u,%u, ssid=%s,%s security=%s",
+						softap->channel_bw, softap->channel_freq,
+						softap->ssid, connect->ssid, connect->security);
+
+				ATCMD_MSG_INFO("WRELAY", "%d,%.1f,\"%s\",\"%s\",\"%s\",\"\"",
+						softap->channel_bw, softap->channel_freq / 10.,
+						softap->ssid, connect->ssid, connect->security);
+#endif				
 			}
 			else
 			{
@@ -5865,6 +5906,7 @@ static int _atcmd_wifi_init_info (atcmd_wifi_info_t *info)
 		connect->connected = false;
 		connect->connecting = false;
 		connect->disconnecting = false;
+
 		strcpy(connect->ssid, ATCMD_WIFI_INIT_SSID);
 		strcpy(connect->bssid, ATCMD_WIFI_INIT_BSSID);
 		strcpy(connect->security, ATCMD_WIFI_INIT_SECURITY);

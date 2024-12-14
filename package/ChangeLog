@@ -4,6 +4,29 @@
 *
 *******************************************************************
 
+[2024-12-12]
+Change summary for version 1.3.1:
+
+  Bugfix
+    * Memory leak during the scan operation
+    * IPv6 build issue in AT-CMD
+
+  Changes
+    * Update SDK APIs
+      o Add bandwidth information in scan results
+      o Add to get the offered lease time when using DHCP.
+    * Update AT-CMD
+      o Update AT commands: refer to UG-7394-006-AT_Command document
+    * Update samples
+      o sample_softap_uart_tcp_server, sample_nontim_tcp_client
+    * Update FirmwareFlashTool
+      o Update boot_xip binary to resolve FOTA binary copy issue
+      o Add profile update functionality for 2MB flash memory
+      o Add functionality to show memory map
+    * Add support for serial flash: BY25Q32ES
+    * Remove ASSERT() when a heap allocation is failed while processing rx frame
+    * Enhanced TIM mode to support operation without RTC wakeup source
+
 [2024-11-22]
 Change summary for version 1.3:
 

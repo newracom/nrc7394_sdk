@@ -40,6 +40,10 @@ static void DEV_GPIO_Config (int pin, bool output, int level)
 	gpio.word &= ~(1 << pin);
 	nrc_gpio_set_alt(&gpio);
 
+	nrc_gpio_get_alt2(&gpio);
+	gpio.word &= ~(1 << pin);
+	nrc_gpio_set_alt2(&gpio);
+
 	nrc_gpio_get_dir(&gpio);
 	gpio.word = (gpio.word & ~(1 << pin)) | (output ? (1 << pin) : 0);
 	nrc_gpio_config_dir(&gpio);

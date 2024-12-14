@@ -213,6 +213,7 @@ extern int wifi_api_get_ip4_address (char *address, char *netmask, char *gateway
 extern int wifi_api_set_ip4_address (char *address, char *netmask, char *gateway);
 
 extern int wifi_api_start_dhcp_client (uint32_t timeout_msec);
+extern int wifi_api_get_dhcp_lease_time (void);
 
 extern int wifi_api_start_deep_sleep (uint32_t timeout, uint8_t gpio);
 extern bool wifi_api_wakeup_done (void);

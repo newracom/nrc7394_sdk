@@ -60,6 +60,9 @@ nvs_handle_t nvs_handle;
 //#define WAKEUP_GPIO_PIN 25
 #endif
 
+#define TCP_SND_RECV_TIMEOUT 15 /* in sec */
+#define TCP_SND_RECV_RETRY_MAX 4 /* Timeout retry max */
+
 static void user_operation(uint32_t delay_ms)
 {
 	_delay_ms(delay_ms);
@@ -155,6 +158,9 @@ static int connect_to_server(WIFI_CONFIG *param)
 {
 	int sockfd;
 	struct sockaddr_in dest_addr;
+	int ret = 0;
+	int flag;
+	struct timeval tv;
 
 	/* build the destination's Internet address */
 	memset(&dest_addr, 0, sizeof(dest_addr));
@@ -169,6 +175,14 @@ static int connect_to_server(WIFI_CONFIG *param)
 		return sockfd;
 	}
 	nrc_usr_print("Connecting to server %s:%d\n", param->remote_addr, param->remote_port);
+
+	flag = 1;
+	setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, (void *) &flag, sizeof(int));
+
+	tv.tv_sec = TCP_SND_RECV_TIMEOUT;
+	tv.tv_usec = 0;
+	setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, (const char *)&tv, sizeof(tv));
+	setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv, sizeof(tv));
 
 	if (connect(sockfd, (struct sockaddr *)&dest_addr, sizeof(dest_addr)) != 0) {
 		nrc_usr_print("Connecttion to server failed.\n");
@@ -229,6 +243,8 @@ static void send_data_to_server(WIFI_CONFIG *param, uint32_t send_data_size)
 	size_t length = send_data_size;
 	int i = 0;
 	int data_index = 0;
+	int ret;
+	int err_retry = 0;
 
 	buf = (char*)nrc_mem_malloc(send_data_size);
 	if(!buf)
@@ -253,8 +269,29 @@ static void send_data_to_server(WIFI_CONFIG *param, uint32_t send_data_size)
 						(void*)&client, uxTaskPriorityGet(NULL), NULL);
 #endif
 
-		if (send(sockfd, buf, length, 0) < 0) {
-			nrc_usr_print("Error occurred during sending\n");
+		while (1) {
+			ret = send(sockfd, buf, length, 0);
+			if(ret > 0) {
+				nrc_usr_print("%s sent %d bytes\n", __func__, length);
+				break;
+			} else if(ret == 0) {
+				nrc_usr_print("%s Connection closed by the peer.\n", __func__);
+				break;
+			} else {
+				int err = errno;
+				if (err == EAGAIN || err == EWOULDBLOCK) {
+					if(err_retry++ < TCP_SND_RECV_RETRY_MAX) {
+						_delay_ms(100);
+						nrc_usr_print("%s sent retry %d\n", __func__, err_retry);
+					} else {
+						nrc_usr_print("%s stopped : %d(%s)\n", __func__, ret, lwip_strerr(ret));
+						break;
+					}
+				} else {
+					nrc_usr_print("%s stopped : %d(%s)\n", __func__, ret, lwip_strerr(ret));
+					break;
+				}
+			}
 		}
 	}
 
@@ -269,7 +306,7 @@ static void send_data_to_server(WIFI_CONFIG *param, uint32_t send_data_size)
 		   it is necessary to give some delay to wait for FIN ACK from server and send ACK for it. */
 		/* One can remove below delay and the server will eventually clean up the server socket
 		   when the TCP FIN timeout reached. */
-		_delay_ms(100);
+		_delay_ms(300);
 		if(buf)
 			nrc_mem_free(buf);
 	}

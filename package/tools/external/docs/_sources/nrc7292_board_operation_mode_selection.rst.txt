@@ -1,7 +1,7 @@
-.. _board_operation_mode_selection:
+.. _nrc7292_board_operation_mode_selection:
 
-NRC Board Operation Mode Selection and Power Supply
-===================================================
+NRC7292 Board Operation Mode Selection
+======================================
 The DIP switch on the NRC board can be configured to select one of the following three modes of operation:
 
 .. warning::

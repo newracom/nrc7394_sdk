@@ -36,17 +36,31 @@
 
 /**********************************************************************************************/
 
-#define LWIP_SOCKET_NUM_MAX				MEMP_NUM_NETCONN /* 12, lib/lwip/contrib/port/lwipopts.h */
-
+/*
+ * lib/FreeRTOS/Source/include/event_groups.h
+ *
+ * The type that holds event bits always matches TickType_t - therefore the
+ * number of bits it holds is set by configUSE_16_BIT_TICKS (16 bits if set to 1,
+ * 32 bits if set to 0.
+ *
+ * Although event groups are not related to ticks, for internal implementation
+ * reasons the number of bits available for use in an event group is dependent
+ * on the configUSE_16_BIT_TICKS setting in FreeRTOSConfig.h.  If
+ * configUSE_16_BIT_TICKS is 1 then each event group contains 8 usable bits (bit
+ * 0 to bit 7).  If configUSE_16_BIT_TICKS is set to 0 then each event group has
+ * 24 usable bits (bit 0 to bit 23).  The EventBits_t type is used to store
+ * event bits within an event group.
+ */
 #if configUSE_16_BIT_TICKS
-#define LWIP_SOCKET_EVENT_BIT_MAX		8
+#define LWIP_SOCKET_EVENT_BIT_MAX		(16 - 8)
 #else
-#define LWIP_SOCKET_EVENT_BIT_MAX		24
+#define LWIP_SOCKET_EVENT_BIT_MAX		(32 - 8)
 #endif
 
-#if LWIP_SOCKET_NUM_MAX > LWIP_SOCKET_EVENT_BIT_MAX
-#error "LWIP_SOCKET_NUM_MAX > LWIP_SOCKET_EVENT_BIT_MAX"
-#endif
+/*
+ * lib/lwip/contrib/port/lwipopts.h 
+ */
+#define LWIP_SOCKET_NUM_MAX				MEMP_NUM_NETCONN 
 
 #define LWIP_SOCKET_TASK_PRIORITY		ATCMD_TASK_PRIORITY
 #define LWIP_SOCKET_TASK_STACK_SIZE		((4 * 1024) / sizeof(StackType_t))

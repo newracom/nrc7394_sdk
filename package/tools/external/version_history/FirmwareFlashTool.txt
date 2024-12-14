@@ -1,5 +1,5 @@
 <CURRENT VERSION>
-v6.3.0 / v7.2.0 (Multi)
+v6.4.0 / v7.4.0 (Multi)
 
 <VERSION HISTORY>
 v3.0.0
@@ -141,3 +141,11 @@ v6.3.0 / v7.2.0 (11/05/2024)
 v6.3.0 / v7.2.0 (11/20/2024)
 - boot.bin Binary update
 - Fixed FWDN failed in exception case
+
+v6.4.0 / v7.4.0 (11/27/2024)
+- Updated bootloader/firmware.
+- Added memory map read/write feature.
+
+v6.4.0 / v7.4.0 (12/06/2024)
+- Updated bootloader/firmware.
+- Support BY25Q32ES

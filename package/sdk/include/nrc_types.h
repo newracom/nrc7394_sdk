@@ -259,6 +259,7 @@ typedef union {
 		char *flags;
 		char *ssid;
 		tWIFI_SECURITY security;
+		tWIFI_BANDWIDTH bandwidth;
 	};
 } SCAN_RESULT;
 

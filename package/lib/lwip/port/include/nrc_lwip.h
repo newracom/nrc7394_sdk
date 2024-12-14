@@ -111,6 +111,7 @@ int static_run(int vif);
 int dhcp_run(int vif);
 int wifi_dhcpc_start(int vif);
 int wifi_dhcpc_stop(int vif);
+int wifi_dhcpc_get_lease_time(int vif);
 int wifi_dhcpc_status(int vif);
 int wifi_station_dhcpc_start(int vif);
 int wifi_station_dhcpc_stop(int vif);

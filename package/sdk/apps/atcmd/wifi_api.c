@@ -1075,6 +1075,21 @@ int wifi_api_start_dhcp_client (uint32_t timeout_msec)
 	return DHCP_TIMEOUT;
 }
 
+int wifi_api_get_dhcp_lease_time (void)
+{
+	int vif_id = wifi_api_is_relay_mode() ? vif_id_br : vif_id_sta; 
+	int lease_time;
+
+	lease_time = wifi_dhcpc_get_lease_time(vif_id);
+	if (lease_time < 0)
+	{
+		_atcmd_error("failed to get DHCP lease time");
+		return -1;
+	}
+
+	return lease_time;
+}
+
 /**********************************************************************************************/
 
 int wifi_api_start_deep_sleep (uint32_t timeout, uint8_t gpio)

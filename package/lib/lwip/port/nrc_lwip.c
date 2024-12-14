@@ -247,6 +247,45 @@ int wifi_dhcpc_stop(int vif)
 	return 0;
 }
 
+int wifi_dhcpc_get_lease_time(int vif)
+{
+	struct dhcp *dhcp_data = NULL;
+	struct netif *target_if;
+
+	switch (vif) {
+#ifdef SUPPORT_ETHERNET_ACCESSPOINT
+		case ETHERNET_INTERFACE:
+#if LWIP_BRIDGE
+			if (nrc_eth_get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
+				target_if = &br_netif;
+				break;
+			}
+#endif /* LWIP_BRIDGE */
+#endif /* SUPPORT_ETHERNET_ACCESSPOINT */
+
+		case WLAN0_INTERFACE:
+		case WLAN1_INTERFACE:
+			target_if = nrc_netif_get_by_idx(vif);
+			break;
+
+		case BRIDGE_INTERFACE: 
+			target_if = &br_netif;
+			break;
+
+		default:
+			E(TT_NET, "%sinvalid vif (%d\n", module_name(), vif);
+			return -EINVAL;
+	}
+
+	dhcp_data = netif_dhcp_data(target_if);
+
+	if (dhcp_data) {
+		return dhcp_data->offered_t0_lease;
+	} else {
+		return -EINVAL;
+	}
+}
+
 int wifi_dhcpc_status(int vif)
 {
 	if (vif >= END_INTERFACE)

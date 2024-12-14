@@ -167,6 +167,7 @@ uint32_t	nrc_sf_fota_info_addr(void);
 #define FM25W16A_JEDEC_ID (0xA12815)
 #define FM25W32A_JEDEC_ID (0xA12816)
 #define ZB25WQ16A_JEDEC_ID (0x5E3415)
+#define BY25Q32ES_JEDEC_ID (0x684016)
 
 /* ----------------------------------
  * W26XX JEDEC ID

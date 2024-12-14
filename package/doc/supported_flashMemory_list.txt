@@ -4,7 +4,7 @@
 *                                                                               *
 *********************************************************************************
 
-                                                             (Updated 11-22-2024)
+                                                             (Updated 12-13-2024)
 +---------------+-----------+---------------------------------+---------+----------+
 | NAME          | JEDEC ID  | Manufacturer                    | Size    | IO Range |
 +---------------+-----------+---------------------------------+---------+----------+
@@ -12,10 +12,10 @@
 |W25Q80EW       |0xEF6014   |WinBOND inc                      |1 MB     |1.65-1.95V|
 |W25Q16FW       |0xEF6015   |WinBOND inc                      |2 MB     |1.65-1.95V|
 |W25Q16JVUXIQ   |0xEF4015   |WinBOND inc                      |2 MB     | 2.7-3.6V |
-I|S25WP080D     |0x9D7014   |Integrated Silicon Solution Inc  |1 MB     |1.65-1.95V|
-I|S25LP080D     |0x9D6014   |Integrated Silicon Solution Inc  |1 MB     | 2.3-3.6V |
-I|S25WP016D     |0x9D7015   |Integrated Silicon Solution Inc  |4 MB     |1.65-1.95V|
-I|S25LP128D     |0x9D6018   |Integrated Silicon Solution Inc  |16 MB    | 2.3-3.6V |
+|IS25WP080D     |0x9D7014   |Integrated Silicon Solution Inc  |1 MB     |1.65-1.95V|
+|IS25LP080D     |0x9D6014   |Integrated Silicon Solution Inc  |1 MB     | 2.3-3.6V |
+|IS25WP016D     |0x9D7015   |Integrated Silicon Solution Inc  |4 MB     |1.65-1.95V|
+|IS25LP128D     |0x9D6018   |Integrated Silicon Solution Inc  |16 MB    | 2.3-3.6V |
 |GD25LQ40C      |0xC86013   |GigaDevice                       |512 KB   |1.65-1.95V|
 |GD25LQ16C      |0xC86015   |GigaDevice                       |2 MB     |1.65-1.95V|
 |GD25Q16CE2GR   |0xC84015   |GigaDevice                       |2 MB     | 2.7-3.6V |
@@ -40,4 +40,5 @@ I|S25LP128D     |0x9D6018   |Integrated Silicon Solution Inc  |16 MB    | 2.3-3.
 |FM25W16A       |0xA12815   |Shanghai Fudan Microelectronics  |2 MB     |1.65-3.6V |
 |FM25W32A       |0xA12816   |Shanghai Fudan Microelectronics  |4 MB     |1.65-3.6V |
 |ZB25WQ16A      |0x5E3415   |Zbit semiconductor               |2 MB     |1.65-3.6V |
+|BY25Q32ES	    |0x684016   |BYTe Semiconductor               |4 MB     |2.70~3.6V |
 +---------------+-----------+---------------------------------+---------+----------+

@@ -391,7 +391,11 @@ static int __atcmd_socket_send_data (atcmd_socket_t *socket, char *data, int len
 
 	if (socket->protocol == ATCMD_SOCKET_PROTO_UDP && IP_IS_V4(&socket->remote_addr))
 	{
+#if defined(CONFIG_ATCMD_IPV6)
+		if (socket->remote_addr.u_addr.ip4.addr == IPADDR_BROADCAST)
+#else
 		if (socket->remote_addr.addr == IPADDR_BROADCAST)
+#endif
 		{
 			netif = wifi_api_get_netif();
 
@@ -400,7 +404,11 @@ static int __atcmd_socket_send_data (atcmd_socket_t *socket, char *data, int len
 
 			if (netif)
 			{
+#if defined(CONFIG_ATCMD_IPV6)
+				if (socket->remote_addr.u_addr.ip4.addr == IPADDR_ANY)
+#else
 				if (netif->ip_addr.addr != IPADDR_ANY)
+#endif
 					netif = NULL;
 			}
 		}
@@ -817,6 +825,7 @@ static int _atcmd_socket_init (void)
 	memset(&cb, 0, sizeof(lwip_socket_cb_t));
 
 	_atcmd_info("%s_SOCKET_SEND", g_atcmd_socket_send_config.event_send ? "EVENT" : "DIRECT");
+	_atcmd_info("MAX_SOCKET_OPEN: lwip=%d atcmd=%d", LWIP_SOCKET_NUM_MAX, ATCMD_SOCKET_NUM_MAX);
 
 	cb.send_ready = _atcmd_socket_send_handler;
 	cb.recv_ready = _atcmd_socket_recv_handler;

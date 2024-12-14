@@ -60,15 +60,9 @@
 
 #define ATCMD_WIFI_INIT_TXPOWER_TYPE	TX_POWER_AUTO
 
-#if 1
-#define ATCMD_WIFI_INIT_SSID			""
-#define ATCMD_WIFI_INIT_BSSID			""
-#define ATCMD_WIFI_INIT_SECURITY		""
-#else
 #define ATCMD_WIFI_INIT_SSID			"halow"
 #define ATCMD_WIFI_INIT_BSSID			"00:00:00:00:00:00"
 #define ATCMD_WIFI_INIT_SECURITY		"open"
-#endif
 #define ATCMD_WIFI_INIT_PASSWORD		""
 #define ATCMD_WIFI_INIT_SAE_PWE			2 /* 0:hunting-and-packing, 1:hash-to-element, 2:both */
 
