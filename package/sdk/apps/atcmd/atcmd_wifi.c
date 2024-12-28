@@ -4169,9 +4169,15 @@ static int _atcmd_wifi_deep_sleep_set (int argc, char *argv[])
 
 			_atcmd_info("wifi_deep_sleep: timeout=%u gpio=%u", timeout, gpio);
 
+			if (timeout == 0 && !_atcmd_wifi_connected())
+			{
+				_atcmd_info("wifi_deep_sleep: not connected");
+				return ATCMD_ERROR_NOTSUPP;
+			}
+
 			ret = wifi_api_start_deep_sleep(timeout, gpio);
 			if (ret == 0)
-				break;
+				return ATCMD_NO_RETURN;
 			else if (ret != -EINVAL)
 				return ATCMD_ERROR_FAIL;
 		}

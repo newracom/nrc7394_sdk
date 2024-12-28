@@ -46,6 +46,7 @@ static struct
 static struct
 {
 	bool log;
+	bool ready;
 
 	struct
 	{
@@ -57,6 +58,7 @@ static struct
 
 	struct
 	{
+		atcmd_boot_cb_t boot;
 		atcmd_info_cb_t info;
 		atcmd_event_cb_t event;
 		atcmd_rxd_cb_t rxd;
@@ -64,6 +66,7 @@ static struct
 } g_atcmd_info =
 {
 	.log = true,
+	.ready = false,
 
 	.ret =
 	{
@@ -74,6 +77,7 @@ static struct
 
 	.cb =
 	{
+		.boot = NULL,
 		.info = NULL,
 		.event = NULL,
 		.rxd = NULL,
@@ -99,6 +103,11 @@ char *nrc_atcmd_param_to_str (const char *param, char *str, int len)
 	str[param_len - 2] = '\0';
 
 	return str;
+}
+
+bool nrc_atcmd_is_ready (void)
+{
+	return g_atcmd_info.ready;
 }
 
 static void nrc_atcmd_init_return (void)
@@ -139,11 +148,14 @@ static void nrc_atcmd_wait_return (char *cmd)
 	int ret = 0;
 
 	if (strcmp(cmd, "ATZ\r\n") == 0)
+	{
+		g_atcmd_info.ready = false;	
 		timeout = 5;
+	}
 	else if (strlen(cmd) > 8 && memcmp(cmd, "AT+UART=", 8) == 0)
 		timeout = 1;
 	else if (strlen(cmd) > 14 && memcmp(cmd, "AT+WDEEPSLEEP=", 14) == 0)
-		timeout = 1;
+		g_atcmd_info.ready = false;	
 
 	pthread_mutex_lock(&g_atcmd_info.ret.mutex);
 
@@ -263,7 +275,9 @@ int nrc_atcmd_send_cmd (const char *fmt, ...)
 
 	nrc_atcmd_wait_return(cmd);
 
-	return nrc_atcmd_get_return();
+	ret = nrc_atcmd_get_return();
+
+	return ret;
 }
 
 int nrc_atcmd_send_data (char *data, int len)
@@ -312,18 +326,57 @@ static atcmd_rxd_t *nrc_atcmd_alloc_rxd (enum ATCMD_RXD_TYPE type)
 	return rxd;
 }
 
-static int nrc_atcmd_recv_info (char *msg, int len)
+static int nrc_atcmd_recv_boot (char *msg, int len)
+{
+	int reason = 0;
+
+	if (!msg || !len)
+		return -EINVAL;
+
+	if (memcmp(msg, "+BOOT:", 6) != 0)
+		return -EINVAL;
+	else
+	{
+		msg += 6;
+		len -= 6;
+	}
+
+	if (!g_atcmd_info.ready)
+	{
+		g_atcmd_info.ready = true;	
+		nrc_atcmd_set_return(ATCMD_RET_NONE);
+	}
+
+	if (strstr(msg, "POR"))
+		reason |= ATCMD_BOOT_POR;
+	
+	if (strstr(msg, "WDT"))
+		reason |= ATCMD_BOOT_WDT;
+	
+	if (strstr(msg, "PMC"))
+		reason |= ATCMD_BOOT_PMC;
+	
+	if (strstr(msg, "HSPI"))
+		reason |= ATCMD_BOOT_HSPI;
+	
+/*	log_debug("reason: 0x%X (%s)\n", reason, msg); */
+
+	if (g_atcmd_info.cb.boot)
+		g_atcmd_info.cb.boot(reason);
+
+	return 0;
+}
+
+/* static int nrc_atcmd_recv_info (char *msg, int len)
 {
 	if (!msg || !len)
 		return -1;
 
 	if (g_atcmd_info.cb.info)
-	{
 		g_atcmd_info.cb.info(0, 1, &msg);
-	}
 
 	return 0;
-}
+} */
 
 static int nrc_atcmd_recv_event (char *msg, int len)
 {
@@ -368,7 +421,7 @@ static int nrc_atcmd_recv_event (char *msg, int len)
 		[ATCMD_SEVENT_RECV_READY] = "RECV_READY",
 		[ATCMD_SEVENT_RECV_ERROR] = "RECV_ERROR",
 	};
-	char *argv[3];
+	char *argv[10];
 	int argc;
 	int event;
 	int i;
@@ -388,7 +441,10 @@ static int nrc_atcmd_recv_event (char *msg, int len)
 		{
 			msg[i] = '\0';
 
-			argv[argc++] = &msg[i + 1];
+			if (argc < 10)
+				argv[argc] = &msg[i + 1];
+
+			argc++;
 		}
 	}
 
@@ -399,8 +455,17 @@ static int nrc_atcmd_recv_event (char *msg, int len)
 		if (strcmp(argv[0], "TCP_ERROR") == 0)
 			strcpy(argv[0], "RECV_ERROR");
 
-		if (strcmp(name[event], argv[0]) == 0)
+		if (strcmp(argv[0], name[event]) == 0)
 		{
+			if (event == ATCMD_WEVENT_DEEPSLEEP_WAKEUP)
+			{
+				if (!g_atcmd_info.ready)
+				{
+					g_atcmd_info.ready = true;
+					nrc_atcmd_set_return(ATCMD_RET_NONE);
+				}
+			}
+
 			if (g_atcmd_info.cb.event)
 				g_atcmd_info.cb.event(event, argc - 1, argv + 1);
 
@@ -609,6 +674,7 @@ void nrc_atcmd_recv (char *buf, int len)
 		ATCMD_MSG_ERROR = -1,
 		ATCMD_MSG_OK = 0,
 		ATCMD_MSG_INFO,
+		ATCMD_MSG_BOOT,
 		ATCMD_MSG_BEVENT,
 		ATCMD_MSG_WEVENT,
 		ATCMD_MSG_SEVENT,
@@ -682,92 +748,97 @@ void nrc_atcmd_recv (char *buf, int len)
 
 		msg.buf[msg.cnt++] = buf[i];
 
-		if (msg.cnt == 1)
-		{
-			switch (msg.buf[0])
-			{
-				case '+':
-					msg.type = ATCMD_MSG_INFO;
-					break;
-
-				case 'O':
-					msg.type = ATCMD_MSG_OK;
-					break;
-
-				case 'E':
-					msg.type = ATCMD_MSG_ERROR;
-					break;
-
-				default:
-					msg.cnt = 0;
-			}
-
-			continue;
-		}
-
 		switch (msg.type)
 		{
-			case ATCMD_MSG_OK:
-				if (msg.cnt > 4 || memcmp(msg.buf, "OK\r\n", msg.cnt) != 0)
+			case ATCMD_MSG_NONE:
+				if (msg.cnt > 1)
 				{
-					msg.cnt = 0;
-					msg.type = ATCMD_MSG_NONE;
-					continue;
+					log_error("invaid count (%d)\n", msg.cnt);
+					msg.buf[0] = msg.buf[msg.cnt - 1];
+					msg.cnt = 1;
 				}
 
+				switch (msg.buf[0])
+				{
+					case 'O':
+						msg.type = ATCMD_MSG_OK;
+						break;
+
+					case 'E':
+						msg.type = ATCMD_MSG_ERROR;
+						break;
+
+					case '+':
+						msg.type = ATCMD_MSG_INFO;
+						break;
+
+					default:
+						msg.cnt = 0;
+				}
+
+				continue;
+
+			case ATCMD_MSG_OK:
 				if (msg.cnt < 4)
 					continue;
+				else if (memcmp(msg.buf, "OK\r\n", msg.cnt) != 0)
+				{
+					msg.type = ATCMD_MSG_NONE;
+					msg.cnt = 0;
+					continue;
+				}
 
 				break;
 
 			case ATCMD_MSG_ERROR:
-				if (msg.cnt > 7 || memcmp(msg.buf, "ERROR\r\n", msg.cnt) != 0)
-				{
-					msg.cnt = 0;
-					msg.type = ATCMD_MSG_NONE;
-					continue;
-				}
-
 				if (msg.cnt < 7)
 					continue;
+				else if (memcmp(msg.buf, "ERROR\r\n", msg.cnt) != 0)
+				{
+					msg.type = ATCMD_MSG_NONE;
+					msg.cnt = 0;
+					continue;
+				}
 
 				break;
 
 			case ATCMD_MSG_INFO:
-				if (memcmp(msg.buf, "+BEVENT:", msg.cnt) == 0)
+				if (msg.cnt == 6 && memcmp(msg.buf, "+BOOT:", msg.cnt) == 0)
 				{
-					if (msg.cnt == 8)
+					msg.type = ATCMD_MSG_BOOT;
+					continue;
+				}
+				else if (msg.cnt == 8)
+				{
+					if (memcmp(msg.buf, "+BEVENT:", msg.cnt) == 0)
+					{			
 						msg.type = ATCMD_MSG_BEVENT;
-					continue;
-				}
-				else if (memcmp(msg.buf, "+WEVENT:", msg.cnt) == 0)
-				{
-					if (msg.cnt == 8)
+						continue;
+					}
+					else if (memcmp(msg.buf, "+WEVENT:", msg.cnt) == 0)
+					{
 						msg.type = ATCMD_MSG_WEVENT;
-					continue;
-				}
-				else if (memcmp(msg.buf, "+SEVENT:", msg.cnt) == 0)
-				{
-					if (msg.cnt == 8)
+						continue;
+					}
+					else if (memcmp(msg.buf, "+SEVENT:", msg.cnt) == 0)
+					{
 						msg.type = ATCMD_MSG_SEVENT;
+						continue;
+					}
+				}
+				else if (msg.cnt == 5 && memcmp(msg.buf, "+RXD:", msg.cnt) == 0)
+				{
+					msg.type = ATCMD_MSG_DATA_SOCKET;
 					continue;
 				}
-				else if (memcmp(msg.buf, "+RXD:", msg.cnt) == 0)
+				else if (msg.cnt == 12 && memcmp(msg.buf, "+RXD_SFUSER:", msg.cnt) == 0)
 				{
-					if (msg.cnt == 5)
-						msg.type = ATCMD_MSG_DATA_SOCKET;
+					msg.type = ATCMD_MSG_DATA_SFUSER;
 					continue;
 				}
-				else if (memcmp(msg.buf, "+RXD_SFUSER:", msg.cnt) == 0)
+				else if (msg.cnt == 15 && memcmp(msg.buf, "+RXD_SFSYSUSER:", msg.cnt) == 0)
 				{
-					if (msg.cnt == 12)
-						msg.type = ATCMD_MSG_DATA_SFUSER;
-					continue;
-				}
-				else if (memcmp(msg.buf, "+RXD_SFSYSUSER:", msg.cnt) == 0)
-				{
-					if (msg.cnt == 15)
-						msg.type = ATCMD_MSG_DATA_SFSYSUSER;
+					msg.type = ATCMD_MSG_DATA_SFSYSUSER;
 					continue;
 				}
 		}
@@ -790,7 +861,11 @@ void nrc_atcmd_recv (char *buf, int len)
 					break;
 
 				case ATCMD_MSG_INFO:
-					nrc_atcmd_recv_info(msg.buf, msg.cnt);
+					/* nrc_atcmd_recv_info(msg.buf, msg.cnt); */
+					break;
+
+				case ATCMD_MSG_BOOT:
+					nrc_atcmd_recv_boot(msg.buf, msg.cnt);
 					break;
 
 				case ATCMD_MSG_BEVENT:
@@ -831,6 +906,14 @@ int nrc_atcmd_register_callback (int type, void *func)
 {
 	switch (type)
 	{
+		case ATCMD_CB_BOOT:
+			if (!g_atcmd_info.cb.boot)
+			{
+				g_atcmd_info.cb.boot = func;
+				return 0;
+			}
+			break;
+
 		case ATCMD_CB_INFO:
 			if (!g_atcmd_info.cb.info)
 			{
@@ -862,6 +945,10 @@ int nrc_atcmd_unregister_callback (int type)
 {
 	switch (type)
 	{
+		case ATCMD_CB_BOOT:
+			g_atcmd_info.cb.boot = NULL;
+			break;
+
 		case ATCMD_CB_INFO:
 			g_atcmd_info.cb.info = NULL;
 			break;

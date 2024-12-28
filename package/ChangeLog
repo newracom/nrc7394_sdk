@@ -4,6 +4,18 @@
 *
 *******************************************************************
 
+[2024-12-27]
+Change summary for version 1.3.2:
+
+  Bugfix
+    * ps_schedule / sleep_alone wakeup time delay issue
+    * Incorrect bandwidth information of the scan result for the same center frequency JP channels
+    * Issue where the TX Power is coming out weaker than the TX Power set in the actual BD (non-periodic)
+    * Issue where a watchdog reset occurs during EAPOL operation when RELAY and duty cycle are enabled (non-periodic)
+
+  Changes
+    * Set IDLE_TIMEOUT_MS to 100 ms for deep sleep samples
+
 [2024-12-12]
 Change summary for version 1.3.1:
 

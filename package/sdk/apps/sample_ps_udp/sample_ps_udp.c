@@ -42,7 +42,7 @@ nvs_handle_t nvs_handle;
 /* TIM or NonTIM deep sleep (select one depending on services)*/
 #define TIM_DEEPSLEEP 0 //TIM (1) NonTIM(0)
 /* in ms. STA can enter deep sleep if there is no traffic during timeout */
-#define IDLE_TIMEOUT 0 // ms
+#define IDLE_TIMEOUT 100 // ms
 /* in ms. STA wakes up if sleep time is expired during deep sleep*/
 #define SLEEP_TIME_MS (60 * 1000) // ms
 /* in ms. the send delay */

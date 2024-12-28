@@ -285,30 +285,15 @@ static int raspi_cli_option (int argc, char *argv[], raspi_cli_opt_t *opt)
 /**********************************************************************************************/
 
 static pthread_t g_raspi_cli_thread;
-static pthread_mutex_t g_raspi_cli_recv_mutex;
-
-static void raspi_cli_recv_lock (void)
-{
-	pthread_mutex_lock(&g_raspi_cli_recv_mutex);
-}
-
-static void raspi_cli_recv_unlock (void)
-{
-	pthread_mutex_unlock(&g_raspi_cli_recv_mutex);
-}
 
 static void *raspi_cli_recv_thread (void *arg)
 {
 	char buf[128 * 1024];
 	int ret;
 
-    pthread_mutex_init(&g_raspi_cli_recv_mutex, NULL);
-
 	while (1)
 	{
-		raspi_cli_recv_lock();
 		ret = raspi_hif_read(buf, sizeof(buf));
-		raspi_cli_recv_unlock();
 
 		if (ret > 0)
 		{
@@ -317,7 +302,9 @@ static void *raspi_cli_recv_thread (void *arg)
 		}
 		else if (ret < 0 && ret != -EAGAIN)
 		{
-			log_error("raspi_hif_read(), %s\n", strerror(-ret));
+			if (nrc_atcmd_is_ready())
+				log_error("raspi_hif_read(), %s\n", strerror(-ret));
+
 			sleep(1);
 		}
 
@@ -326,6 +313,8 @@ static void *raspi_cli_recv_thread (void *arg)
 			usleep(1 * 1000);
 		else if (ret < 0 && ret != -ETIME)
 			break;
+/*		else
+			log_debug("eirq_poll=%d\n", ret); */
 	}
 
 	pthread_exit(0);
@@ -520,14 +509,8 @@ static int raspi_cli_run_script (raspi_cli_hif_t *hif, char *script, bool atcmd_
 			continue;
 		else if (memcmp(cmd, "AT", 2) == 0)
 		{
-			if (strcmp(cmd, "ATZ") == 0)
-				raspi_cli_recv_lock();
-
 			if (nrc_atcmd_send_cmd(cmd) == ATCMD_RET_ERROR && atcmd_error_exit)
 				goto error_exit;
-
-			if (strcmp(cmd, "ATZ") == 0)
-				raspi_cli_recv_unlock();
 		}
 		else if (memcmp(cmd, "UART ", 5) == 0) /* UART <baudrate> */
 		{
@@ -845,9 +828,6 @@ static void raspi_cli_run_loop (raspi_cli_hif_t *hif)
 		{
 			tx_mode = ATCMD_TX_NONE;
 
-			if (strcmp(buf, "ATZ") == 0)
-				raspi_cli_recv_lock();
-
 			if (nrc_atcmd_send_cmd(buf) == ATCMD_RET_OK)
 			{
 				if (memcmp(buf, "AT+SSEND=", 9) == 0)
@@ -890,9 +870,6 @@ static void raspi_cli_run_loop (raspi_cli_hif_t *hif)
 					}
 				}
 			}
-			
-			if (strcmp(buf, "ATZ") == 0)
-				raspi_cli_recv_unlock();
 
 			continue;
 		}

@@ -537,8 +537,6 @@ nrc_err_t nrc_wait_for_ip(int vif, uint32_t timeout)
 	int ip_retry_check = 0;
 	while (1) {
 		ip_retry_check++;
-		_delay_ms(1000);
-
 		if (nrc_wifi_get_state(vif) == WIFI_STATE_DISCONNECTED) {
 			return NRC_FAIL;
 		}
@@ -560,6 +558,7 @@ nrc_err_t nrc_wait_for_ip(int vif, uint32_t timeout)
 				return NRC_FAIL;
 			}
 		}
+		_delay_ms(1000);
 	}
 
 	return NRC_SUCCESS;

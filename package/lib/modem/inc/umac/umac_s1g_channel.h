@@ -84,7 +84,7 @@ const struct s1g_channel_table* GetS1GDefaulTable(void);
 const struct s1g_channel_table* GetS1GFirstTable(void);
 const struct s1g_channel_table* get_s1g_channel_item(uint8_t index);
 const struct s1g_channel_table* get_s1g_channel_item_by_s1g_freq(const uint16_t s1g_freq);
-const struct s1g_channel_table* get_s1g_channel_item_by_nons1g_freq(const uint16_t s1g_freq);
+const struct s1g_channel_table* get_s1g_channel_item_by_nons1g_freq(const uint16_t nons1g_freq);
 const struct s1g_channel_table* get_s1g_channel_item_by_channel_number(uint8_t index);
 #else
 const CHANNEL_MAPPING_TABLE* GetS1GDefaulTable(void);

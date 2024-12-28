@@ -41,6 +41,14 @@
 
 /**********************************************************************************************/
 
+enum ATCMD_BOOT_REASON
+{
+	ATCMD_BOOT_POR = (1 << 0),
+	ATCMD_BOOT_WDT = (1 << 1),
+	ATCMD_BOOT_PMC = (1 << 2),
+	ATCMD_BOOT_HSPI = (1 << 3)
+};
+
 enum ATCMD_RET_TYPE
 {
 	ATCMD_RET_ERROR = -1,
@@ -106,7 +114,8 @@ enum ATCMD_EVENT
 
 enum ATCMD_CB_TYPE
 {
-	ATCMD_CB_INFO = 0,
+	ATCMD_CB_BOOT = 0,
+	ATCMD_CB_INFO,
 	ATCMD_CB_EVENT,
 	ATCMD_CB_RXD
 };
@@ -140,6 +149,7 @@ typedef struct
 	};
 } atcmd_rxd_t;
 
+typedef int (*atcmd_boot_cb_t) (int reason);
 typedef int (*atcmd_info_cb_t) (enum ATCMD_INFO info, int argc, char *argv[]);
 typedef int (*atcmd_event_cb_t) (enum ATCMD_EVENT event, int argc, char *argv[]);
 typedef void (*atcmd_rxd_cb_t) (atcmd_rxd_t *rxd, char *data);
@@ -147,6 +157,8 @@ typedef void (*atcmd_rxd_cb_t) (atcmd_rxd_t *rxd, char *data);
 /**********************************************************************************************/
 
 extern char *nrc_atcmd_param_to_str (const char *param, char *str, int len);
+
+extern bool nrc_atcmd_is_ready (void);
 
 extern int nrc_atcmd_send (char *buf, int len);
 extern int nrc_atcmd_send_cmd (const char *fmt, ...);

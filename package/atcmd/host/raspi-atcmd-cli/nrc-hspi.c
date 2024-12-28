@@ -230,8 +230,8 @@ static int hspi_transfer (hspi_opcode_t *opcode, char *buf, int len)
 
 		if (resp.ack == HSPI_ACK_VALUE)
 		{
-			if (retry > 0)
-				_hspi_log("hspi_transfer: retry=%d/%d\n", retry, retry_max);
+/*			if (retry > 0)
+				_hspi_log("hspi_transfer: retry=%d/%d\n", retry, retry_max); */
 
 			if (opcode->burst)
 			{
@@ -253,8 +253,8 @@ static int hspi_transfer (hspi_opcode_t *opcode, char *buf, int len)
 
 	if (ret != 0 || retry >= retry_max)
 	{
-		_hspi_log("hspi_transfer: retry=%d/%d ret=%d\n", retry, retry_max, ret);
-		hspi_opcode_print(opcode);
+/*		_hspi_log("hspi_transfer: retry=%d/%d ret=%d\n", retry, retry_max, ret); */
+/*		hspi_opcode_print(opcode); */
 		ret = -1;
 	}
 
