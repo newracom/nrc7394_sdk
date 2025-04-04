@@ -73,17 +73,21 @@ nrc_err_t run_sample_vendor_ie(WIFI_CONFIG *param)
 	while(1){_delay_ms(500);}
 }
 
-
 static void vendor_ie_event_handler(int vif, tWIFI_EVENT_ID event, int data_len, void *data)
 {
 	uint8_t cmd_id = 0;
-
+    char ssid[33] = {'\0',};
+    vendor_ie_bcn_t* vendor_ie_bcn;
 	switch(event) {
 		case WIFI_EVT_VENDOR_IE:
-			cmd_id = ((unsigned char *)data)[0];
-			nrc_usr_print("[%02X] ", cmd_id);
-			for(int i=1; i< data_len; i++){
-				nrc_usr_print("%02X ", ((unsigned char *)data)[i]);
+            vendor_ie_bcn = (vendor_ie_bcn_t*) data;
+            strncpy(ssid, vendor_ie_bcn->ssid, vendor_ie_bcn->ssid_len);
+            nrc_usr_print("BSSID("MACSTR") RSSI:%d SSID:%s ",
+                    MAC2STR(vendor_ie_bcn->bssid), vendor_ie_bcn->rssi, ssid);
+            cmd_id = ((unsigned char *)vendor_ie_bcn->vie_data)[0];
+            nrc_usr_print("[%02X] ", cmd_id);
+			for(int i=1; i< vendor_ie_bcn->vie_len; i++){
+				nrc_usr_print("%02X ", ((unsigned char *)vendor_ie_bcn->vie_data)[i]);
 			}
 			break;
 		default:

@@ -30,23 +30,23 @@
 
 #define atcmd_log_send(fmt, ...)	atcmd_log("SEND: " fmt, ##__VA_ARGS__)
 #define atcmd_log_recv(fmt, ...)	atcmd_log("RECV: " fmt, ##__VA_ARGS__)
+#define atcmd_log_data(fmt, ...)	atcmd_log("DATA: " fmt, ##__VA_ARGS__)
 
 /**********************************************************************************************/
 
 static struct
 {
-	uint64_t send;
-	uint64_t recv;
-} g_atcmd_data =
-{
-	.send = 0,
-	.recv = 0
-};
-
-static struct
-{
 	bool log;
 	bool ready;
+
+	struct
+	{
+		uint32_t send;
+		uint32_t recv;
+
+		bool print_send;
+		bool print_recv;
+	} data;
 
 	struct
 	{
@@ -67,6 +67,14 @@ static struct
 {
 	.log = true,
 	.ready = false,
+	
+	.data =
+	{
+		.send = 0,
+		.recv = 0,
+		.print_send = false,
+		.print_recv = false,
+	},
 
 	.ret =
 	{
@@ -103,6 +111,41 @@ char *nrc_atcmd_param_to_str (const char *param, char *str, int len)
 	str[param_len - 2] = '\0';
 
 	return str;
+}
+
+static void nrc_atcmd_print_data (char *data, int len)
+{
+	const int line_bytes = 16;
+	char buf[((3 * 16) + 1) + (16 + 1)];
+	char *hex = &buf[0];
+	char *ascii = &buf[(3 * 16) + 1];
+	int i;
+
+	memset(buf, 0, sizeof(buf));
+
+	for (i = 0 ; i < len ; i++)
+	{
+		sprintf(hex + (3 * (i % line_bytes)), "%02X ", data[i]);
+
+		if (data[i] >= 0x20 && data[i] <= 0x7E)
+			sprintf(ascii + (i % line_bytes), "%c", data[i]);
+		else
+			sprintf(ascii + (i % line_bytes), ".");
+
+		if ((i % line_bytes) == (line_bytes - 1))
+		{
+			atcmd_log_data("%s %s\n", hex, ascii);
+			memset(buf, 0, sizeof(buf));
+		}
+	}
+		
+	if (((i - 1) % line_bytes) < (line_bytes - 1))
+	{
+		for (i %= line_bytes ; i < line_bytes ; i++)
+			sprintf(hex + (3 * (i % line_bytes)), "   ");
+
+		atcmd_log_data("%s %s\n", hex, ascii);
+	}
 }
 
 bool nrc_atcmd_is_ready (void)
@@ -241,7 +284,10 @@ int nrc_atcmd_send_cmd (const char *fmt, ...)
 
 	len = vsnprintf(cmd, ATCMD_MSG_LEN_MAX, fmt, ap);
 	if (len < (ATCMD_MSG_LEN_MIN - 2) || len > (ATCMD_MSG_LEN_MAX - 2))
+	{
+		log_error("Invalid command length (%d)\n", len);
 		return -1;
+	}
 
 	va_end(ap);
 
@@ -286,13 +332,15 @@ int nrc_atcmd_send_data (char *data, int len)
 		return -1;
 
 	atcmd_log_send("DATA %d\n", len);
+	if (g_atcmd_info.data.print_send)
+		nrc_atcmd_print_data(data, len);
 
-	g_atcmd_data.send += len;
+	g_atcmd_info.data.send += len;
 
 	return 0;
 }
 
-static atcmd_rxd_t *nrc_atcmd_alloc_rxd (enum ATCMD_RXD_TYPE type)
+static atcmd_rxd_t *nrc_atcmd_alloc_rxd (enum ATCMD_DATA_TYPE type)
 {
 	atcmd_rxd_t *rxd;
 
@@ -305,14 +353,14 @@ static atcmd_rxd_t *nrc_atcmd_alloc_rxd (enum ATCMD_RXD_TYPE type)
 
 		switch (type)
 		{
-			case ATCMD_RXD_SOCKET:
+			case ATCMD_DATA_SOCKET:
 				rxd->id = -1;
 				strcpy(rxd->remote_addr, "0.0.0.0");
 				rxd->verbose = false;
 				break;
 
-			case ATCMD_RXD_SFUSER:
-			case ATCMD_RXD_SFSYSUSER:
+			case ATCMD_DATA_SFUSER:
+			case ATCMD_DATA_SFSYSUSER:
 				break;
 
 			default:
@@ -486,7 +534,7 @@ static atcmd_rxd_t *nrc_atcmd_recv_rxd (char *msg)
 	if (!msg)
 		return NULL;
 
-	rxd = nrc_atcmd_alloc_rxd(ATCMD_RXD_SOCKET);
+	rxd = nrc_atcmd_alloc_rxd(ATCMD_DATA_SOCKET);
 	if (!rxd)
 		return NULL;
 
@@ -570,7 +618,7 @@ static atcmd_rxd_t *nrc_atcmd_recv_rxd_sfuser (char *msg)
 	if (!msg)
 		return NULL;
 
-	rxd = nrc_atcmd_alloc_rxd(ATCMD_RXD_SFUSER);
+	rxd = nrc_atcmd_alloc_rxd(ATCMD_DATA_SFUSER);
 	if (!rxd)
 		return NULL;
 
@@ -622,7 +670,7 @@ static atcmd_rxd_t *nrc_atcmd_recv_rxd_sfsysuser (char *msg)
 	if (!msg)
 		return NULL;
 
-	rxd = nrc_atcmd_alloc_rxd(ATCMD_RXD_SFSYSUSER);
+	rxd = nrc_atcmd_alloc_rxd(ATCMD_DATA_SFSYSUSER);
 	if (!rxd)
 		return NULL;
 
@@ -667,8 +715,6 @@ invalid_rxd_sfsysuser:
 
 void nrc_atcmd_recv (char *buf, int len)
 {
-//#define CONFIG_RXD_PRINT
-
 	enum ATCMD_MSG_TYPE
 	{
 		ATCMD_MSG_ERROR = -1,
@@ -720,12 +766,12 @@ void nrc_atcmd_recv (char *buf, int len)
 
 			if (++data.cnt == data.rxd->length)
 			{
-				g_atcmd_data.recv += data.rxd->length;
+				atcmd_log_recv("DATA %d\n", data.cnt);
+				if (g_atcmd_info.data.print_recv)
+					nrc_atcmd_print_data(data.buf, data.cnt);
 
-#ifdef CONFIG_RXD_PRINT
-				data.buf[data.cnt] = '\0';
-				atcmd_log_recv("%s\n", data.buf);
-#endif
+				g_atcmd_info.data.recv += data.cnt;
+
 				if (g_atcmd_info.cb.rxd)
 					g_atcmd_info.cb.rxd(data.rxd, data.buf);
 
@@ -968,34 +1014,46 @@ int nrc_atcmd_unregister_callback (int type)
 	return 0;
 }
 
-void nrc_atcmd_log_on (void)
+bool nrc_atcmd_log_print (int log)
 {
-	g_atcmd_info.log = true;
-}
+	if (log >= 0)
+		g_atcmd_info.log = !!log;
 
-void nrc_atcmd_log_off (void)
-{
-	g_atcmd_info.log = false;
-}
-
-bool nrc_atcmd_log_is_on (void)
-{
 	return g_atcmd_info.log;
+}
+
+void nrc_atcmd_data_reset (void)
+{
+	g_atcmd_info.data.send = 0;
+	g_atcmd_info.data.recv = 0;
 }
 
 void nrc_atcmd_data_info (uint64_t *send, uint64_t *recv)
 {
 	if (send)
-		*send = g_atcmd_data.send;
+		*send = g_atcmd_info.data.send;
 
 	if (recv)
-		*recv = g_atcmd_data.recv;
+		*recv = g_atcmd_info.data.recv;
 }
 
-void nrc_atcmd_data_reset (void)
+int nrc_atcmd_data_print (int send, int recv)
 {
-	g_atcmd_data.send = 0;
-	g_atcmd_data.recv = 0;
+	int print = 0;
+
+	if (send >= 0)
+		g_atcmd_info.data.print_send = !!send;
+
+	if (recv >= 0)
+		g_atcmd_info.data.print_recv = !!recv;
+
+	if (g_atcmd_info.data.print_send)
+		print |= (1 << 0);
+
+	if (g_atcmd_info.data.print_recv)
+		print |= (1 << 1);
+
+	return print & 0x3;
 }
 
 static union
@@ -1051,16 +1109,16 @@ int nrc_atcmd_firmware_download (char *bin_data, int bin_size, uint32_t bin_crc3
 	if (nrc_atcmd_register_callback (ATCMD_CB_EVENT, nrc_atcmd_firmware_download_event_callback) != 0)
 		return -1;
 
-	if (nrc_atcmd_send_cmd("AT+FWUPDATE=0") != 0)
+	if (nrc_atcmd_send_cmd("AT+FWUPDATE=0") != ATCMD_RET_OK)
 		goto firmware_download_done;
 
-	if (nrc_atcmd_send_cmd("AT+FWUPDATE=%u,0x%X,%u", bin_size, bin_crc32, verify) != 0)
+	if (nrc_atcmd_send_cmd("AT+FWUPDATE=%u,0x%X,%u", bin_size, bin_crc32, verify) != ATCMD_RET_OK)
 		goto firmware_download_done;
 
-	if (nrc_atcmd_send_cmd("AT+FWUPDATE?") != 0)
+	if (nrc_atcmd_send_cmd("AT+FWUPDATE?") != ATCMD_RET_OK)
 		goto firmware_download_done;
 
-	if (nrc_atcmd_send_cmd("AT+FWBINDL?") != 0)
+	if (nrc_atcmd_send_cmd("AT+FWBINDL?") != ATCMD_RET_OK)
 		goto firmware_download_done;
 
 	for (offset = 0 ; offset < bin_size ; offset += length)
@@ -1072,7 +1130,7 @@ int nrc_atcmd_firmware_download (char *bin_data, int bin_size, uint32_t bin_crc3
 
 		g_atcmd_firmware_download_event.flags = 0;
 
-		if (nrc_atcmd_send_cmd("AT+FWBINDL=%u,%u", offset, length) != 0)
+		if (nrc_atcmd_send_cmd("AT+FWBINDL=%u,%u", offset, length) != ATCMD_RET_OK)
 			goto firmware_download_done;
 
 		if (nrc_atcmd_send_data(bin_data + offset, length) != 0)
@@ -1088,10 +1146,10 @@ int nrc_atcmd_firmware_download (char *bin_data, int bin_size, uint32_t bin_crc3
 		}
 	}
 
-	if (nrc_atcmd_send_cmd("AT+FWBINDL?") != 0)
+	if (nrc_atcmd_send_cmd("AT+FWBINDL?") != ATCMD_RET_OK)
 		goto firmware_download_done;
 
-	if (nrc_atcmd_send_cmd("AT+FWUPDATE?") != 0)
+	if (nrc_atcmd_send_cmd("AT+FWUPDATE?") != ATCMD_RET_OK)
 		goto firmware_download_done;
 
 	ret = 0;

@@ -1930,7 +1930,7 @@ int wpa_supplicant_need_to_roam_within_ess(struct wpa_supplicant *wpa_s,
 		cur_est = wpas_get_est_throughput_from_bss_snr(wpa_s,
 							       current_bss,
 							       cur_snr);
-		wpa_dbg(wpa_s, MSG_DEBUG,
+		wpa_msg(wpa_s, MSG_INFO,
 			"Using signal poll values for the current BSS: level=%d snr=%d est_throughput=%u",
 			cur_level, cur_snr, cur_est);
 	}
@@ -2054,8 +2054,11 @@ static int wpa_supplicant_need_to_roam(struct wpa_supplicant *wpa_s,
 	if (!current_bss)
 		return 1; /* current BSS not seen in scan results */
 
-	if (current_bss == selected)
+	if (current_bss == selected) {
+		wpa_msg(wpa_s, MSG_INFO,
+			"Skip roaming - current BSS SNR is better");
 		return 0;
+	}
 
 	if (selected->last_update_idx > current_bss->last_update_idx)
 		return 1; /* current BSS not seen in the last scan */

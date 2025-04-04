@@ -625,6 +625,48 @@ etharp_get_entry(size_t i, ip4_addr_t **ipaddr, struct netif **netif, struct eth
   }
 }
 
+#if defined(LWIP_DEBUG)
+void
+etharp_show_entries(void)
+{
+  int i, j, num = 0;
+#if ARP_QUEUEING
+  struct etharp_q_entry *q;
+#else /* ARP_QUEUEING */
+  struct pbuf *q;
+#endif /* ARP_QUEUEING */
+
+  LWIP_DEBUGF(LWIP_DBG_ON, ("Address\t\tHWaddress\t\tState\t\tAge\tPendQ\n"));
+  for (i = 0; i < ARP_TABLE_SIZE; ++i) {
+    struct etharp_entry *entry = &arp_table[i];
+    if (entry->state != ETHARP_STATE_EMPTY) {
+      ip_addr_debug_print_val(LWIP_DBG_ON, entry->ipaddr);
+      LWIP_DEBUGF(LWIP_DBG_ON, ("\t"));
+      LWIP_DEBUGF(LWIP_DBG_ON, ("%02"X16_F":%02"X16_F":%02"X16_F":%02"X16_F":%02"X16_F":%02"X16_F"\t",
+              (u16_t)entry->ethaddr.addr[0], (u16_t)entry->ethaddr.addr[1], (u16_t)entry->ethaddr.addr[2],
+              (u16_t)entry->ethaddr.addr[3], (u16_t)entry->ethaddr.addr[4], (u16_t)entry->ethaddr.addr[5]));
+      LWIP_DEBUGF(LWIP_DBG_ON, ("%s\t\t",
+        entry->state == ETHARP_STATE_PENDING ? "PENDING" :
+        entry->state == ETHARP_STATE_STABLE ? "STABLE" :
+        entry->state == ETHARP_STATE_STABLE_REREQUESTING_1 ? "STABLE1" :
+        entry->state == ETHARP_STATE_STABLE_REREQUESTING_2 ? "STABLE2" :
+#if ETHARP_SUPPORT_STATIC_ENTRIES
+        entry->state == ETHARP_STATE_STATIC ? "STATIC" :
+#endif
+        "UNKNOWN"));
+      LWIP_DEBUGF(LWIP_DBG_ON, ("%ds\t", entry->ctime));
+      for (j = 0, q = entry->q; q != NULL; j++, q = q->next);
+      LWIP_DEBUGF(LWIP_DBG_ON, ("%d\n", j));
+
+      if (entry->state >= ETHARP_STATE_STABLE) {
+        num++;
+      }
+    }
+  }
+  LWIP_DEBUGF(LWIP_DBG_ON, ("Total entries: %d (MAX AGE:%ds PENDING AGE:%ds)\n", num, ARP_MAXAGE, ARP_MAXPENDING));
+}
+#endif /* defined(LWIP_DEBUG) */
+
 /**
  * Responds to ARP requests to us. Upon ARP replies to us, add entry to cache
  * send out queued IP packets. Updates cache with snooped address pairs.

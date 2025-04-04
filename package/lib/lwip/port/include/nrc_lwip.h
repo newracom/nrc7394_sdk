@@ -9,6 +9,7 @@ extern "C" {
 
 #include "lwip/netif.h"
 #include "lwip/ip_addr.h"
+#include "lwip/dhcp.h"
 
 typedef enum {
 	WIFI_NULL_MODE = 0,      /**< null mode */
@@ -110,6 +111,7 @@ int static_run(int vif);
 #if LWIP_IPV4 && LWIP_DHCP
 int dhcp_run(int vif);
 int wifi_dhcpc_start(int vif);
+int wifi_dhcpc_start_with_event (int vif, dhcp_event_handler_t event_handler);
 int wifi_dhcpc_stop(int vif);
 int wifi_dhcpc_get_lease_time(int vif);
 int wifi_dhcpc_status(int vif);
@@ -141,6 +143,8 @@ int reset_wifi_ap_mode(int vif);
 u32_t get_utc_time(void);
 char *get_utc_time_str (char *buf, int len);
 int initialize_sntp(const char *server, u32_t timeout);
+
+bool ip_from_arp_cache(uint8_t *macaddr, ip4_addr_t *ipaddr);
 
 #if LWIP_IPV6
 void wifi_nd6_restart_netif( int vif );

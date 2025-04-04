@@ -38,9 +38,9 @@
 #include "system.h"
 
 #if defined( SUPPORT_MBEDTLS )
-#include "mbedtls/net.h"
+#include "mbedtls/net_sockets.h"
 #include "mbedtls/ssl.h"
-#include "mbedtls/certs.h"
+//#include "mbedtls/certs.h"
 #include "mbedtls/entropy.h"
 #include "mbedtls/ctr_drbg.h"
 #include "mbedtls/debug.h"
@@ -56,6 +56,8 @@ typedef struct {
 	mbedtls_x509_crt cacert;
 	mbedtls_x509_crt clicert;
 	mbedtls_pk_context pkey;
+	mbedtls_entropy_context entropy;
+	mbedtls_ctr_drbg_context ctr_drbg;
 } mqtt_ssl_t;
 #endif
 
@@ -395,13 +397,15 @@ void mqtt_ssl_disconnect(Network *n)
 	mbedtls_net_free(&ssl->net_ctx);
 #if defined(MBEDTLS_X509_CRT_PARSE_C)
 	mbedtls_x509_crt_free( &ssl->cacert);
-	if ((ssl->pkey).pk_info != NULL) {
+	if ((ssl->pkey).MBEDTLS_PRIVATE(pk_info) != NULL) {
 		mbedtls_x509_crt_free(&ssl->clicert);
 		mbedtls_pk_free(&ssl->pkey);
 	}
 #endif
 	mbedtls_ssl_free(&ssl->ssl_ctx);
 	mbedtls_ssl_config_free(&ssl->ssl_conf);
+	mbedtls_ctr_drbg_free(&ssl->ctr_drbg);
+	mbedtls_entropy_free(&ssl->entropy);
 }
 
 int NetworkConnectTLS(Network *n, const char *addr, int po, Certs *certs)
@@ -474,9 +478,25 @@ int NetworkConnectTLS(Network *n, const char *addr, int po, Certs *certs)
 
 #if defined(MBEDTLS_CERTS_C)
 		nrc_usr_print("  . Parsing the client private key[%s] ...", certs->client_pk_pwd);
-			ret = mbedtls_pk_parse_key(&ssl->pkey,
+
+#if (MBEDTLS_VERSION_MAJOR >= 3)
+		mbedtls_ctr_drbg_init(&ssl->ctr_drbg);
+		mbedtls_entropy_init(&ssl->entropy);
+		if ((ret = mbedtls_ctr_drbg_seed(&ssl->ctr_drbg, mbedtls_entropy_func,
+			&ssl->entropy, NULL, 0)) != 0) {
+			nrc_usr_print(" failed! mbedtls_ctr_drbg_seed returned -0x%x\n", -ret);
+			return ret;
+		}
+
+		ret = mbedtls_pk_parse_key(&ssl->pkey,
+			(const unsigned char *)certs->client_pk, certs->client_pk_length,
+			(const unsigned char *)certs->client_pk_pwd, certs->client_pk_pwd_length,
+			mbedtls_ctr_drbg_random, &ssl->ctr_drbg);
+#else
+		ret = mbedtls_pk_parse_key(&ssl->pkey,
 			(const unsigned char *)certs->client_pk, certs->client_pk_length,
 			(const unsigned char *)certs->client_pk_pwd, certs->client_pk_pwd_length);
+#endif /* (MBEDTLS_VERSION_MAJOR >= 3) */
 #else
 		{
 			ret = 1;

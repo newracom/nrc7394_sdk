@@ -161,4 +161,7 @@ bool get_enable_auth_ctrl(void);
 void set_group_mcs(int8_t mcs);
 int8_t get_group_mcs();
 
+void set_dhcp_mcs(int8_t mcs);
+int8_t get_dhcp_mcs();
+
 #endif /* LMAC_CONFIG_H */

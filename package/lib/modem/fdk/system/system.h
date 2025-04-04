@@ -21,7 +21,7 @@ extern "C"{
 #endif
 #include "system_efuse.h"
 #include "system_pmsspi.h"
-
+#include "system_eeprom.h"
 
 #if defined(EXCLUDE_FDK_MAC)
 #if defined(UCODE)

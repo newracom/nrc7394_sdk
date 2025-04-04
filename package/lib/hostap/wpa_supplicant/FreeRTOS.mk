@@ -170,11 +170,11 @@ WPA_SUPP_CSRCS += $(shell find $(WPA_SUPP_ROOT)/wpa_supplicant -name config_nrc.
 WPA_SUPP_CSRCS += config_nrc_util.c
 endif
 
-ifdef CONFIG_NO_CONFIG_WRITE
+ifeq ($(CONFIG_NO_CONFIG_WRITE),y)
 CFLAGS += -DCONFIG_NO_CONFIG_WRITE
 endif
 
-ifdef CONFIG_NO_CONFIG_BLOBS
+ifeq ($(CONFIG_NO_CONFIG_BLOBS),y)
 CFLAGS += -DCONFIG_NO_CONFIG_BLOBS
 endif
 

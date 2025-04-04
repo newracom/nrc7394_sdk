@@ -82,6 +82,15 @@ typedef struct _auth_ctrl_t{
 	uint8_t TI_MAX;
 } auth_ctrl_t;
 
+typedef struct {
+    uint32_t vie_len;
+    char* vie_data;
+    uint8_t bssid[6];
+    int8_t rssi;
+    uint8_t ssid_len;
+    char* ssid;
+} vendor_ie_bcn_t;
+
 #if defined(INCLUDE_SCAN_MODE)
 /* scan type (normal vs fast) */
 enum {
@@ -160,10 +169,10 @@ void 	 system_modem_api_get_capabilities(struct wim_cap_param* param);
 #define system_modem_api_enable_mac_address(x, y)	0 // TODO
 #endif /* defined(NRC7393) */
 #define system_modem_api_add_key(x, y, z)		lmac_sec_add_key(x, y, z)
-#define system_modem_api_del_key(x, y)			lmac_sec_del_key(x, y)
-#define system_modem_api_del_key_all(x)			lmac_sec_del_key_all(x)
 #define system_modem_api_set_basic_rate(x, y)		lmac_set_basic_rate(x, y)
 #define system_modem_api_set_tsf_timer(x, y, z)		lmac_set_tsf_timer(x, y, z)
+#define system_modem_api_get_tsf_low(x)				lmac_get_tsf_l(x)
+#define system_modem_api_get_tsf_high(x)			lmac_get_tsf_h(x)
 #define system_modem_api_set_response_ind(x, y)		lmac_set_response_ind(x, y)
 #define system_modem_api_get_response_ind(x)		lmac_get_response_ind(x)
 #define system_modem_api_set_aggregation(x, y)		lmac_set_aggregation(x, y)
@@ -184,6 +193,11 @@ void 	 system_modem_api_get_capabilities(struct wim_cap_param* param);
 #define system_modem_api_ps_set_ret_short_beacon_interval(x)		lmac_ps_set_short_bcn_interval(x)
 #define system_modem_api_ps_set_ret_beacon_interval(x)		lmac_ps_set_bcn_interval(x)
 
+#define system_modem_api_set_bcmc_mcs(x)		lmac_set_group_mcs(x)
+#define system_modem_api_get_bcmc_mcs()		lmac_get_group_mcs()
+#define system_modem_api_set_dhcp_mcs(x)		lmac_set_dhcp_mcs(x)
+#define system_modem_api_get_dhcp_mcs()		lmac_get_dhcp_mcs()
+
 void     system_modem_api_set_ssid(int vif_id , uint8_t *ssid , uint8_t ssid_len);
 void     system_modem_api_set_dtim_period(int vif_id, uint8_t period);
 uint8_t  system_modem_api_get_dtim_period(int vif_id);
@@ -195,6 +209,7 @@ void     system_modem_api_ap_enable_short_beacon(int vif_id, bool enable, bool f
 void     system_modem_api_ap_set_short_beacon_interval(int vif_id, uint16_t short_beacon_interval);
 uint16_t system_modem_api_ap_get_short_beacon_interval(int vif_id);
 void     system_modem_api_set_tim_flag(uint8_t vif_id);
+void     system_modem_api_set_be_cwmin(int vif_id, uint16_t cw_min);
 void     system_modem_api_set_bssid(int vif_id, uint8_t *bssid);
 void     system_modem_api_enable_bssid(int vif_id, bool enable);
 void     system_modem_api_set_edca_param(int vif_id, struct edca_param* edca);
@@ -312,6 +327,9 @@ int system_modem_api_ps_set_sleep(uint8_t sleep_mode, uint64_t interval_ms);
 void system_modem_api_ps_cleanup_dl_ring();
 bool system_modem_api_set_listen_interval(int vif_id, uint16_t interval);
 bool system_modem_api_get_listen_interval(int vif_id, uint16_t *interval, uint32_t *interval_ms);
+bool system_modem_api_ps_set_user_data(void* data, uint16_t size);
+bool system_modem_api_ps_get_user_data(void* data, uint16_t size);
+uint16_t system_modem_api_ps_get_user_data_size(void);
 
 #if defined(INCLUDE_TWT_SUPPORT)
 void system_modem_api_set_tx_suppress_start(uint32_t setting, uint32_t value);
@@ -377,9 +395,15 @@ bool system_modem_api_ps_wakeup_reason(uint8_t *reason);
 bool system_modem_api_ps_add_schedule(uint32_t timeout, bool net_init, void*  func);
 bool system_modem_api_ps_add_gpio_callback(bool net_init, void*  func);
 bool system_modem_api_ps_start_schedule(void);
+#if defined (INCLUDE_PS_SCHEDULE)
 void system_modem_api_run_retention_schedule();
 void system_modem_api_ps_check_network_init(bool* net_init, bool* ps_callback);
 void system_modem_api_ps_schedule_resume_for_timeout();
+#else
+static inline void system_modem_api_run_retention_schedule() {return;}
+static inline void system_modem_api_ps_check_network_init(bool* net_init, bool* ps_callback) {return;}
+static inline void system_modem_api_ps_schedule_resume_for_timeout() {return;}
+#endif
 int system_modem_api_ps_event_user_get(int event);
 int system_modem_api_ps_event_user_clear(int   event);
 
@@ -404,6 +428,9 @@ bool system_modem_api_set_support_ch_width(uint8_t sup_ch_width);
 bool system_modem_api_save_hw_key(int vif_id, struct cipher_def *key_info);
 bool system_modem_api_flush_hw_key(void);
 void system_modem_api_del_hw_key(int vif_id, const uint8_t *addr, struct cipher_def *key_info);
+bool system_modem_api_remove_hw_key(const uint8_t *addr, struct cipher_def *key);
+bool system_modem_api_del_key(int vif_id, struct cipher_def *key_info);
+bool system_modem_api_del_key_all(int vif_id);
 
 #if defined(INCLUDE_MANUAL_CONT_TX_SUPPORT)
 bool system_modem_api_set_cont_tx(bool enable, uint32_t freq_100k, const char* bw, uint8_t mcs,
@@ -429,6 +456,7 @@ void system_modem_api_set_utc_time(uint8_t* utc);
 bool system_modem_api_get_utc_time(uint8_t* utc);
 int system_modem_api_set_static_ip(int vif_id);
 void system_modem_api_set_jtag(bool enable);
+bool system_modem_api_set_scan_period(int vif_id, uint32_t time);
 #endif//INCLUDE_STANDALONE
 
 #if defined(INCLUDE_AUTH_CONTROL)
@@ -442,6 +470,7 @@ bool system_modem_api_get_auth_control_scale(uint8_t *scale);
 bool system_modem_api_reset_auth_current_ti(void);
 bool system_modem_api_set_auth_current_ti(void);
 bool system_modem_api_get_auth_current_ti(int *ti);
+bool system_modem_api_get_auth_control_bo_cnt(int *cnt);
 #else
 static inline void system_modem_api_set_enable_auth_control(int vif_id, bool enable) {}
 static inline bool system_modem_api_get_enable_auth_control(int vif_id) {return false;}

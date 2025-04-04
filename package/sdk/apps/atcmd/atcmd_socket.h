@@ -68,11 +68,22 @@ typedef char atcmd_socket_ipaddr_t[ATCMD_SOCKET_IPADDR_LEN_MAX + 1];
 
 typedef struct
 {
-	int16_t id;
-	int16_t protocol;
+	int8_t id;
+	int8_t protocol;
 	uint16_t local_port;
+
 	uint16_t remote_port;
 	ip_addr_t remote_addr;
+	
+	struct
+	{
+#define ATCMD_SOCKET_MULTICAST_GROUP_MAX	3
+
+		uint8_t group;
+		uint8_t ttl;			
+
+		ip_addr_t group_addr[ATCMD_SOCKET_MULTICAST_GROUP_MAX];
+	} multicast;
 } atcmd_socket_t;
 
 typedef struct
@@ -103,9 +114,12 @@ typedef struct
 extern void atcmd_socket_reset (atcmd_socket_t *socket);
 extern int atcmd_socket_enable (void);
 extern void atcmd_socket_disable (void);
-extern int atcmd_socket_send_data (atcmd_socket_t *socket, char *data, int len, bool done_event);
-extern void atcmd_socket_send_timeout (int id, uint32_t done, uint32_t drop, uint32_t wait);
-extern void atcmd_socket_send_exit (int id, uint32_t done, uint32_t drop);
+extern int atcmd_socket_send_data (int id, char *data, int len);
+
+extern void atcmd_socket_event_send_done (int id, uint32_t done);
+extern void atcmd_socket_event_send_idle (int id, uint32_t done, uint32_t drop, uint32_t wait, uint32_t time);
+extern void atcmd_socket_event_send_drop (int id, uint32_t drop);
+extern void atcmd_socket_event_send_exit (int id, uint32_t done, uint32_t drop);
 
 /**********************************************************************************************/
 #endif /* #ifndef __NRC_ATCMD_SOCKET_H__ */

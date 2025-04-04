@@ -11,27 +11,19 @@ extern "C"{
 #define DRV_I2C_IOCTL_OPT_SHUTDOWN											3
 
 #define DRV_I2C_IOCTL_OPT_IRQ_CTRL											10
-#define DRV_I2C_IOCTL_OPT_RESET_IRQ_FLAG									11
 
-#define DRV_I2C_IOCTL_OPT_DATA_WIDTH										50
+//#define DRV_I2C_IOCTL_OPT_DATA_WIDTH										50
 #define DRV_I2C_IOCTL_OPT_BUS_SPEED											51
-
-#define DRV_I2C_IOCTL_OPT_COMMAND											100
 
 #define DRV_I2C_IOCTL_OPT_GPIO_SCL											300
 #define DRV_I2C_IOCTL_OPT_GPIO_SDA											301
 /****************************************************************************/
-#define DRV_I2C_IOCTL_OPT_DATA_WIDTH_8BIT									0
-#define DRV_I2C_IOCTL_OPT_DATA_WIDTH_16BIT									1
+#define DRV_I2C_WRITE_MEM_ADDR_SIZE_NONE									0
+#define DRV_I2C_WRITE_MEM_ADDR_SIZE_8BIT									1
+#define DRV_I2C_WRITE_MEM_ADDR_SIZE_16BIT									2
 
-#define DRV_I2C_IOCTL_OPT_RESET_IRQ_FLAG_RESET								1
-
-#define DRV_I2C_IOCTL_OPT_COMMAND_RD									(1 << 0)
-#define DRV_I2C_IOCTL_OPT_COMMAND_STA									(1 << 1)
-#define DRV_I2C_IOCTL_OPT_COMMAND_STO									(1 << 2)
-#define DRV_I2C_IOCTL_OPT_COMMAND_WR									(1 << 3)
-#define DRV_I2C_IOCTL_OPT_COMMAND_NACK									(1 << 4)
-#define DRV_I2C_IOCTL_OPT_COMMAND_ACK									(1 << 5)
+//#define DRV_I2C_IOCTL_OPT_DATA_WIDTH_8BIT									0
+//#define DRV_I2C_IOCTL_OPT_DATA_WIDTH_16BIT								1
 
 #define DRV_I2C_IOCTL_OPT_GPIO_RESET									0xffff
 /****************************************************************************/
@@ -44,6 +36,7 @@ enum drv_i2c_id_t{
 
 typedef struct DRV_I2C_HANDLE_T * drv_i2c_handle_t;
 struct drv_i2c_ioctl_t;
+struct drv_i2c_ops_t;
 struct drv_i2c_t;
 
 union drv_i2c_ioctl_flag_u{
@@ -61,7 +54,7 @@ struct drv_i2c_ioctl_t{
 	int8_t enable;
 	int8_t irq_enable;
 	uint32_t busspeed;
-	uint8_t data_width;
+//	uint8_t data_width;
 	uint32_t gp_scl_group	:16;
 	uint32_t gp_scl_pin		:16;
 	uint32_t gp_sda_group	:16;
@@ -77,17 +70,17 @@ struct DRV_I2C_HANDLE_T{
 struct drv_i2c_ops_t{
 	int32_t (*startup)(struct drv_i2c_t *);
 	void (*shutdown)(struct drv_i2c_t *);
-	int32_t (*enable_irq)(struct drv_i2c_t *, uint32_t);
+	int32_t (*irq_enable)(struct drv_i2c_t *, uint32_t);
 	int32_t (*close)(struct drv_i2c_t *);
-	void (*write)(struct drv_i2c_t *, uint32_t );
-	uint32_t (*read)(struct drv_i2c_t * );
+	void (*write)(struct drv_i2c_t *, uint16_t, uint16_t, uint8_t, uint8_t *, uint32_t );
+	void (*read)(struct drv_i2c_t *, uint16_t, uint16_t, uint8_t, uint8_t *, uint32_t );
 	int32_t (*ioctl)(struct drv_i2c_t *, uint32_t, unsigned int );
 };
 
 struct drv_i2c_t{
 	drv_i2c_handle_t handle;
 	const struct drv_i2c_ops_t *ops;
-	void (*handle_irq)(void);
+	void (*handle_irq)(drv_i2c_handle_t);
 };
 
 /** 
@@ -114,7 +107,8 @@ int32_t drv_i2c_close( drv_i2c_handle_t handle );
   \param [in]	dat
   \return		ret
 */
-int32_t drv_i2c_write( drv_i2c_handle_t handle, uint32_t dat );
+//int32_t drv_i2c_write( drv_i2c_handle_t handle, uint32_t dat );
+int32_t drv_i2c_write( drv_i2c_handle_t handle, uint16_t dev_addr, uint16_t mem_addr, uint8_t mem_addr_size, uint8_t *dat, uint32_t size );
 
 /** 
   \brief		i2c driver read function
@@ -123,7 +117,7 @@ int32_t drv_i2c_write( drv_i2c_handle_t handle, uint32_t dat );
   \param [in]	dat
   \return		ret
 */
-int32_t drv_i2c_read( drv_i2c_handle_t handle, uint32_t *dat );
+int32_t drv_i2c_read( drv_i2c_handle_t handle, uint16_t dev_addr, uint16_t mem_addr, uint8_t mem_addr_size, uint8_t *dat, uint32_t size );
 
 /** 
   \brief		i2c driver input output control function
@@ -159,4 +153,3 @@ int32_t drv_i2c_register_driver( struct drv_i2c_t *i2c );
 #endif
 
 #endif
-

@@ -556,5 +556,7 @@ void            WIFI0_Handler();
 
 void            drv_mac_lbt_config(bool valid , uint32_t cs_time , uint32_t pause_time , uint32_t tx_time );
 
+int8_t          drv_mac_compute_rssi_compensation_offset(int8_t rssi_raw);
+
 
 #endif

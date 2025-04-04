@@ -14,5 +14,5 @@ void drv_set_pause(uint32_t time);
 uint32_t drv_get_pause();
 void drv_set_pause_hw(uint32_t time);
 uint32_t drv_get_pause_hw();
-void drv_set_suppress_lbt(uint32_t time);
+void drv_set_suppress_lbt(uint32_t setting, uint32_t time);
 #endif /* LMAC_DRV_H */

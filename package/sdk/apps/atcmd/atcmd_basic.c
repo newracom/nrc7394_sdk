@@ -26,409 +26,6 @@
 
 #include "atcmd.h"
 
-/**********************************************************************************************/
-
-static int _atcmd_basic_event_handler (int type, ...)
-{
-	va_list ap;
-	int ret = 0;
-
-	va_start(ap, type);
-
-	switch (type)
-	{
-		case ATCMD_BASIC_EVENT_FWBINDL_IDLE:
-		{
-			const char *name = "FWBINDL_IDLE";
-			uint32_t len = va_arg(ap, uint32_t);
-			uint32_t cnt = va_arg(ap, uint32_t);
-
-			_atcmd_info("BEVENT: %s, len=%u cnt=%u", name, len, cnt);
-			ATCMD_MSG_BEVENT("\"%s\",%u,%u", name, len, cnt);
-			break;
-		}
-
-		case ATCMD_BASIC_EVENT_FWBINDL_DROP:
-		{
-			const char *name = "FWBINDL_DROP";
-			uint32_t len = va_arg(ap, uint32_t);
-
-			_atcmd_info("BEVENT: %s, len=%u", name, len);
-			ATCMD_MSG_BEVENT("\"%s\",%u", name, len);
-			break;
-		}
-
-		case ATCMD_BASIC_EVENT_FWBINDL_FAIL:
-		{
-			const char *name = "FWBINDL_FAIL";
-			uint32_t len = va_arg(ap, uint32_t);
-
-			_atcmd_info("BEVENT: %s, len=%u", name, len);
-			ATCMD_MSG_BEVENT("\"%s\",%u", name, len);
-			break;
-		}
-
-		case ATCMD_BASIC_EVENT_FWBINDL_DONE:
-		{
-			const char *name = "FWBINDL_DONE";
-			uint32_t len = va_arg(ap, uint32_t);
-
-			_atcmd_info("BEVENT: %s, len=%u", name, len);
-			ATCMD_MSG_BEVENT("\"%s\",%u", name, len);
-			break;
-		}
-
-#if defined(CONFIG_ATCMD_SFUSER)
-		case ATCMD_BASIC_EVENT_SFUSER_IDLE:
-		{
-			const char *name = "SFUSER_IDLE";
-			uint32_t offset = va_arg(ap, uint32_t);
-			uint32_t length = va_arg(ap, uint32_t);
-			uint32_t count = va_arg(ap, uint32_t);
-
-			_atcmd_info("BEVENT: %s, offset=%u length=%u count=%u", name, offset, length, count);
-			ATCMD_MSG_BEVENT("\"%s\",%u,%u,%u", name, offset, length, count);
-			break;
-		}
-
-		case ATCMD_BASIC_EVENT_SFUSER_DROP:
-		{
-			const char *name = "SFUSER_DROP";
-			uint32_t offset = va_arg(ap, uint32_t);
-			uint32_t length = va_arg(ap, uint32_t);
-
-			_atcmd_info("BEVENT: %s, offset=%u length=%u", name, offset, length);
-			ATCMD_MSG_BEVENT("\"%s\",%u,%u", name, offset, length);
-			break;
-		}
-
-		case ATCMD_BASIC_EVENT_SFUSER_FAIL:
-		{
-			const char *name = "SFUSER_FAIL";
-			uint32_t offset = va_arg(ap, uint32_t);
-			uint32_t length = va_arg(ap, uint32_t);
-
-			_atcmd_info("BEVENT: %s, offset=%u length=%u", name, offset, length);
-			ATCMD_MSG_BEVENT("\"%s\",%u,%u", name, offset, length);
-			break;
-		}
-
-		case ATCMD_BASIC_EVENT_SFUSER_DONE:
-		{
-			const char *name = "SFUSER_DONE";
-			uint32_t offset = va_arg(ap, uint32_t);
-			uint32_t length = va_arg(ap, uint32_t);
-
-			_atcmd_info("BEVENT: %s, offset=%u length=%u", name, offset, length);
-			ATCMD_MSG_BEVENT("\"%s\",%u,%u", name, offset, length);
-			break;
-		}
-#endif
-
-		default:
-			_atcmd_info("BEVENT: invalid type (%d)", type);
-			ret = -1;
-	}
-
-	va_end(ap);
-
-	return ret;
-}
-
-/**********************************************************************************************/
-
-static bool g_atcmd_version_verbose = false;
-
-static int _atcmd_basic_version_get (int argc, char *argv[])
-{
-	switch (argc)
-	{
-		case 0:
-		{
-			char str_sdk_ver[ATCMD_STR_SIZE(8)];
-			char str_atcmd_ver[ATCMD_STR_SIZE(8)];
-
-			snprintf(str_sdk_ver, sizeof(str_sdk_ver), "%u.%u.%u",
-						SDK_VER_MAJOR, SDK_VER_MINOR, SDK_VER_REVISION);
-
-			snprintf(str_atcmd_ver, sizeof(str_atcmd_ver), "%u.%u.%u",
-						ATCMD_VER_MAJOR, ATCMD_VER_MINOR, ATCMD_VER_REVISION);
-
-			if (!g_atcmd_version_verbose)
-				ATCMD_MSG_INFO("VER", "\"%s\",\"%s\"", str_sdk_ver, str_atcmd_ver);
-			else
-			{
-#if defined(SDK_VER_DESCRIPTION)
-				ATCMD_MSG_INFO("VER", "\"%s%s\",\"%s\",\"%s, %s\"",
-						str_sdk_ver, SDK_VER_DESCRIPTION, str_atcmd_ver, __TIME__, __DATE__);
-#else
-				ATCMD_MSG_INFO("VER", "\"%s\",\"%s\",\"%s, %s\"",
-						str_sdk_ver, str_atcmd_ver, __TIME__, __DATE__);
-#endif
-			}
-
-			break;
-		}
-
-		default:
-			return ATCMD_ERROR_INVAL;
-	}
-
-	return ATCMD_SUCCESS;
-}
-
-static int _atcmd_basic_version_set (int argc, char *argv[])
-{
-	switch (argc)
-	{
-		case 0:
-			ATCMD_MSG_HELP("AT+VER=<verbose>");
-			break;
-
-		case 1:
-		{
-			int verbose = atoi(argv[0]);
-
-			if (verbose == 0 || verbose == 1)
-			{
-				g_atcmd_version_verbose = !!verbose;
-				break;
-			}
-		}
-
-		default:
-			return ATCMD_ERROR_INVAL;
-	}
-
-	return ATCMD_SUCCESS;
-}
-static atcmd_info_t g_atcmd_basic_version =
-{
-	.list.next = NULL,
-	.list.prev = NULL,
-
-	.group = ATCMD_GROUP_BASIC,
-
-	.cmd = "VER",
-	.id = ATCMD_BASIC_VERSION,
-
-	.handler[ATCMD_HANDLER_RUN] = NULL,
-	.handler[ATCMD_HANDLER_GET] = _atcmd_basic_version_get,
-	.handler[ATCMD_HANDLER_SET] = _atcmd_basic_version_set,
-};
-
-/**********************************************************************************************/
-
-static char g_atcmd_boot_reason[32];
-
-static int _atcmd_basic_boot_get (int argc, char *argv[])
-{
-	switch (argc)
-	{
-		case 0:
-			_atcmd_info("boot_get: %s", g_atcmd_boot_reason);
-			ATCMD_MSG_INFO("BOOT", "\"%s\"", g_atcmd_boot_reason);
-			break;
-
-		default:
-			return ATCMD_ERROR_INVAL;
-	}
-
-	return ATCMD_SUCCESS;
-}
-
-static atcmd_info_t g_atcmd_basic_boot =
-{
-	.list.next = NULL,
-	.list.prev = NULL,
-
-	.group = ATCMD_GROUP_BASIC,
-
-	.cmd = "BOOT",
-	.id = ATCMD_BASIC_BOOT,
-
-	.handler[ATCMD_HANDLER_RUN] = NULL,
-	.handler[ATCMD_HANDLER_GET] = _atcmd_basic_boot_get,
-	.handler[ATCMD_HANDLER_SET] = NULL,
-};
-
-/**********************************************************************************************/
-
-#if defined(NRC7394)
-
-static int _atcmd_basic_xtal_get (int argc, char *argv[])
-{
-	switch (argc)
-	{
-		case 0:
-		{
-			const char *str_status[3] = { "not checked", "working", "not working" };
-			int status = nrc_get_xtal_status();
-
-			switch (status)
-			{
-				case 0:
-				case 1:
-				case 2:
-					_atcmd_info("xtal_status: %d, %s", status, str_status[status]);
-
-					ATCMD_MSG_INFO("XTAL", "%d", status);
-			}
-			break;
-		}
-
-		default:
-			return ATCMD_ERROR_INVAL;
-	}
-
-	return ATCMD_SUCCESS;
-}
-
-static atcmd_info_t g_atcmd_basic_xtal =
-{
-	.list.next = NULL,
-	.list.prev = NULL,
-
-	.group = ATCMD_GROUP_BASIC,
-
-	.cmd = "XTAL",
-	.id = ATCMD_BASIC_XTAL,
-
-	.handler[ATCMD_HANDLER_RUN] = NULL,
-	.handler[ATCMD_HANDLER_GET] = _atcmd_basic_xtal_get,
-	.handler[ATCMD_HANDLER_SET] = NULL,
-};
-
-#endif
-
-/**********************************************************************************************/
-
-#if defined(CONFIG_ATCMD_UART) || defined(CONFIG_ATCMD_UART_HFC)
-
-bool g_atcmd_uart_passthrough_support = false;
-
-static int _atcmd_basic_uart_get (int argc, char *argv[])
-{
-	switch (_hif_get_type())
-	{
-		case _HIF_TYPE_UART:
-		case _HIF_TYPE_UART_HFC:
-			break;
-
-		default:
-			return ATCMD_ERROR_NOTSUPP;
-	}
-
-	switch (argc)
-	{
-		case 0:
-		{
-			_hif_uart_t uart;
-
-			_hif_uart_get_info(&uart);
-
-			ATCMD_MSG_INFO("UART", "%d,%d,%d,%d,%d",
-							uart.baudrate,
-							uart.data_bits + 5, uart.stop_bits + 1, uart.parity,
-							uart.hfc);
-			break;
-		}
-
-		default:
-			return ATCMD_ERROR_INVAL;
-	}
-
-	return ATCMD_SUCCESS;
-}
-
-static int _atcmd_basic_uart_set (int argc, char *argv[])
-{
-	char *param_baudrate = NULL;
-	char *param_hfc = NULL;
-
-	switch (_hif_get_type())
-	{
-		case _HIF_TYPE_UART:
-		case _HIF_TYPE_UART_HFC:
-			break;
-
-		default:
-			return ATCMD_ERROR_NOTSUPP;
-	}
-
-	switch (argc)
-	{
-		case 0:
-			ATCMD_MSG_HELP("AT+UART=<baudrate>,<HFC>");
-			break;
-
-		case 1:
-		{
-			if (_hif_get_type() != _HIF_TYPE_UART)
-				return ATCMD_ERROR_NOTSUPP;
-
-			switch (atoi(argv[0]))
-			{
-				case 0: g_atcmd_uart_passthrough_support = false; break;
-				case 1: g_atcmd_uart_passthrough_support = true; break;
-				default: return ATCMD_ERROR_INVAL;
-			}
-
-			_atcmd_info("UART-PT %s", g_atcmd_uart_passthrough_support ? "ON" : "OFF");
-			break;
-		}
-
-		case 2:
-		{
-			_hif_uart_t uart;
-			int ret;
-
-			param_baudrate = argv[0];
-			param_hfc = argv[1];
-
-			_hif_uart_get_info(&uart);
-
-			uart.baudrate = atoi(param_baudrate);
-
-			switch (atoi(param_hfc))
-			{
-				case 0: uart.hfc = false; break;
-				case 1: uart.hfc = true; break;
-
-				default:
-					return ATCMD_ERROR_INVAL;
-			}
-
-			ret = _hif_uart_change(&uart);
-			if (ret == 0)
-				break;
-			else if (ret == -1)
-				return ATCMD_ERROR_FAIL;
-		}
-
-		default:
-			return ATCMD_ERROR_INVAL;
-	}
-
-	return ATCMD_SUCCESS;
-}
-
-static atcmd_info_t g_atcmd_basic_uart =
-{
-	.list.next = NULL,
-	.list.prev = NULL,
-
-	.group = ATCMD_GROUP_BASIC,
-
-	.cmd = "UART",
-	.id = ATCMD_BASIC_UART,
-
-	.handler[ATCMD_HANDLER_RUN] = NULL,
-	.handler[ATCMD_HANDLER_GET] = _atcmd_basic_uart_get,
-	.handler[ATCMD_HANDLER_SET] = _atcmd_basic_uart_set,
-};
-
-#endif /* #if defined(CONFIG_ATCMD_UART) || defined(CONFIG_ATCMD_UART_HFC) */
 
 /**********************************************************************************************/
 
@@ -647,6 +244,717 @@ static void _atcmd_gpio_init (NRC_GPIO_DIR dir, NRC_GPIO_MODE mode)
 		_atcmd_gpio_set_config(&config);
 	}
 }
+
+/**********************************************************************************************/
+
+static bool g_atcmd_adc_enable = false;
+
+static void _atcmd_adc_init (void)
+{
+	 nrc_adc_init(false);
+
+	 g_atcmd_adc_enable = false;
+}
+
+static void _atcmd_adc_deinit (void)
+{
+	 nrc_adc_deinit();
+
+	 g_atcmd_adc_enable = false;
+}
+
+static void _atcmd_adc_enable (void)
+{
+	if (!g_atcmd_adc_enable)
+	{
+		_atcmd_info("ADC: enable");
+
+		g_atcmd_adc_enable = true;
+		nrc_adc_enable();
+	}
+}
+
+static void _atcmd_adc_disable (void)
+{
+	if (g_atcmd_adc_enable)
+	{
+		_atcmd_info("ADC: disable");
+
+		g_atcmd_adc_enable = false;
+		nrc_adc_disable();
+	}
+}
+
+static bool _atcmd_adc_channel_valid (int channel)
+{
+	switch (channel)
+	{
+#if defined(NRC7292)
+		case ADC1:
+		case ADC2:
+		case ADC3:
+#else
+		case ADC0:
+		case ADC1:
+#endif
+			return true;
+
+		default:
+			return false;
+	}
+}
+
+static uint16_t _atcmd_adc_get_value (int channel)
+{
+	return nrc_adc_get_data(channel);
+}
+
+/**********************************************************************************************/
+
+#if defined(CONFIG_ATCMD_FWUPDATE)
+
+static struct
+{
+	uint32_t size;
+	uint32_t crc32;
+	uint32_t download;
+	int verify;
+} g_firmware_update =
+{
+	.size = 0,
+	.crc32 = 0,
+	.download = 0,
+	.verify = 0,
+};
+
+static void _atcmd_firmware_error_print (uint8_t *read_buf, uint8_t *buf, int len)
+{
+	int err_offset = -1;
+	int err_len = 0;
+	int i;
+
+	for (i = 0 ; i < len ; i++)
+	{
+		if (read_buf[i] == buf[i])
+		{
+			if (err_offset >= 0)
+			{
+				_atcmd_info("  - offset=%d len=%d", err_offset, err_len);
+
+				err_offset = -1;
+				err_len = 0;
+			}
+			continue;
+		}
+
+		if (err_offset >= 0)
+			err_len++;
+		else
+		{
+			err_offset = i;
+			err_len = 1;
+		}
+	}
+}
+
+static int _atcmd_firmware_verify (uint32_t offset, uint8_t *buf, int len)
+{
+	static uint8_t read_buf[ATCMD_DATA_LEN_MAX];
+	int ret;
+
+	ret = util_fota_read(offset, read_buf, len);
+   	if (ret != 0)
+		_atcmd_info("fw_verify: util_fota_read() failed, offset=%u len=%d ret=%d", offset, len, ret);
+	else
+	{
+		ret = memcmp(read_buf, buf, len);
+		if (ret != 0)
+		{
+			_atcmd_info("fw_verify: flash error, offset=%u len=%d", offset, len);
+
+			if (g_firmware_update.verify == 2)
+				_atcmd_firmware_error_print(read_buf, buf, len);
+		}
+	}
+
+	return ret;
+}
+
+static int _atcmd_firmware_download (char *buf, int len)
+{
+	uint32_t offset = g_firmware_update.download;
+	int ret;
+	int i;
+
+	for (i = 0 ; i < 2 ; i++)
+	{
+		ret = util_fota_write(offset, (uint8_t *)buf, len);
+		if (ret != 0)
+			_atcmd_info("fw_download: util_fota_write() failed, offset=%u len=%d ret=%d", offset, len, ret);
+		else if (g_firmware_update.verify > 0)
+			ret = _atcmd_firmware_verify(offset, (uint8_t *)buf, len);
+
+		if (ret == 0)
+			break;
+
+		if (i == 0)
+		{
+			_atcmd_debug("fw_download: erase and rewrite"); 
+
+			ret = util_fota_erase(offset, len);
+		   	if (ret != 0)
+			{
+				_atcmd_info("fw_download: util_fota_erase() failed, offset=%u len=%d ret=%d", offset, len, ret);
+				break;
+			}
+		}
+	}
+
+	if (ret != 0)
+		len = 0;	
+		
+	g_firmware_update.download += len;		
+
+	return len;
+}
+
+#endif /* #if defined(CONFIG_ATCMD_FWUPDATE) */
+
+/**********************************************************************************************/
+
+#if defined(CONFIG_ATCMD_SFUSER)
+
+enum
+{
+	SF_USER_READ = 0,
+	SF_USER_WRITE,
+	SF_USER_ERASE
+};
+
+static bool _atcmd_sf_user_support (void)
+{
+	uint32_t flash_size = system_api_get_flash_size() / (1024 * 1024);
+	uint32_t addr = nrc_get_user_data_area_address();
+	uint32_t size = nrc_get_user_data_area_size();
+
+	switch (flash_size)
+	{
+		case 2:
+			if (addr == 0x1E6000 && size == (100 * 1024)) /* factory default */
+				return true;
+
+			if (addr == 0x1F4000 && size == (8 * 1024)) /* extension profile 1/3 */
+				return true;
+
+			break;
+
+		case 4:
+			if (addr == 0x3DA000 && size == (100 * 1024)) /* factory default */
+				return true;
+	}
+
+	return false;
+}
+
+static bool _atcmd_sf_user_valid_params (int mode, uint32_t offset, uint32_t length)
+{
+	int sf_user_area_size = nrc_get_user_data_area_size();
+	int length_max;
+
+	switch (mode)
+	{
+		case SF_USER_READ:
+		case SF_USER_WRITE:
+			length_max = ATCMD_DATA_LEN_MAX;
+			break;
+
+		case SF_USER_ERASE:
+			length_max = sf_user_area_size;
+			break;
+
+		default:
+			_atcmd_info("sf_user: invalid param, mode=%u", mode);
+			return false;
+	}
+
+	if (offset >= sf_user_area_size)
+	{
+		_atcmd_info("sf_user: invalid param, offset=%u size=%d", 
+						offset, sf_user_area_size);
+		return false;
+	}
+
+	if (length == 0 || length > length_max)
+	{
+		_atcmd_info("sf_user: invalid param, length=%u/%d size=%d", 
+						length, length_max, sf_user_area_size);
+		return false;
+	}
+
+	if ((offset + length) > sf_user_area_size)
+	{
+		_atcmd_info("sf_user: invalid param, offset=%u length=%u size=%d", 
+						offset, length, sf_user_area_size);
+		return false;
+	}
+
+	return true;
+}
+
+static int _atcmd_sf_user_write (uint32_t offset, uint32_t length, char *data)
+{
+	_atcmd_debug("sf_user_write: offset=%d length=%d", offset, length);
+
+	if (nrc_write_user_data(offset, (uint8_t *)data, length) != NRC_SUCCESS)
+		return 0;
+
+	return length;
+}
+
+#endif /* #if defined(CONFIG_ATCMD_SFUSER) */
+
+/**********************************************************************************************/
+
+static int _atcmd_basic_event_handler (int type, ...)
+{
+	va_list ap;
+	int ret = 0;
+
+	va_start(ap, type);
+
+	switch (type)
+	{
+		case ATCMD_BASIC_EVENT_FWBINDL_IDLE:
+		{
+			const char *name = "FWBINDL_IDLE";
+			uint32_t len = va_arg(ap, uint32_t);
+			uint32_t cnt = va_arg(ap, uint32_t);
+
+			_atcmd_info("BEVENT: %s, len=%u cnt=%u", name, len, cnt);
+			ATCMD_MSG_BEVENT("\"%s\",%u,%u", name, len, cnt);
+			break;
+		}
+
+		case ATCMD_BASIC_EVENT_FWBINDL_DROP:
+		{
+			const char *name = "FWBINDL_DROP";
+			uint32_t len = va_arg(ap, uint32_t);
+
+			_atcmd_info("BEVENT: %s, len=%u", name, len);
+			ATCMD_MSG_BEVENT("\"%s\",%u", name, len);
+			break;
+		}
+
+		case ATCMD_BASIC_EVENT_FWBINDL_FAIL:
+		{
+			const char *name = "FWBINDL_FAIL";
+			uint32_t len = va_arg(ap, uint32_t);
+
+			_atcmd_info("BEVENT: %s, len=%u", name, len);
+			ATCMD_MSG_BEVENT("\"%s\",%u", name, len);
+			break;
+		}
+
+		case ATCMD_BASIC_EVENT_FWBINDL_DONE:
+		{
+			const char *name = "FWBINDL_DONE";
+			uint32_t len = va_arg(ap, uint32_t);
+
+			_atcmd_info("BEVENT: %s, len=%u", name, len);
+			ATCMD_MSG_BEVENT("\"%s\",%u", name, len);
+			break;
+		}
+
+#if defined(CONFIG_ATCMD_SFUSER)
+		case ATCMD_BASIC_EVENT_SFUSER_IDLE:
+		{
+			const char *name = "SFUSER_IDLE";
+			uint32_t offset = va_arg(ap, uint32_t);
+			uint32_t length = va_arg(ap, uint32_t);
+			uint32_t count = va_arg(ap, uint32_t);
+
+			_atcmd_info("BEVENT: %s, offset=%u length=%u count=%u", name, offset, length, count);
+			ATCMD_MSG_BEVENT("\"%s\",%u,%u,%u", name, offset, length, count);
+			break;
+		}
+
+		case ATCMD_BASIC_EVENT_SFUSER_DROP:
+		{
+			const char *name = "SFUSER_DROP";
+			uint32_t offset = va_arg(ap, uint32_t);
+			uint32_t length = va_arg(ap, uint32_t);
+
+			_atcmd_info("BEVENT: %s, offset=%u length=%u", name, offset, length);
+			ATCMD_MSG_BEVENT("\"%s\",%u,%u", name, offset, length);
+			break;
+		}
+
+		case ATCMD_BASIC_EVENT_SFUSER_FAIL:
+		{
+			const char *name = "SFUSER_FAIL";
+			uint32_t offset = va_arg(ap, uint32_t);
+			uint32_t length = va_arg(ap, uint32_t);
+
+			_atcmd_info("BEVENT: %s, offset=%u length=%u", name, offset, length);
+			ATCMD_MSG_BEVENT("\"%s\",%u,%u", name, offset, length);
+			break;
+		}
+
+		case ATCMD_BASIC_EVENT_SFUSER_DONE:
+		{
+			const char *name = "SFUSER_DONE";
+			uint32_t offset = va_arg(ap, uint32_t);
+			uint32_t length = va_arg(ap, uint32_t);
+
+			_atcmd_info("BEVENT: %s, offset=%u length=%u", name, offset, length);
+			ATCMD_MSG_BEVENT("\"%s\",%u,%u", name, offset, length);
+			break;
+		}
+#endif
+
+		default:
+			_atcmd_info("BEVENT: invalid type (%d)", type);
+			ret = -1;
+	}
+
+	va_end(ap);
+
+	return ret;
+}
+
+/**********************************************************************************************/
+
+static bool g_atcmd_version_verbose = false;
+
+static int _atcmd_basic_version_get (int argc, char *argv[])
+{
+	switch (argc)
+	{
+		case 0:
+		{
+			char buf[ATCMD_MSG_LEN_MAX];
+			int len;
+
+			/* SDK Package */
+#if !defined(SDK_VER_DESCRIPTION)
+			len = snprintf(buf, sizeof(buf), "\"%u.%u.%u\"", 
+					SDK_VER_MAJOR, SDK_VER_MINOR, SDK_VER_REVISION);
+#else			
+			len = snprintf(buf, sizeof(buf), "\"%u.%u.%u-%s\"", 
+					SDK_VER_MAJOR, SDK_VER_MINOR, SDK_VER_REVISION, SDK_VER_DESCRIPTION);
+#endif			
+
+			/* AT Command Set */
+			len += snprintf(buf + len, sizeof(buf) - len, ",\"%u.%u.%u\"", 
+					ATCMD_VER_MAJOR, ATCMD_VER_MINOR, ATCMD_VER_REVISION);
+
+			/* Date & Time */
+			if (g_atcmd_version_verbose)
+				len += snprintf(buf + len, sizeof(buf) - len, ",\"%s %s\"", __DATE__, __TIME__);
+
+			ATCMD_MSG_INFO("VER", "%s", buf);
+			break;
+		}
+
+		default:
+			return ATCMD_ERROR_INVAL;
+	}
+
+	return ATCMD_SUCCESS;
+}
+
+static int _atcmd_basic_version_set (int argc, char *argv[])
+{
+	switch (argc)
+	{
+		case 0:
+			ATCMD_MSG_HELP("AT+VER=<verbose>");
+			break;
+
+		case 1:
+		{
+			int verbose = atoi(argv[0]);
+
+			if (verbose == 0 || verbose == 1)
+			{
+				g_atcmd_version_verbose = !!verbose;
+				break;
+			}
+		}
+
+		default:
+			return ATCMD_ERROR_INVAL;
+	}
+
+	return ATCMD_SUCCESS;
+}
+static atcmd_info_t g_atcmd_basic_version =
+{
+	.list.next = NULL,
+	.list.prev = NULL,
+
+	.group = ATCMD_GROUP_BASIC,
+
+	.cmd = "VER",
+	.id = ATCMD_BASIC_VERSION,
+
+	.handler[ATCMD_HANDLER_RUN] = NULL,
+	.handler[ATCMD_HANDLER_GET] = _atcmd_basic_version_get,
+	.handler[ATCMD_HANDLER_SET] = _atcmd_basic_version_set,
+};
+
+/**********************************************************************************************/
+
+static char g_atcmd_boot_reason[32];
+
+static int _atcmd_basic_boot_get (int argc, char *argv[])
+{
+	switch (argc)
+	{
+		case 0:
+			_atcmd_info("boot_get: %s", g_atcmd_boot_reason);
+			ATCMD_MSG_INFO("BOOT", "\"%s\"", g_atcmd_boot_reason);
+			break;
+
+		default:
+			return ATCMD_ERROR_INVAL;
+	}
+
+	return ATCMD_SUCCESS;
+}
+
+static atcmd_info_t g_atcmd_basic_boot =
+{
+	.list.next = NULL,
+	.list.prev = NULL,
+
+	.group = ATCMD_GROUP_BASIC,
+
+	.cmd = "BOOT",
+	.id = ATCMD_BASIC_BOOT,
+
+	.handler[ATCMD_HANDLER_RUN] = NULL,
+	.handler[ATCMD_HANDLER_GET] = _atcmd_basic_boot_get,
+	.handler[ATCMD_HANDLER_SET] = NULL,
+};
+
+/**********************************************************************************************/
+
+static int _atcmd_basic_heap_get (int argc, char *argv[])
+{
+	switch (argc)
+	{
+		case 0:
+		{
+			size_t cur_size = xPortGetFreeHeapSize();
+			size_t min_size = xPortGetMinimumEverFreeHeapSize();
+
+			_atcmd_info("heap_size: %d, %d", cur_size, min_size);
+
+			ATCMD_MSG_INFO("HEAP", "%d,%d", cur_size, min_size);
+			break;
+		}
+
+		default:
+			return ATCMD_ERROR_INVAL;
+	}
+
+	return ATCMD_SUCCESS;
+}
+static atcmd_info_t g_atcmd_basic_heap =
+{
+	.list.next = NULL,
+	.list.prev = NULL,
+
+	.group = ATCMD_GROUP_BASIC,
+
+	.cmd = "HEAP",
+	.id = ATCMD_BASIC_HEAP,
+
+	.handler[ATCMD_HANDLER_RUN] = NULL,
+	.handler[ATCMD_HANDLER_GET] = _atcmd_basic_heap_get,
+	.handler[ATCMD_HANDLER_SET] = NULL,
+};
+
+/**********************************************************************************************/
+
+#if defined(NRC7394)
+
+static int _atcmd_basic_xtal_get (int argc, char *argv[])
+{
+	switch (argc)
+	{
+		case 0:
+		{
+			const char *str_status[3] = { "not checked", "working", "not working" };
+			int status = nrc_get_xtal_status();
+
+			switch (status)
+			{
+				case 0:
+				case 1:
+				case 2:
+					_atcmd_info("xtal_status: %d, %s", status, str_status[status]);
+
+					ATCMD_MSG_INFO("XTAL", "%d", status);
+			}
+			break;
+		}
+
+		default:
+			return ATCMD_ERROR_INVAL;
+	}
+
+	return ATCMD_SUCCESS;
+}
+
+static atcmd_info_t g_atcmd_basic_xtal =
+{
+	.list.next = NULL,
+	.list.prev = NULL,
+
+	.group = ATCMD_GROUP_BASIC,
+
+	.cmd = "XTAL",
+	.id = ATCMD_BASIC_XTAL,
+
+	.handler[ATCMD_HANDLER_RUN] = NULL,
+	.handler[ATCMD_HANDLER_GET] = _atcmd_basic_xtal_get,
+	.handler[ATCMD_HANDLER_SET] = NULL,
+};
+
+#endif
+
+/**********************************************************************************************/
+
+#if defined(CONFIG_ATCMD_UART) || defined(CONFIG_ATCMD_UART_HFC)
+
+bool g_atcmd_uart_passthrough_support = false;
+
+static int _atcmd_basic_uart_get (int argc, char *argv[])
+{
+	switch (_hif_get_type())
+	{
+		case _HIF_TYPE_UART:
+		case _HIF_TYPE_UART_HFC:
+			break;
+
+		default:
+			return ATCMD_ERROR_NOTSUPP;
+	}
+
+	switch (argc)
+	{
+		case 0:
+		{
+			_hif_uart_t uart;
+
+			_hif_uart_get_info(&uart);
+
+			ATCMD_MSG_INFO("UART", "%d,%d,%d,%d,%d",
+							uart.baudrate,
+							uart.data_bits + 5, uart.stop_bits + 1, uart.parity,
+							uart.hfc);
+			break;
+		}
+
+		default:
+			return ATCMD_ERROR_INVAL;
+	}
+
+	return ATCMD_SUCCESS;
+}
+
+static int _atcmd_basic_uart_set (int argc, char *argv[])
+{
+	char *param_baudrate = NULL;
+	char *param_hfc = NULL;
+
+	switch (_hif_get_type())
+	{
+		case _HIF_TYPE_UART:
+		case _HIF_TYPE_UART_HFC:
+			break;
+
+		default:
+			return ATCMD_ERROR_NOTSUPP;
+	}
+
+	switch (argc)
+	{
+		case 0:
+			ATCMD_MSG_HELP("AT+UART=<baudrate>,<HFC>");
+			break;
+
+		case 1:
+		{
+			if (_hif_get_type() != _HIF_TYPE_UART)
+				return ATCMD_ERROR_NOTSUPP;
+
+			switch (atoi(argv[0]))
+			{
+				case 0: g_atcmd_uart_passthrough_support = false; break;
+				case 1: g_atcmd_uart_passthrough_support = true; break;
+				default: return ATCMD_ERROR_INVAL;
+			}
+
+			_atcmd_info("UART-PT %s", g_atcmd_uart_passthrough_support ? "ON" : "OFF");
+			break;
+		}
+
+		case 2:
+		{
+			_hif_uart_t uart;
+			int ret;
+
+			param_baudrate = argv[0];
+			param_hfc = argv[1];
+
+			_hif_uart_get_info(&uart);
+
+			uart.baudrate = atoi(param_baudrate);
+
+			switch (atoi(param_hfc))
+			{
+				case 0: uart.hfc = false; break;
+				case 1: uart.hfc = true; break;
+
+				default:
+					return ATCMD_ERROR_INVAL;
+			}
+
+			ret = _hif_uart_change(&uart);
+			if (ret == 0)
+				break;
+			else if (ret == -1)
+				return ATCMD_ERROR_FAIL;
+		}
+
+		default:
+			return ATCMD_ERROR_INVAL;
+	}
+
+	return ATCMD_SUCCESS;
+}
+
+static atcmd_info_t g_atcmd_basic_uart =
+{
+	.list.next = NULL,
+	.list.prev = NULL,
+
+	.group = ATCMD_GROUP_BASIC,
+
+	.cmd = "UART",
+	.id = ATCMD_BASIC_UART,
+
+	.handler[ATCMD_HANDLER_RUN] = NULL,
+	.handler[ATCMD_HANDLER_GET] = _atcmd_basic_uart_get,
+	.handler[ATCMD_HANDLER_SET] = _atcmd_basic_uart_set,
+};
+
+#endif /* #if defined(CONFIG_ATCMD_UART) || defined(CONFIG_ATCMD_UART_HFC) */
+
+/**********************************************************************************************/
 
 static int _atcmd_basic_gpio_config_get (int argc, char *argv[])
 {
@@ -874,68 +1182,6 @@ static atcmd_info_t g_atcmd_basic_gpio_value =
 
 /**********************************************************************************************/
 
-static bool g_atcmd_adc_enable = false;
-
-static void _atcmd_adc_init (void)
-{
-	 nrc_adc_init(false);
-
-	 g_atcmd_adc_enable = false;
-}
-
-static void _atcmd_adc_deinit (void)
-{
-	 nrc_adc_deinit();
-
-	 g_atcmd_adc_enable = false;
-}
-
-static void _atcmd_adc_enable (void)
-{
-	if (!g_atcmd_adc_enable)
-	{
-		_atcmd_info("ADC: enable");
-
-		g_atcmd_adc_enable = true;
-		nrc_adc_enable();
-	}
-}
-
-static void _atcmd_adc_disable (void)
-{
-	if (g_atcmd_adc_enable)
-	{
-		_atcmd_info("ADC: disable");
-
-		g_atcmd_adc_enable = false;
-		nrc_adc_disable();
-	}
-}
-
-static bool _atcmd_adc_channel_valid (int channel)
-{
-	switch (channel)
-	{
-#if defined(NRC7292)
-		case ADC1:
-		case ADC2:
-		case ADC3:
-#else
-		case ADC0:
-		case ADC1:
-#endif
-			return true;
-
-		default:
-			return false;
-	}
-}
-
-static uint16_t _atcmd_adc_get_value (int channel)
-{
-	return nrc_adc_get_data(channel);
-}
-
 static int _atcmd_basic_adc_get (int argc, char *argv[])
 {
 	int channel = -1;
@@ -1031,115 +1277,7 @@ static atcmd_info_t g_atcmd_basic_adc =
 
 /**********************************************************************************************/
 
-static struct
-{
-	uint32_t size;
-	uint32_t crc32;
-	uint32_t download;
-	int verify;
-} g_firmware_update =
-{
-	.size = 0,
-	.crc32 = 0,
-	.download = 0,
-	.verify = 0,
-};
-
-static void _atcmd_firmware_error_print (uint8_t *read_buf, uint8_t *buf, int len)
-{
-	int err_offset = -1;
-	int err_len = 0;
-	int i;
-
-	for (i = 0 ; i < len ; i++)
-	{
-		if (read_buf[i] == buf[i])
-		{
-			if (err_offset >= 0)
-			{
-				_atcmd_info("  - offset=%d len=%d", err_offset, err_len);
-
-				err_offset = -1;
-				err_len = 0;
-			}
-			continue;
-		}
-
-		if (err_offset >= 0)
-			err_len++;
-		else
-		{
-			err_offset = i;
-			err_len = 1;
-		}
-	}
-}
-
-static int _atcmd_firmware_verify (uint32_t offset, uint8_t *buf, int len)
-{
-	static uint8_t read_buf[ATCMD_DATA_LEN_MAX];
-	int ret;
-
-	ret = util_fota_read(offset, read_buf, len);
-   	if (ret != 0)
-		_atcmd_info("fw_verify: util_fota_read() failed, offset=%u len=%d ret=%d", offset, len, ret);
-	else
-	{
-		ret = memcmp(read_buf, buf, len);
-		if (ret != 0)
-		{
-			_atcmd_info("fw_verify: flash error, offset=%u len=%d", offset, len);
-
-			if (g_firmware_update.verify == 2)
-				_atcmd_firmware_error_print(read_buf, buf, len);
-		}
-	}
-
-	return ret;
-}
-
-static int _atcmd_firmware_write (char *buf, int len)
-{
-	uint32_t offset = g_firmware_update.download;
-	int ret;
-	int i;
-
-	for (i = 0 ; i < 2 ; i++)
-	{
-		ret = util_fota_write(offset, (uint8_t *)buf, len);
-		if (ret != 0)
-			_atcmd_info("fw_write: util_fota_write() failed, offset=%u len=%d ret=%d", offset, len, ret);
-		else if (g_firmware_update.verify > 0)
-			ret = _atcmd_firmware_verify(offset, (uint8_t *)buf, len);
-
-		if (ret == 0)
-			break;
-
-		if (i == 0)
-		{
-			_atcmd_debug("fw_write: erase and rewrite"); 
-
-			ret = util_fota_erase(offset, len);
-		   	if (ret != 0)
-			{
-				_atcmd_info("fw_write: util_fota_erase() failed, offset=%u len=%d ret=%d", offset, len, ret);
-				break;
-			}
-		}
-	}
-
-	if (ret != 0)
-		_atcmd_basic_event_handler(ATCMD_BASIC_EVENT_FWBINDL_FAIL, len);
-	else
-	{
-		_atcmd_basic_event_handler(ATCMD_BASIC_EVENT_FWBINDL_DONE, len);
-		g_firmware_update.download += len;
-	}
-
-	return ret;
-}
-
-/**********************************************************************************************/
+#if defined(CONFIG_ATCMD_FWUPDATE)
 
 static int _atcmd_basic_firmware_update_run (int argc, char *argv[])
 {
@@ -1272,7 +1410,11 @@ static atcmd_info_t g_atcmd_basic_firmware_update =
 	.handler[ATCMD_HANDLER_SET] = _atcmd_basic_firmware_update_set,
 };
 
+#endif /* #if defined(CONFIG_ATCMD_FWUPDATE) */
+
 /**********************************************************************************************/
+
+#if defined(CONFIG_ATCMD_FWUPDATE)
 
 uint32_t _atcmd_timeout_value (const char *cmd);
 
@@ -1322,6 +1464,7 @@ static int _atcmd_basic_firmware_download_set (int argc, char *argv[])
 
 			if (offset == g_firmware_update.download)
 			{
+				atcmd_data_mode_params_t data_mode_params;
 				uint32_t timeout_msec = _atcmd_timeout_value("FWBINDL");
 
 				if (timeout_msec == 0)
@@ -1329,7 +1472,13 @@ static int _atcmd_basic_firmware_download_set (int argc, char *argv[])
 
 				_atcmd_info("fw_download_set: offset=%u length=%u timeout=%u", offset, length, timeout_msec);
 
-				if (atcmd_firmware_download_enable(length, timeout_msec) != 0)
+				atcmd_data_mode_init_params(ATCMD_DATA_FWBINDL, &data_mode_params);
+
+				data_mode_params.len = length;
+				data_mode_params.timeout = timeout_msec;
+				data_mode_params.done_event = true;
+
+				if (atcmd_data_mode_enable(&data_mode_params) != 0)
 					return ATCMD_ERROR_FAIL;
 
 				break;
@@ -1360,101 +1509,11 @@ static atcmd_info_t g_atcmd_basic_firmware_donwload =
 	.handler[ATCMD_HANDLER_SET] = _atcmd_basic_firmware_download_set,
 };
 
+#endif /*#if defined(CONFIG_ATCMD_FWUPDATE) */
+
 /**********************************************************************************************/
 
 #if defined(CONFIG_ATCMD_SFUSER)
-
-enum
-{
-	SF_USER_READ = 0,
-	SF_USER_WRITE,
-	SF_USER_ERASE
-};
-
-static bool _atcmd_sf_user_support (void)
-{
-	uint32_t flash_size = system_api_get_flash_size() / (1024 * 1024);
-	uint32_t addr = nrc_get_user_data_area_address();
-	uint32_t size = nrc_get_user_data_area_size();
-
-	switch (flash_size)
-	{
-		case 2:
-			if (addr == 0x1E6000 && size == (100 * 1024)) /* factory default */
-				return true;
-
-			if (addr == 0x1F4000 && size == (8 * 1024)) /* extension profile 1/3 */
-				return true;
-
-			break;
-
-		case 4:
-			if (addr == 0x3DA000 && size == (100 * 1024)) /* factory default */
-				return true;
-	}
-
-	return false;
-}
-
-static bool _atcmd_sf_user_valid_params (int mode, uint32_t offset, uint32_t length)
-{
-	int sf_user_area_size = nrc_get_user_data_area_size();
-	int length_max;
-
-	switch (mode)
-	{
-		case SF_USER_READ:
-		case SF_USER_WRITE:
-			length_max = ATCMD_DATA_LEN_MAX;
-			break;
-
-		case SF_USER_ERASE:
-			length_max = sf_user_area_size;
-			break;
-
-		default:
-			_atcmd_info("sf_user: invalid param, mode=%u", mode);
-			return false;
-	}
-
-	if (offset >= sf_user_area_size)
-	{
-		_atcmd_info("sf_user: invalid param, offset=%u size=%d", 
-						offset, sf_user_area_size);
-		return false;
-	}
-
-	if (length == 0 || length > length_max)
-	{
-		_atcmd_info("sf_user: invalid param, length=%u/%d size=%d", 
-						length, length_max, sf_user_area_size);
-		return false;
-	}
-
-	if ((offset + length) > sf_user_area_size)
-	{
-		_atcmd_info("sf_user: invalid param, offset=%u length=%u size=%d", 
-						offset, length, sf_user_area_size);
-		return false;
-	}
-
-	return true;
-}
-
-static int _atcmd_sf_user_write (uint32_t offset, uint32_t length, char *data)
-{
-	_atcmd_debug("sf_user_write: offset=%d length=%d", offset, length);
-
-	if (nrc_write_user_data(offset, (uint8_t *)data, length) != NRC_SUCCESS)
-	{
-		_atcmd_basic_event_handler(ATCMD_BASIC_EVENT_SFUSER_FAIL, offset, length);
-		return 0;
-	}
-
-	_atcmd_basic_event_handler(ATCMD_BASIC_EVENT_SFUSER_DONE, offset, length);
-
-	return length;
-}
 
 static int _atcmd_basic_sf_user_get (int argc, char *argv[])
 {
@@ -1550,15 +1609,26 @@ static int _atcmd_basic_sf_user_set (int argc, char *argv[])
 						}
 
 					case SF_USER_WRITE:
+					{
+						atcmd_data_mode_params_t data_mode_params;
+
 						_atcmd_info("sf_user_write: offset=%d length=%d", offset, length);
 
-						if (atcmd_sf_user_mode_enable(offset, length, 1000) != 0)
+						atcmd_data_mode_init_params(ATCMD_DATA_SFUSER, &data_mode_params);
+
+						data_mode_params.len = length;
+						data_mode_params.timeout = 1000;
+						data_mode_params.done_event = true;
+						data_mode_params.sfuser.offset = offset;
+
+						if (atcmd_data_mode_enable(&data_mode_params) != 0)
 						{
 							_atcmd_info("sf_user_write: failed");
 							return ATCMD_ERROR_FAIL;
 						}
 
 						return ATCMD_SUCCESS;
+					}
 				
 					case SF_USER_ERASE:
 						if (argc == 1)
@@ -1775,6 +1845,7 @@ static atcmd_timeout_t g_atcmd_timeout_socket[] =
 	{ "SOPEN6", 30 },
 #endif
 	{ "SSEND", 0 },
+	{ "SRECV", 0 },
 
 	{ NULL, 0 }
 };
@@ -1959,6 +2030,7 @@ static atcmd_info_t *g_atcmd_info_basic[] =
 {
 	&g_atcmd_basic_version,
 	&g_atcmd_basic_boot,
+	&g_atcmd_basic_heap,
 #if defined(NRC7394)
 	&g_atcmd_basic_xtal,
 #endif
@@ -1969,9 +2041,11 @@ static atcmd_info_t *g_atcmd_info_basic[] =
 	&g_atcmd_basic_gpio_value,
 	&g_atcmd_basic_adc,
 
+#if defined(CONFIG_ATCMD_FWUPDATE)
 	&g_atcmd_basic_firmware_update,
 	&g_atcmd_basic_firmware_donwload,
-	
+#endif
+
 #if defined(CONFIG_ATCMD_SFUSER)
 	&g_atcmd_basic_sf_user,
 #endif
@@ -2071,20 +2145,32 @@ bool atcmd_gpio_pin_valid (int pin)
 	return _atcmd_gpio_pin_valid(pin);
 }
 
-int atcmd_firmware_write (char *buf, int len)
+#if defined(CONFIG_ATCMD_FWUPDATE)
+int atcmd_firmware_download (char *buf, int len)
 {
-	return _atcmd_firmware_write(buf, len);
+	return _atcmd_firmware_download(buf, len);
 }
 
-void atcmd_firmware_download_timeout (uint32_t len, uint32_t cnt)
+void atcmd_firmware_download_event_idle (uint32_t len, uint32_t cnt)
 {
 	_atcmd_basic_event_handler(ATCMD_BASIC_EVENT_FWBINDL_IDLE, len, cnt);
 }
 
-void atcmd_firmware_download_drop (uint32_t len)
+void atcmd_firmware_download_event_drop (uint32_t len)
 {
 	_atcmd_basic_event_handler(ATCMD_BASIC_EVENT_FWBINDL_DROP, len);
 }
+
+void atcmd_firmware_download_event_fail (uint32_t len)
+{
+	_atcmd_basic_event_handler(ATCMD_BASIC_EVENT_FWBINDL_FAIL, len);
+}
+
+void atcmd_firmware_download_event_done (uint32_t len)
+{
+	_atcmd_basic_event_handler(ATCMD_BASIC_EVENT_FWBINDL_DONE, len);
+}
+#endif
 
 #if defined(CONFIG_ATCMD_SFUSER)
 int atcmd_sf_user_write (uint32_t offset, uint32_t length, char *data)
@@ -2092,14 +2178,24 @@ int atcmd_sf_user_write (uint32_t offset, uint32_t length, char *data)
 	return _atcmd_sf_user_write(offset, length, data);
 }
 
-void atcmd_sf_user_write_timeout (uint32_t offset, uint32_t length, uint32_t count)
+void atcmd_sf_user_write_event_idle (uint32_t offset, uint32_t length, uint32_t count)
 {
 	_atcmd_basic_event_handler(ATCMD_BASIC_EVENT_SFUSER_IDLE, offset, length, count);
 }
 
-void atcmd_sf_user_write_drop (uint32_t offset, uint32_t length)
+void atcmd_sf_user_write_event_drop (uint32_t offset, uint32_t length)
 {
 	_atcmd_basic_event_handler(ATCMD_BASIC_EVENT_SFUSER_DROP, offset, length);
+}
+
+void atcmd_sf_user_write_event_fail (uint32_t offset, uint32_t length)
+{
+		_atcmd_basic_event_handler(ATCMD_BASIC_EVENT_SFUSER_FAIL, offset, length);
+}
+
+void atcmd_sf_user_write_event_done (uint32_t offset, uint32_t length)
+{
+	_atcmd_basic_event_handler(ATCMD_BASIC_EVENT_SFUSER_DONE, offset, length);
 }
 #endif
 

@@ -2,11 +2,13 @@ SECTIONS
 {
 	.text :
 	{
+        __isr_vector_start = .;
 		KEEP(*(.isr_vector))
+        __isr_vector_end = .;
 		/* *(.text) */
 		/* *(.text*) */
-		*(EXCLUDE_FILE(*lmac*.c.o *umac_s1g*.c.o *ec*.c.o *bignum*.c.o).text)
-		*(EXCLUDE_FILE(*lmac*.c.o *umac_s1g*.c.o *ec*.c.o *bignum*.c.o).text*)
+		*(EXCLUDE_FILE(*driver_nrc*.c.o *lmac*.c.o *umac_s1g*.c.o *ec*.c.o *bignum*.c.o).text)
+		*(EXCLUDE_FILE(*driver_nrc*.c.o *lmac*.c.o *umac_s1g*.c.o *ec*.c.o *bignum*.c.o).text*)
 
 		. = ALIGN(4);
 		PROVIDE_HIDDEN (__preinit_array_start = .);
@@ -46,7 +48,7 @@ SECTIONS
 		*(.glue_7t)
 		*(.gnu.linkonce.r.*)
 		*(.gnu.linkonce.d.*);
-/*		
+/*
 		*(.data.impure_data);
 		*(.data._impure_ptr);
 */
@@ -54,10 +56,10 @@ SECTIONS
 		KEEP(*(.eh_frame*))
 		. = ALIGN(4);
 		_etext = .;
-		
+
 	} > FLASH
 
-	.ARM.extab : 
+	.ARM.extab :
 	{
 		*(.ARM.extab* .gnu.linkonce.armextab.*)
 	} > FLASH
@@ -72,7 +74,7 @@ SECTIONS
 	. = ALIGN(4);
 	PROVIDE(__etext = .);
 
-	.data : 
+	.data :
 	{
 		__data_load__ = LOADADDR(.data);
 		__data_start__ = .;
@@ -80,6 +82,7 @@ SECTIONS
 		. = ALIGN(4);
 
 		/* executed on ram (object unit) */
+		KEEP(*driver_nrc*.c.o(.text* .rodata*))
 		KEEP(*lmac*.c.o(.text* .rodata*))
 		KEEP(*umac_s1g*.c.o(.text* .rodata*))
 		KEEP(*ec*.c.o(.text* .rodata*))
@@ -95,7 +98,7 @@ SECTIONS
 		__sfc_code_nc_end__ = .;
 		*(.sfc_code_c*)
 		. = ALIGN(4);
-		
+
 		*(.data)
 		*(.data*)
 		. = ALIGN(4);
@@ -115,7 +118,7 @@ SECTIONS
 
 	PROVIDE(__dstart__ = __data_start__);
 
-	.bssreloc (NOLOAD)  : 
+	.bssreloc (NOLOAD)  :
 	{
 		PROVIDE(__bss_start__ = .);
 		. = ALIGN(4);
@@ -124,7 +127,7 @@ SECTIONS
 		*(COMMON)
 		. = ALIGN(4);
 		PROVIDE(__bss_end__ = .);
-	} > RAM 
+	} > RAM
 
 	PROVIDE(__ebss = .);
 	. = ALIGN(4);
@@ -148,9 +151,9 @@ SECTIONS
 	} > PP_BUF
 
 	.retention_info (NOLOAD) :
-	{		
+	{
 		PROVIDE(__retention_info_start__ = .);
-		*(.retention_info*);		
+		*(.retention_info*);
 		. = ALIGN(4);
 		PROVIDE(__retention_info_end__ = .);
 	} > RETENTION_INFO
@@ -164,7 +167,7 @@ SECTIONS
 		PROVIDE(__retention_end__ = .);
 	} > RETENTION AT>FLASH
 
-	PROVIDE(end = .); 
+	PROVIDE(end = .);
 	PROVIDE(__CODE_START = ORIGIN(FLASH));
 	PROVIDE(__DATA_START = ORIGIN(RAM));
 	PROVIDE(__DATA_END = ORIGIN(RAM) + LENGTH(RAM));

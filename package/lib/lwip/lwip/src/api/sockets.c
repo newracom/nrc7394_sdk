@@ -537,6 +537,604 @@ alloc_socket(struct netconn *newconn, int accepted)
   return -1;
 }
 
+#if defined(LWIP_DEBUG)
+void
+lwip_show_sockets(void)
+{
+  int i, num = 0;
+  u16_t local_port = 0, remote_port = 0;
+
+  LWIP_DEBUGF(LWIP_DBG_ON, ("  FD   TYPE     STATE\tLOCAL\t\t\tREMOTE\t\t\tLISTENER\tTIMER\n"));
+  for (i = 0; i < NUM_SOCKETS; ++i) {
+    struct netconn *conn = sockets[i].conn;
+    if (conn) {
+      int listener = -1;
+      LWIP_DEBUGF(LWIP_DBG_ON, ("  %2d    %s   %7s\t",
+        conn->socket,
+        conn->type == NETCONN_RAW ? "RAW" :
+        conn->type == NETCONN_UDP ? "UDP" :
+        conn->type == NETCONN_TCP ? "TCP" : "INV",
+        conn->state == NETCONN_NONE ? "NONE" :
+        conn->state == NETCONN_WRITE ? "WRITE" :
+        conn->state == NETCONN_LISTEN ? "LISTEN" :
+        conn->state == NETCONN_CONNECT ? "CONNECT" :
+        conn->state == NETCONN_CLOSE ? "CLOSE" : "INV"
+      ));
+      if (conn->type == NETCONN_TCP) {
+        local_port = conn->pcb.tcp->local_port;
+        remote_port = conn->pcb.tcp->remote_port;
+        if (conn->pcb.tcp->listener) {
+          for (int j = 0; j < NUM_SOCKETS; j++) {
+            struct netconn *tcpconn = sockets[j].conn;
+            if (tcpconn && tcpconn->type == NETCONN_TCP &&
+              tcpconn->pcb.tcp == (struct tcp_pcb *)conn->pcb.tcp->listener) {
+              listener = j + LWIP_SOCKET_OFFSET;
+              break;
+            }
+          }
+        }
+      } else if (conn->type == NETCONN_UDP) {
+        local_port = conn->pcb.udp->local_port;
+        remote_port = conn->pcb.udp->remote_port;
+      }
+      LWIP_DEBUGF(LWIP_DBG_ON, ("%3hu.%3hu.%3hu.%3hu:%5d\t",
+        ip4_addr1_16_val(conn->pcb.ip->local_ip),
+        ip4_addr2_16_val(conn->pcb.ip->local_ip),
+        ip4_addr3_16_val(conn->pcb.ip->local_ip),
+        ip4_addr4_16_val(conn->pcb.ip->local_ip),
+        local_port));
+      LWIP_DEBUGF(LWIP_DBG_ON, ("%3hu.%3hu.%3hu.%3hu:%5d\t",
+        ip4_addr1_16_val(conn->pcb.ip->remote_ip),
+        ip4_addr2_16_val(conn->pcb.ip->remote_ip),
+        ip4_addr3_16_val(conn->pcb.ip->remote_ip),
+        ip4_addr4_16_val(conn->pcb.ip->remote_ip),
+        remote_port));
+      if (listener >= 0) {
+        LWIP_DEBUGF(LWIP_DBG_ON, ("%2d\t\t", listener));
+      } else {
+        LWIP_DEBUGF(LWIP_DBG_ON, ("NO\t\t"));
+      }
+      if (conn->type == NETCONN_TCP &&
+        ip_get_option(conn->pcb.ip, SOF_KEEPALIVE)) {
+        LWIP_DEBUGF(LWIP_DBG_ON,
+          ("%ums", (u32_t)(tcp_ticks - conn->pcb.tcp->tmr) * TCP_SLOW_INTERVAL));
+      }
+      LWIP_DEBUGF(LWIP_DBG_ON, ("\n"));
+      num++;
+    }
+  }
+  LWIP_DEBUGF(LWIP_DBG_ON, ("Total sockets: %d\n", num));
+}
+#endif /* defined(LWIP_DEBUG) */
+
+#if defined(INCLUDE_LWIP_RECOVERY)
+#include "nrc_ps_type.h"
+#if !defined(MAX_UDP_RETENT_SESSIONS)
+#define MAX_UDP_RETENT_SESSIONS 1
+#endif /* !defined(MAX_UDP_RETENT_SESSIONS) */
+#if !defined(MAX_TCP_LISTEN_RETENT_SESSIONS)
+#define MAX_TCP_LISTEN_RETENT_SESSIONS 1
+#endif /* !defined(MAX_TCP_LISTEN_RETENT_SESSIONS) */
+#if !defined(MAX_TCP_RETENT_SESSIONS)
+#define MAX_TCP_RETENT_SESSIONS 1
+#endif /* !defined(MAX_TCP_RETENT_SESSIONS) */
+
+struct lwip_ret_info {
+	struct udp_container		udp_session[MAX_UDP_RETENT_SESSIONS];
+	struct tcp_listen_container	tcp_listen_session[MAX_TCP_LISTEN_RETENT_SESSIONS];
+	struct tcp_container		tcp_session[MAX_TCP_RETENT_SESSIONS];
+} __attribute__ ((packed));
+ATTR_RETENTION_INFO struct lwip_ret_info lwip_ret_info;
+
+/**
+ * Search a listen socket that matches the given local and/or remote
+ * address parameters.
+ *
+ * @param local local address to match
+ * @param remote remote address to match
+ *
+ * @return the number of socket descriptors, -1 on error
+ *
+ * @note The given address parameters can be partially or fully specified.
+ *       If the one of them is not specified, it will be treated as a wildcard.
+ */
+int
+lwip_get_listen_sockfd(struct sockaddr *local, struct sockaddr *remote)
+{
+  int i = 0;
+  ip_addr_t req_laddr, req_raddr;
+  u16_t req_lport, req_rport;
+
+  /* Extract local parameters */
+  if (local) {
+    SOCKADDR_TO_IPADDR_PORT(local, &req_laddr, req_lport);
+  } else {
+    ip_addr_set_any(local->sa_family == AF_INET6, &req_laddr);
+    req_lport = 0;
+  }
+
+  /* Extract remote parameters */
+  if (remote) {
+    SOCKADDR_TO_IPADDR_PORT(remote, &req_raddr, req_rport);
+  } else {
+    ip_addr_set_any(remote->sa_family == AF_INET6, &req_raddr);
+    req_rport = 0;
+  }
+
+  /* At least one parameter must be valid */
+  if (req_lport == 0 && ip_addr_isany(&req_laddr) &&
+    req_rport == 0 && ip_addr_isany(&req_raddr)) {
+    return -1;
+  }
+
+  /* Search the socket all conditions are matched */
+  for (i = 0; i < NUM_SOCKETS; ++i) {
+    if (sockets[i].conn && (sockets[i].conn->type == NETCONN_TCP)) {
+      ip_addr_t *laddr, *raddr;
+      u16_t lport = 0, rport = 0;
+      /* Only listen sockets are searched */
+      if (sockets[i].conn->state != NETCONN_LISTEN) {
+        continue;
+      }
+      laddr = &sockets[i].conn->pcb.tcp->local_ip;
+      raddr = &sockets[i].conn->pcb.tcp->remote_ip;
+      lport = sockets[i].conn->pcb.tcp->local_port;
+      rport = sockets[i].conn->pcb.tcp->remote_port;
+
+      if (req_lport != 0 && req_lport != lport) {
+        continue;
+      }
+      if (!ip_addr_isany(&req_laddr) && !ip_addr_cmp(&req_laddr, laddr)) {
+        continue;
+      }
+      if (req_rport != 0 && req_rport != rport) {
+        continue;
+      }
+      if (!ip_addr_isany(&req_raddr) && !ip_addr_cmp(&req_raddr, raddr)) {
+        continue;
+      }
+      return i + LWIP_SOCKET_OFFSET;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Get the socket descriptor array based on the given socket type and
+ * local/remote address.
+ *
+ * @param type socket type
+ * @param sockfd the array to store socket descriptors
+ * @param local local address to match
+ * @param remote remote address to match
+ *
+ * @return the number of socket descriptors, -1 on error
+ *
+ * @note The given address parameters can be partially or fully specified.
+ *       If the one of them is not specified, it will be treated as a wildcard.
+ */
+int
+lwip_get_sockfd_array(int type, int sockfd[], struct sockaddr *local, struct sockaddr *remote)
+{
+  int i, fd_num = 0;
+  int netconn_type;
+  ip_addr_t req_laddr, req_raddr;
+  u16_t req_lport, req_rport;
+
+  /* Convert socket type to netconn type */
+  if (type == SOCK_RAW) {
+    netconn_type = NETCONN_RAW;
+  } else if (type == SOCK_DGRAM) {
+    netconn_type = NETCONN_UDP;
+  } else if (type == SOCK_STREAM) {
+    netconn_type = NETCONN_TCP;
+  } else {
+    return -1;
+  }
+
+  /* Extract local parameters */
+  if (local) {
+    SOCKADDR_TO_IPADDR_PORT(local, &req_laddr, req_lport);
+  } else {
+    ip_addr_set_any(local->sa_family == AF_INET6, &req_laddr);
+    req_lport = 0;
+  }
+
+  /* Extract remote parameters */
+  if (remote) {
+    SOCKADDR_TO_IPADDR_PORT(remote, &req_raddr, req_rport);
+  } else {
+    ip_addr_set_any(remote->sa_family == AF_INET6, &req_raddr);
+    req_rport = 0;
+  }
+
+  /* At least one parameter must be valid */
+  if (req_lport == 0 && ip_addr_isany(&req_laddr) &&
+    req_rport == 0 && ip_addr_isany(&req_raddr)) {
+    return 0;
+  }
+
+  /* Search the sockets all conditions are matched */
+  for (i = 0; i < NUM_SOCKETS; ++i) {
+    if (sockets[i].conn && (sockets[i].conn->type == netconn_type)) {
+      ip_addr_t *laddr, *raddr;
+      u16_t lport = 0, rport = 0;
+      if (netconn_type == NETCONN_TCP) {
+        /* Only non-listen sockets are searched */
+        if (sockets[i].conn->state == NETCONN_LISTEN) {
+          continue;
+        }
+        laddr = &sockets[i].conn->pcb.tcp->local_ip;
+        raddr = &sockets[i].conn->pcb.tcp->remote_ip;
+        lport = sockets[i].conn->pcb.tcp->local_port;
+        rport = sockets[i].conn->pcb.tcp->remote_port;
+      } else if (netconn_type == NETCONN_UDP) {
+        laddr = &sockets[i].conn->pcb.udp->local_ip;
+        raddr = &sockets[i].conn->pcb.udp->remote_ip;
+        lport = sockets[i].conn->pcb.udp->local_port;
+        rport = sockets[i].conn->pcb.udp->remote_port;
+      } else if (netconn_type == NETCONN_RAW) {
+        laddr = &sockets[i].conn->pcb.raw->local_ip;
+        raddr = &sockets[i].conn->pcb.raw->remote_ip;
+      } else {
+        break;
+      }
+
+      if (req_lport != 0 && req_lport != lport) {
+        continue;
+      }
+      if (!ip_addr_isany(&req_laddr) && !ip_addr_cmp(&req_laddr, laddr)) {
+        continue;
+      }
+      if (req_rport != 0 && req_rport != rport) {
+        continue;
+      }
+      if (!ip_addr_isany(&req_raddr) && !ip_addr_cmp(&req_raddr, raddr)) {
+        continue;
+      }
+      sockfd[fd_num++] = i + LWIP_SOCKET_OFFSET;
+    }
+  }
+  return fd_num;
+}
+
+/**
+ * Retent lwIP socket information for socket recovery.
+ *
+ * @return The number of sockets retented.
+ *
+ * This function is used to retent lwIP socket information for socket recovery.
+ * It will iterate all sockets and save the socket information to the given
+ * structure. The saved information will be used to recover sockets when the
+ * system is restarted.
+ */
+int
+lwip_retent_socket(void)
+{
+  int i, j;
+  u8_t tcp_sockets = 0, tcp_listen_sockets = 0, udp_sockets = 0;
+
+  memset(&lwip_ret_info, 0, sizeof(struct lwip_ret_info));
+
+	/* initialize UDP sockets */
+	for (int i = 0; i < MAX_UDP_RETENT_SESSIONS; i++) {
+		struct udp_container *udp = &lwip_ret_info.udp_session[i];
+		udp->netconn.socket = -1;
+	}
+
+	/* initialize TCP_LISTEN sockets */
+	for (int i = 0; i < MAX_TCP_LISTEN_RETENT_SESSIONS; i++) {
+		struct tcp_listen_container *tcp_listen = &lwip_ret_info.tcp_listen_session[i];
+		tcp_listen->netconn.socket = -1;
+	}
+
+	/* initialize TCP sockets */
+	for (int i = 0; i < MAX_TCP_RETENT_SESSIONS; i++) {
+		struct tcp_container *tcp = &lwip_ret_info.tcp_session[i];
+		tcp->netconn.socket = -1;
+	}
+
+  for (i = 0; i < NUM_SOCKETS; ++i) {
+    struct lwip_sock *sock = get_socket(i);
+    if (!sock) {
+      continue;
+    }
+
+    if (sock->conn->type == NETCONN_TCP) {
+      if (sock->conn->state == NETCONN_LISTEN) {
+        /* TCP Listen Sockets */
+        if (tcp_listen_sockets >= MAX_TCP_LISTEN_RETENT_SESSIONS) {
+          LWIP_DEBUGF(SOCKETS_DEBUG, ("%s: retention full(%d) for tcp_listen(%d)\n", __func__,
+                  MAX_TCP_LISTEN_RETENT_SESSIONS, sock->conn->socket));
+          continue;
+        } else if (netconn_retent((struct socket_container *)&lwip_ret_info.tcp_listen_session[tcp_listen_sockets],
+          sock->conn) == ERR_OK) {
+          tcp_listen_sockets++;
+        } else {
+          LWIP_DEBUGF(SOCKETS_DEBUG, ("%s: failed to save tcp_listen(%d)\n", __func__,
+                  sock->conn->socket));
+          return -1;
+        }
+      } else {
+        /* TCP Sockets */
+        if (tcp_sockets >= MAX_TCP_RETENT_SESSIONS) {
+          LWIP_DEBUGF(SOCKETS_DEBUG, ("%s: retention full(%d) for tcp(%d)\n", __func__,
+                  MAX_TCP_RETENT_SESSIONS, sock->conn->socket));
+          continue;
+        } else if (netconn_retent((struct socket_container *)&lwip_ret_info.tcp_session[tcp_sockets],
+          sock->conn) == ERR_OK) {
+          lwip_ret_info.tcp_session[tcp_sockets].pcb.listener = -1;
+          if (sock->conn->pcb.tcp->listener) {
+            for (j = 0; j < NUM_SOCKETS; ++j) {
+              struct lwip_sock *listen_sock = get_socket(j);
+              if (!listen_sock) {
+                continue;
+              }
+              if (listen_sock->conn->type != NETCONN_TCP || listen_sock->conn->state != NETCONN_LISTEN) {
+                continue;
+              }
+              if ((struct tcp_pcb_listen *)listen_sock->conn->pcb.tcp == sock->conn->pcb.tcp->listener) {
+                lwip_ret_info.tcp_session[tcp_sockets].pcb.listener = j + LWIP_SOCKET_OFFSET;
+                LWIP_DEBUGF(SOCKETS_DEBUG, ("%s: set tcp listener(%d) for tcp(%d)\n", __func__,
+                        j + LWIP_SOCKET_OFFSET, sock->conn->socket));
+                break;
+              }
+            }
+          }
+          tcp_sockets++;
+        } else {
+          LWIP_DEBUGF(SOCKETS_DEBUG, ("%s: failed to save tcp(%d)\n", __func__,
+                  sock->conn->socket));
+          return -1;
+        }
+      }
+    } else if (sock->conn->type == NETCONN_UDP) {
+      /* UDP Sockets */
+      if (udp_sockets >= MAX_UDP_RETENT_SESSIONS) {
+        LWIP_DEBUGF(SOCKETS_DEBUG, ("%s: retention full(%d) for udp(%d)\n", __func__,
+                MAX_UDP_RETENT_SESSIONS, sock->conn->socket));
+        continue;
+      } else if (netconn_retent((struct socket_container *)&lwip_ret_info.udp_session[udp_sockets],
+        sock->conn) == ERR_OK) {
+        udp_sockets++;
+      } else {
+        LWIP_DEBUGF(SOCKETS_DEBUG, ("%s: failed to save udp(%d)\n", __func__,
+                sock->conn->socket));
+        return -1;
+      }
+    } else {
+      LWIP_DEBUGF(SOCKETS_DEBUG, ("%s: not supported socket(%d) type(%d)\n", __func__,
+              sock->conn->socket, sock->conn->type));
+      return -1;
+    }
+  }
+  LWIP_DEBUGF(SOCKETS_DEBUG, ("%s: tcp_listen(%d) tcp(%d) udp(%d) saved\n", __func__,
+          tcp_listen_sockets, tcp_sockets, udp_sockets));
+
+  return tcp_sockets + tcp_listen_sockets + udp_sockets;
+}
+
+/**
+ * Recover a previously saved socket.
+ *
+ * @param sc pointer to a socket container containing the saved socket.
+ *
+ * @return the file descriptor of the recovered socket on success, -1 on failure.
+ */
+static int
+recover_socket(struct socket_container *sc)
+{
+  int i, fd, domain;
+  struct netconn *conn;
+
+  /* get the socket index */
+  fd = sc->netconn.socket;
+  if (fd < LWIP_SOCKET_OFFSET) {
+    set_errno(EBADF);
+    return -1;
+  }
+
+  i = fd - LWIP_SOCKET_OFFSET;
+  if (i >= NUM_SOCKETS) {
+    set_errno(EBADF);
+    return -1;
+  }
+
+#ifdef CONFIG_IPV6
+  domain = PF_INET6;
+#else
+  domain = PF_INET;
+#endif
+
+  if (sockets[i].conn) {
+    LWIP_DEBUGF(SOCKETS_DEBUG, ("%s: socket(%d) already used\n", __func__, fd));
+    set_errno(ENOTSOCK);
+    return -1;
+  }
+
+#if LWIP_NETCONN_FULLDUPLEX
+  if (sockets[i].fd_used) {
+    return -1;
+  }
+  sockets[i].fd_used    = 1;
+  sockets[i].fd_free_pending = 0;
+#endif
+
+  /* create a netconn */
+  switch (sc->netconn.type) {
+    case NETCONN_RAW:
+    {
+      struct udp_pcb_container *raw_pcb = (struct udp_pcb_container *)&sc->pcb;
+      conn = netconn_new_with_proto_and_callback(DOMAIN_TO_NETCONN_TYPE(domain, NETCONN_RAW),
+            (u8_t)raw_pcb->protocol, DEFAULT_SOCKET_EVENTCB);
+      LWIP_DEBUGF(SOCKETS_DEBUG, ("%s(%s, NETCONN_RAW, %d) = ", __func__,
+                                  domain == PF_INET ? "PF_INET" : "UNKNOWN", raw_pcb->protocol));
+    }
+    break;
+    case NETCONN_UDP:
+    {
+      struct udp_pcb_container *udp_pcb = (struct udp_pcb_container *)&sc->pcb;
+      conn = netconn_new_with_callback(DOMAIN_TO_NETCONN_TYPE(domain,
+                                      ((udp_pcb->protocol == IPPROTO_UDPLITE) ? NETCONN_UDPLITE : NETCONN_UDP)),
+                                      DEFAULT_SOCKET_EVENTCB);
+      LWIP_DEBUGF(SOCKETS_DEBUG, ("%s(%s, NETCONN_UDP, %d) = ", __func__,
+                                  domain == PF_INET ? "PF_INET" : "UNKNOWN", udp_pcb->protocol));
+#if LWIP_NETBUF_RECVINFO
+      if (conn) {
+        /* netconn layer enables pktinfo by default, sockets default to off */
+        conn->flags &= ~NETCONN_FLAG_PKTINFO;
+      }
+#endif /* LWIP_NETBUF_RECVINFO */
+    }
+    break;
+    case NETCONN_TCP:
+    conn = netconn_new_with_callback(DOMAIN_TO_NETCONN_TYPE(domain, NETCONN_TCP), DEFAULT_SOCKET_EVENTCB);
+    LWIP_DEBUGF(SOCKETS_DEBUG, ("%s(%s, NETCONN_TCP) = ", __func__,
+                                domain == PF_INET ? "PF_INET" : "UNKNOWN"));
+    break;
+    default:
+    LWIP_DEBUGF(SOCKETS_DEBUG, ("%s(%d, %d/UNKNOWN) = -1\n", __func__,
+                                domain, sc->netconn.type));
+    set_errno(EINVAL);
+    return -1;
+  }
+
+  if (!conn) {
+    LWIP_DEBUGF(SOCKETS_DEBUG, ("%s: failed to create netconn\n", __func__));
+    set_errno(ENOBUFS);
+    return -1;
+  }
+
+  /* initialize socket */
+  sockets[i].conn       = conn;
+  sockets[i].lastdata.pbuf = NULL;
+#if LWIP_SOCKET_SELECT || LWIP_SOCKET_POLL
+  LWIP_ASSERT("sockets[i].select_waiting == 0", sockets[i].select_waiting == 0);
+  sockets[i].rcvevent   = 0;
+  sockets[i].sendevent  = (NETCONNTYPE_GROUP(conn->type) == NETCONN_TCP ? (conn->callback != 0) : 1);
+  sockets[i].errevent   = 0;
+#endif /* LWIP_SOCKET_SELECT || LWIP_SOCKET_POLL */
+  conn->socket = i + LWIP_SOCKET_OFFSET;
+  done_socket(&sockets[i]);
+
+  /* extract local port and address */
+  u16_t local_port = 0;
+  u32_t local_addr = 0;
+  if (conn->type == NETCONN_TCP) {
+    struct tcp_pcb_container *tcp_pcb = (struct tcp_pcb_container *)&sc->pcb;
+    local_port = tcp_pcb->local_port;
+    local_addr = tcp_pcb->local_ip;
+  } else if (conn->type == NETCONN_UDP) {
+    struct udp_pcb_container *udp_pcb = (struct udp_pcb_container *)&sc->pcb;
+    local_port = udp_pcb->local_port;
+    local_addr = udp_pcb->local_ip;
+  }
+
+#ifdef CONFIG_IPV6
+  struct sockaddr_in6 sockaddr;
+  sockaddr.sin6_len = sizeof(struct sockaddr_in6);
+  sockaddr.sin6_family = AF_INET6;
+  sockaddr.sin6_port = htons(local_port);
+  sockaddr.sin6_flowinfo = 0;
+  sockaddr.sin6_addr = in6addr_any;
+  sockaddr.sin6_scope_id = 1;
+#else
+  struct sockaddr_in sockaddr;
+  sockaddr.sin_len = sizeof(struct sockaddr_in);
+  sockaddr.sin_family = AF_INET;
+  sockaddr.sin_port = htons(local_port);
+  sockaddr.sin_addr.s_addr = local_addr;
+#endif
+
+  /* bind socket to local port */
+  if (conn->type == NETCONN_TCP) {
+    if (sc->netconn.state == NETCONN_LISTEN) {
+      /* TCP listen socket */
+      struct tcp_pcb_listen_container *tcp_pcb_listen = (struct tcp_pcb_listen_container *)&sc->pcb;
+      if (lwip_bind(fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) < 0) {
+        LWIP_DEBUGF(SOCKETS_DEBUG, ("%s: failed to bind TCP listen socket(%d)\n", __func__, fd));
+        lwip_close(conn->socket);
+        set_errno(EINVAL);
+        return -1;
+      }
+
+      if (lwip_listen(fd, tcp_pcb_listen->backlog) < 0) {
+        LWIP_DEBUGF(SOCKETS_DEBUG, ("%s: failed to set listening TCP listen socket(%d)\n", __func__, fd));
+        lwip_close(conn->socket);
+        set_errno(EINVAL);
+        return -1;
+      }
+    } else {
+      /* TCP active socket */
+      struct tcp_pcb_container *tcp_pcb = (struct tcp_pcb_container *)&sc->pcb;
+      conn->pcb.tcp->listener = NULL;
+      if (tcp_pcb->listener >= 0) {
+        struct lwip_sock *sock = get_socket(tcp_pcb->listener);
+        if (sock && sock->conn->state == NETCONN_LISTEN) {
+          conn->pcb.tcp->listener = (struct tcp_pcb_listen *)sock->conn->pcb.tcp;
+        }
+      }
+      TCP_REG_ACTIVE(conn->pcb.tcp);
+    }
+  } else if (conn->type == NETCONN_UDP) {
+    /* UDP socket */
+    if (lwip_bind(fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) < 0) {
+      LWIP_DEBUGF(SOCKETS_DEBUG, ("%s: failed to bind UDP socket(%d)\n", __func__, fd));
+      lwip_close(conn->socket);
+      set_errno(EINVAL);
+      return -1;
+    }
+  }
+
+  /* recover netconn & PCB variables */
+  if (netconn_recover(conn, sc) < 0) {
+    LWIP_DEBUGF(SOCKETS_DEBUG, ("%s: failed to recover netconn(%d)\n", __func__, fd));
+    lwip_close(conn->socket);
+    set_errno(ENOTRECOVERABLE);
+    return -1;
+  }
+
+  return conn->socket;
+}
+
+/**
+ * Recovers lwIP socket information from the given structure.
+ *
+ * @return The number of sockets recovered.
+ */
+int
+lwip_recover_socket(void)
+{
+  int i;
+  u8_t tcp_sockets = 0, tcp_listen_sockets = 0, udp_sockets = 0;
+
+  /* TCP listen socket : should be recovered prior to TCP active socket */
+  for (i = 0; i < MAX_TCP_LISTEN_RETENT_SESSIONS; ++i) {
+    if (recover_socket((struct socket_container *)&lwip_ret_info.tcp_listen_session[i]) >= 0) {
+      tcp_listen_sockets++;
+    }
+  }
+
+  /* TCP active socket */
+  for (i = 0; i < MAX_TCP_RETENT_SESSIONS; ++i) {
+    if (recover_socket((struct socket_container *)&lwip_ret_info.tcp_session[i]) >= 0) {
+      tcp_sockets++;
+    }
+  }
+
+  /* UDP socket */
+  for (i = 0; i < MAX_UDP_RETENT_SESSIONS; ++i) {
+    if (recover_socket((struct socket_container *)&lwip_ret_info.udp_session[i]) >= 0) {
+      udp_sockets++;
+    }
+  }
+  LWIP_DEBUGF(SOCKETS_DEBUG, ("%s: tcp_listen(%d) tcp(%d) udp(%d) recovered\n", __func__,
+          tcp_listen_sockets, tcp_sockets, udp_sockets));
+
+  return tcp_sockets + tcp_listen_sockets + udp_sockets;
+}
+#endif /* defined(INCLUDE_LWIP_RECOVERY) */
+
 /** Free a socket (under lock)
  *
  * @param sock the socket to free

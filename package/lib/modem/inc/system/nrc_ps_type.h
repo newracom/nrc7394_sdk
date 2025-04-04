@@ -71,6 +71,8 @@ typedef enum {
 	POWER_SAVE_TIM
 } POWER_SAVE_TIM_MODE;
 
+#define ATTR_RETENTION_INFO		__attribute__((section(".retention_info")))
+
 /* function prototype for scheduled callbacks */
 typedef void (*scheduled_callback)();
 #if defined (INCLUDE_PS_SCHEDULE)

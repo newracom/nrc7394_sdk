@@ -286,6 +286,49 @@ nrc_err_t nrc_ps_start_schedule();
  ***********************************************/
 nrc_err_t nrc_ps_resume_deep_sleep();
 
+/**********************************************
+ * @fn nrc_err_t nrc_ps_save_user_data(void* data, uint16_t size)
+ *
+ * @brief Saves user-specific data into the retention memory for later retrieval.
+ *        This function allows applications to store data that persists across
+ *        deep sleep or other power-saving states.
+ *
+ * @param data Pointer to the data to be saved.
+ * @param size Size of the data to be saved in bytes. It must not exceed the
+ *             available retention memory size for user data.
+ *
+ * @return If successful, returns NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
+ ***********************************************/
+nrc_err_t nrc_ps_save_user_data(void* data, uint16_t size);
+
+/**********************************************
+ * @fn nrc_err_t nrc_ps_load_user_data(void* data, uint16_t size)
+ *
+ * @brief Loads previously saved user-specific data from the retention memory.
+ *        This function retrieves data stored by `nrc_ps_save_user_data` and
+ *        copies it into the provided buffer.
+ *
+ * @param data Pointer to the buffer where the loaded data will be stored.
+ * @param size Size of the buffer in bytes. It must not exceed the size of the
+ *             available retention memory size for user data.
+ *
+ * @return If successful, returns NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
+ ***********************************************/
+nrc_err_t nrc_ps_load_user_data(void* data, uint16_t size);
+
+/**********************************************
+ * @fn uint16_t nrc_ps_get_available_user_data_size(void)
+ *
+ * @brief Retrieves the maximum size of user data that can be saved in the
+ *        retention memory.
+ *
+ *        This function provides the size of the retention memory available
+ *        for storing user-specific data.
+ *
+ * @return The maximum size of user data in bytes.
+ ***********************************************/
+uint16_t nrc_ps_get_available_user_data_size(void);
+
 
 #ifdef __cplusplus
 }

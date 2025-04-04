@@ -16,7 +16,7 @@ SRCS += \
 	nvs_pagemanager.cpp \
 	nvs_storage.cpp \
 	nvs_types.cpp \
-#	nvs_encrypted_partition.cpp
+	aes_ctr_cipher.cpp
 
 CSRCS += util_cmd_nvs.c
 

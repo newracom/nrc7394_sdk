@@ -7,6 +7,12 @@
 #define SYSCONFIG_SECTOR_SIZE               4096
 #define SYSCONFIG_PRE_USER_FACTORY_SIZE      256
 #define SYSCONFIG_USER_FACTORY_SIZE          512
+#define SYSCONFIG_SIZE                       768
+
+typedef enum {
+	CONFIG_IN_FLASH,
+	CONFIG_IN_EEPROM,
+} config_location_t;
 
 //1 Byte
 typedef struct {
@@ -44,7 +50,8 @@ typedef struct {
 			uint32_t auxadc_temp_override_valid :  1;
 			uint32_t unused                     :  1;
 			uint32_t rx_cal_default_override    :  1;
-			uint32_t reserved1                  :  8;
+			uint32_t gp17_tx_on_monitoring      :  1;
+			uint32_t reserved1                  :  7;
 			uint32_t sxtal_32k_flag             :  2; //0: Unknown, 1: okay, 2: not okay
 			uint32_t reserved2                  : 14;
 		};
@@ -80,28 +87,38 @@ typedef struct {
 	};
 } sf_sys_config_gpio_index_map_t;
 
+// 4 Bytes
+typedef struct {
+	uint16_t valid          : 1;
+	uint16_t polarity       : 1;
+	uint16_t pin            : 6;
+	uint16_t channel_set_id : 8;
+	char     country_code[2];
+} sf_sys_config_gpio_band_select_t;
+
 //768 Bytes (256 + 512)
 typedef struct {
-	uint32_t                        version; /* sys_config structure version*/
-	char                            mac_addr0[6]; /*mac address for interface 0*/
-	char                            mac_addr1[6]; /*mac address for interface 1*/
-	uint8_t                         cal_use; /*enable/disable the usage of calibration data*/
-	sf_sys_config_trx_pass_fail_t   trx_pass_fail;
-	uint16_t                        hw_version; /* HW Version */
-	uint32_t                        auxadc_temp_override;
-	uint32_t                        reserved1; /* Previously rf_pllldo12_tr struct */
-	sf_sys_config_chip_type_t       chip_type; /* NRC7394 module name - TBD */
-	sf_sys_config_module_type_t     module_type;
-	sf_sys_config_module_feature_t  module_feature;
-	sf_sys_config_txpwr_boosting_t  txpwr_boosting;
-	uint8_t                         max_txgain; /* NRC7394 max txgain */
-	uint8_t                         max_txpwr; /* NRC7394 max txpwr */
-	uint8_t                         fem_polarity;
-	sf_sys_config_gpio_index_map_t  gpio_index_map;
-	char                            serial_number[32];
-	char                            mfgt_version[32];
-	uint8_t                         reserved2[144];
-	char                            user_factory[SYSCONFIG_USER_FACTORY_SIZE];
+	uint32_t                         version; /* sys_config structure version*/
+	char                             mac_addr0[6]; /*mac address for interface 0*/
+	char                             mac_addr1[6]; /*mac address for interface 1*/
+	uint8_t                          cal_use; /*enable/disable the usage of calibration data*/
+	sf_sys_config_trx_pass_fail_t    trx_pass_fail;
+	uint16_t                         hw_version; /* HW Version */
+	uint32_t                         auxadc_temp_override;
+	uint32_t                         reserved1; /* Previously rf_pllldo12_tr struct */
+	sf_sys_config_chip_type_t        chip_type; /* NRC7394 module name - TBD */
+	sf_sys_config_module_type_t      module_type;
+	sf_sys_config_module_feature_t   module_feature;
+	sf_sys_config_txpwr_boosting_t   txpwr_boosting;
+	uint8_t                          max_txgain; /* NRC7394 max txgain */
+	uint8_t                          max_txpwr; /* NRC7394 max txpwr */
+	uint8_t                          fem_polarity;
+	sf_sys_config_gpio_index_map_t   gpio_index_map;
+	char                             serial_number[32];
+	char                             mfgt_version[32];
+	sf_sys_config_gpio_band_select_t gpio_band_select;
+	uint8_t                          reserved2[140];
+	char                             user_factory[SYSCONFIG_USER_FACTORY_SIZE];
 } sf_sys_config_t;
 /* sysconfig END */
 
@@ -118,6 +135,8 @@ typedef struct {
 #define RF_CAL_MAX_SIZE_WITHOUT_SLOT   (RF_CAL_SECTOR_SIZE - RF_CAL_SLOT_HEADER_SIZE)
 #define RF_CAL_MAX_INT32_BUF_SIZE      16
 #define RF_CAL_MAX_DATA_COUNT          8
+#define RF_CAL_MAIN_HEADER_SIZE        8
+#define RF_CAL_DATA_SIZE               512
 
 #define RF_CAL_ENCODE_BW(x) (__builtin_ctz(x))
 #define RF_CAL_DECODE_BW(x) (1 << x)
@@ -125,6 +144,15 @@ typedef struct {
 #define RF_CAL_TXGAIN_TXPWR_KEY_VALUE_PER_LINE 8
 #define RF_CAL_FREQ_OFFSET_KEY_VALUE_PER_LINE  4
 
+// EEPROM
+#define EEPROM_SLOT_INFO_SIZE                12
+#define EEPROM_SYSCONFIG_ADDR                0x0
+#define EEPROM_SYSCONFIG_SIZE                SYSCONFIG_SIZE
+#define EEPROM_SYSCONFIG_SECTOR_SIZE         EEPROM_SLOT_INFO_SIZE + EEPROM_SYSCONFIG_SIZE
+#define EEPROM_RF_CAL_ADDR                   0x0320
+#define EEPROM_RF_CAL_MAX_DATA_COUNT         5
+#define EEPROM_RF_CAL_MAX_DATA_SIZE          RF_CAL_MAIN_HEADER_SIZE + (EEPROM_RF_CAL_MAX_DATA_COUNT*RF_CAL_DATA_SIZE)
+#define EEPROM_RF_CAL_SECTOR_SIZE            EEPROM_SLOT_INFO_SIZE + EEPROM_RF_CAL_MAX_DATA_SIZE
 /////////////////
 // MAIN HEADER //
 /////////////////
@@ -151,11 +179,11 @@ typedef struct {
 typedef struct {
 	uint32_t rx_bw_1m : 4;
 	uint32_t prim_1m  : 4;
-	uint32_t rx_bw_2m : 4; 
+	uint32_t rx_bw_2m : 4;
 	uint32_t prim_2m  : 4;
-	uint32_t rx_bw_4m : 4; 
+	uint32_t rx_bw_4m : 4;
 	uint32_t prim_4m  : 4;
-	uint32_t rx_bw_8m : 4; 
+	uint32_t rx_bw_8m : 4;
 	uint32_t prim_8m  : 4;
 } rf_cal_op_tx_bw_t;
 
@@ -323,7 +351,7 @@ typedef bool (*rf_cal_data_header_filter_func) (rf_cal_data_header_t*);
 
 /* rfcal END */
 /* nrc_config API */
-#define API 
+#define API
 
 typedef struct {
 	sf_sys_config_t sysconfig;
@@ -337,6 +365,7 @@ extern nrc_config_info_t *nrc_config_info;
 //#define RF_CAL_BLOCK nrc_config_info->rf_cal_block
 
 void API	nrc_config_init();
+void API        nrc_config_enable_sjit_workaround();
 
 void API 	nrc_config_sysconfig_print(sf_sys_config_t *sysconfig, bool hex);
 void API 	nrc_config_sysconfig_user_factory_print(sf_sys_config_t *sysconfig, bool hex);
@@ -344,20 +373,35 @@ void API 	nrc_config_sysconfig_user_factory_print(sf_sys_config_t *sysconfig, bo
 void API 	nrc_config_rf_cal_print_data(rf_cal_data_t *data, int indent_level, bool hex);
 bool API 	nrc_config_rf_cal_print_block(rf_cal_block_t *block, bool hex);
 
+bool 		nrc_config_rf_cal_main_header_load(rf_cal_main_header_t *main_header_buf);
+bool 		nrc_config_rf_cal_main_header_print(rf_cal_main_header_t *main_header, bool hex);
 bool 		nrc_config_rf_cal_signature_valid(rf_cal_main_header_t *main_header);
 bool		nrc_config_rf_cal_version_supported(rf_cal_main_header_t *main_header);
 bool 		nrc_config_rf_cal_data_segment_valid(rf_cal_data_header_t *data_header);
-bool 		nrc_config_rf_cal_evaluate_interpolator(rf_cal_interpolator_t *interpolator, int16_t input, int32_t *output);
+bool 		nrc_config_rf_cal_evaluate_interpolator(rf_cal_interpolator_t *interpolator, int16_t input, int32_t *output, bool bounded);
 
 uint8_t         nrc_config_rf_cal_get_s1g_channel_index(rf_cal_data_t *rf_cal_data, uint16_t freq, uint8_t bw);
 
-void API 	nrc_config_load_sysconfig_from_flash(void);
+void API 	nrc_config_set_config_location(config_location_t input);
+uint8_t API     nrc_config_get_config_location(void);
+void API 	nrc_config_erase_sysconfig(void);
+void API 	nrc_config_commit_sysconfig(void);
+void API 	nrc_config_erase_sysconfig_user_factory(void);
+void API 	nrc_config_load_sysconfig_block(uint8_t* sysconfig_block);
+void API 	nrc_config_load_sysconfig(void);
 bool API 	nrc_config_rf_cal_select_first_filtered_data(rf_cal_data_header_filter_func data_header_filter);
 void API 	nrc_config_rf_cal_select_first_valid_data();
 bool API 	nrc_config_rf_cal_select_data_by_country_code(char *country_code, uint8_t id);
 
+void API 	nrc_config_load_rf_cal_block(uint8_t* rf_cal_block_data);
+void API 	nrc_config_erase_rf_cal_block(void);
+void API 	nrc_config_commit_rf_cal_block(uint8_t* rf_cal_block_data);
+
 uint8_t API     nrc_config_rf_cal_get_preferred_worldwide_index(char *country_code, uint8_t id);
 bool API nrc_config_rf_cal_get_preferred_country(char *cc);
+uint16_t API     nrc_config_get_hw_version(void);
+bool API 	nrc_config_get_macaddr(uint8_t *macaddr, uint8_t vif_id);
+bool API 	nrc_config_set_macaddr(uint8_t *macaddr, uint8_t vif_id);
 
 extern bool sysconfig_valid;
 extern bool rf_cal_valid;

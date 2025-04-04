@@ -90,7 +90,11 @@ typedef struct  {
 	uint16_t bgscan_short;
 	int bgscan_thresh;
 	uint16_t bgscan_long;
-	uint8_t	auth_control;
+	uint8_t auth_control;
+	uint8_t ps_mode;
+	uint16_t ps_idle;
+	uint32_t ps_sleep;
+	uint32_t scan_period;
 }WIFI_CONFIG;
 #define WIFI_CONFIG_SIZE	sizeof (WIFI_CONFIG)
 

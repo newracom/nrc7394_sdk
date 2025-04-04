@@ -49,7 +49,6 @@ void nrc_ps_get_rconf(ctrl_iface_recovery_t *config);
 ctrl_iface_resp_t *ctrl_iface_receive_response(int vif_id, const char *fmt, ...);
 bool CTRL_IFACE_RESP_OK (ctrl_iface_resp_t *resp);
 bool CTRL_IFACE_RESP_MSG (ctrl_iface_resp_t *resp);
-bool CTRL_IFACE_RESP_ERR (ctrl_iface_resp_t *resp);
 void CTRL_IFACE_RESP_FREE (ctrl_iface_resp_t *resp);
 
 #endif /* CTRL_IFACE_FREERTOS_H */

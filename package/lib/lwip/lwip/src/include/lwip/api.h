@@ -297,6 +297,159 @@ struct netvector {
   size_t len;
 };
 
+#if defined(INCLUDE_LWIP_RECOVERY)
+#define IP_PCB_T			\
+	uint32_t local_ip;		\
+	uint32_t remote_ip;		\
+	uint8_t netif_idx;		\
+	uint8_t so_options;		\
+	uint8_t tos;			\
+	uint8_t ttl
+
+struct udp_pcb_container {
+	IP_PCB_T;
+	uint8_t protocol;
+	uint16_t local_port;
+	uint16_t remote_port;
+	uint16_t flags;
+} __attribute__((packed));
+
+struct tcp_pcb_listen_container {
+	IP_PCB_T;
+	uint8_t state;
+	uint16_t local_port;
+	uint8_t backlog;
+	uint8_t accepts_pending;
+} __attribute__((packed));
+
+struct tcp_pcb_container {
+	IP_PCB_T;
+	uint8_t state;
+	uint16_t local_port;
+	uint16_t remote_port;
+	uint16_t flags;
+
+	/* receiver variables */
+	uint32_t rcv_nxt;   /* next seqno expected */
+	uint16_t rcv_wnd;   /* receiver window available */
+	uint16_t rcv_ann_wnd; /* receiver window to announce */
+	uint32_t rcv_ann_right_edge; /* announced right edge of window */
+
+	/* Retransmission timer. */
+	int16_t rtime;
+
+	uint16_t mss;   /* maximum segment size */
+
+	/* RTT (round trip time) estimation variables */
+	uint32_t rttest; /* RTT estimate in 500ms ticks */
+	uint32_t rtseq;  /* sequence number being timed */
+	int16_t sa, sv; /* @see "Congestion Avoidance and Control" by Van Jacobson and Karels */
+
+	int16_t rto;    /* retransmission time-out (in ticks of TCP_SLOW_INTERVAL) */
+	uint8_t nrtx;    /* number of retransmissions */
+
+	/* fast retransmit/recovery */
+	uint8_t dupacks;
+	uint32_t lastack; /* Highest acknowledged seqno. */
+
+	/* congestion avoidance/control variables */
+	uint16_t cwnd;
+	uint16_t ssthresh;
+
+	/* first byte following last rto byte */
+	uint32_t rto_end;
+
+	/* sender variables */
+	uint32_t snd_nxt;   /* next new seqno to be sent */
+	uint32_t snd_wl1, snd_wl2; /* Sequence and acknowledgement numbers of last
+	                           window update. */
+	uint32_t snd_lbb;       /* Sequence number of next byte to be buffered. */
+	uint16_t snd_wnd;   /* sender window */
+	uint16_t snd_wnd_max; /* the maximum sender window announced by the remote host */
+
+	uint16_t snd_buf;   /* Available buffer space for sending (in bytes). */
+
+	/* Delayed ACK control: number of quick acks */
+	uint8_t quickack;
+
+	uint16_t bytes_acked;
+
+	void *connected;
+
+	int listener;
+
+	uint32_t ts_lastacksent;
+	uint32_t ts_recent;
+
+	/* idle time before KEEPALIVE is sent */
+	uint32_t keep_idle;
+	uint32_t keep_intvl;
+	uint32_t keep_cnt;
+
+	/* Persist timer counter */
+	uint8_t persist_cnt;
+	/* Persist timer back-off */
+	uint8_t persist_backoff;
+	/* Number of persist probes */
+	uint8_t persist_probe;
+
+	/* KEEPALIVE counter */
+	uint8_t keep_cnt_sent;
+} __attribute__((packed));
+
+struct pcb_container {
+	IP_PCB_T;
+	uint8_t payload[0];
+} __attribute__((packed));
+
+struct netconn_container {
+	/** type of the netconn (TCP, UDP or RAW) */
+	uint8_t type;
+	/** current state of the netconn */
+	uint8_t state;
+
+	/** only used for socket layer */
+	int socket;
+
+	/** timeout to wait for sending data (which means enqueueing data for sending
+	    in internal buffers) in milliseconds */
+	int send_timeout;
+
+	/** timeout in milliseconds to wait for new data to be received
+	    (or connections to arrive for listening netconns) */
+	uint32_t recv_timeout;
+
+	/** maximum amount of bytes queued in recvmbox
+	    not used for TCP: adjust TCP_WND instead! */
+	int recv_bufsize;
+
+	/** flags holding more netconn-internal state, see NETCONN_FLAG_* defines */
+	uint8_t flags;
+	/** A callback function that is informed about events for this netconn */
+	void *callback;
+} __attribute__((packed));
+
+struct udp_container {
+	struct netconn_container netconn;
+	struct udp_pcb_container pcb;
+} __attribute__((packed));
+
+struct tcp_listen_container {
+	struct netconn_container netconn;
+	struct tcp_pcb_listen_container pcb;
+} __attribute__((packed));
+
+struct tcp_container {
+	struct netconn_container netconn;
+	struct tcp_pcb_container pcb;
+} __attribute__((packed));
+
+struct socket_container {
+	struct netconn_container netconn;
+	struct pcb_container pcb;
+} __attribute__((packed));
+#endif /* defined(INCLUDE_LWIP_RECOVERY) */
+
 /** Register an Network connection event */
 #define API_EVENT(c,e,l) if (c->callback) {         \
                            (*c->callback)(c, e, l); \
@@ -311,6 +464,10 @@ struct netvector {
 #define netconn_new_with_callback(t, c) netconn_new_with_proto_and_callback(t, 0, c)
 struct netconn *netconn_new_with_proto_and_callback(enum netconn_type t, u8_t proto,
                                              netconn_callback callback);
+#if defined(INCLUDE_LWIP_RECOVERY)
+err_t   netconn_retent(struct socket_container *sc, struct netconn *conn);
+err_t   netconn_recover(struct netconn *conn, struct socket_container *sc);
+#endif /* defined(INCLUDE_LWIP_RECOVERY) */
 err_t   netconn_prepare_delete(struct netconn *conn);
 err_t   netconn_delete(struct netconn *conn);
 /** Get the type of a netconn (as enum netconn_type). */

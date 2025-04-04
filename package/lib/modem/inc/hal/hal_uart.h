@@ -4,6 +4,9 @@
 #define PRINT_BUFFER_SIZE		512
 #define INT_CONSOLE_BUFFER_MAX  8192
 #define CLK_RESET_UART0		(0x00000001L << 8)
+#define CONSOLE_UART_BAUDRATE 115200
+#define CONSOLE_UART_CH 0
+#define UART_CHANNEL_MAX 2
 
 enum uart_data_bit {
     UART_DB5 = 0,
@@ -51,8 +54,12 @@ void hal_uart_vprintf(const char *,va_list );
 void hal_uart_isr(int vector);
 
 void nrc_hsuart_init(int ch, enum uart_data_bit db, int br,
-                     enum uart_stop_bit sb, enum uart_parity_bit pb, enum uart_hardware_flow_control hfc, enum uart_fifo fifo);
-
+			enum uart_stop_bit sb, enum uart_parity_bit pb,
+			enum uart_hardware_flow_control hfc, enum uart_fifo fifo);
+void nrc_hsuart_common_init(int ch, enum uart_data_bit db, int br,
+			enum uart_stop_bit sb, enum uart_parity_bit pb,
+			enum uart_hardware_flow_control hfc, enum uart_fifo fifo,
+			int tx, int rx, int rts, int cts);
 bool nrc_hsuart_putch(int ch, const char c);
 bool nrc_hsuart_getch(int ch, char *c);
 void nrc_hsuart_str(int ch, const char *str);
@@ -62,6 +69,7 @@ void nrc_hsuart_dma_enable(int ch, bool enable);
 void nrc_hsuart_interrupt(int ch, bool tx_en, bool rx_en);
 void nrc_hsuart_int_clr(int ch, bool tx_int, bool rx_int, bool to_int);
 void nrc_hsuart_fifo_level(int ch, uint32_t tx_level, uint32_t rx_level);
+void nrc_hsuart_set_alt_uart_to_gpio(int ch);
 
 #ifdef RELEASE
 	#define system_printf

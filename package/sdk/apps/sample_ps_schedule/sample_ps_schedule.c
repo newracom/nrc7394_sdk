@@ -62,6 +62,7 @@
 
 static nvs_handle_t nvs_handle;
 static uint64_t time_woken = 0;
+static WIFI_CONFIG param;
 
 static int connect_to_server(WIFI_CONFIG *param)
 {
@@ -233,7 +234,6 @@ static void run_scheduled_client()
 	int32_t collect_count = 0;
 	uint64_t current_time = 0;
 
-	WIFI_CONFIG param;
 	uint8_t boot;
 
 	nrc_uart_console_enable(true);
@@ -369,6 +369,11 @@ void user_init(void)
 	app_version.patch = SAMPLE_PS_SCHEDULE_PATCH;
 	nrc_set_app_version(&app_version);
 	nrc_set_app_name(SAMPLE_PS_SCHEDULE_APP_NAME);
+
+	/* set wifi config here so that wifi configuration data be written to retention memory */
+	/* subsequent calling "nrc_wifi_set_config" will retrieve the data from retention memory */
+	memset(&param, 0, WIFI_CONFIG_SIZE);
+	nrc_wifi_set_config(&param);
 
 	/* Open nvram */
 	/* Note that nvs_init should have already called, and it is done in system start up. */

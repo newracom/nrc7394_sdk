@@ -136,19 +136,8 @@ int ctrl_iface_receive(int vif_id, char *cmd)
 				wpa_printf(MSG_DEBUG, "WPA: Control interface response '%s' (%d)", reply, reply_len);
 			else {
 				wpa_printf(MSG_DEBUG, "WPA: Control interface response (%d)", reply_len);
-
-				char temp;
-
-				for (i = 0 ; i < reply_len ; i += PRINT_BUFFER_SIZE) {
-					if ((reply_len - i) < PRINT_BUFFER_SIZE)
-						wpa_printf(MSG_DEBUG, "%s\n", reply + i);
-					else {
-						temp = reply[i + PRINT_BUFFER_SIZE];
-						reply[i + PRINT_BUFFER_SIZE] = '\0';
-						wpa_printf(MSG_DEBUG, "%s", reply + i);
-						reply[i + PRINT_BUFFER_SIZE] = temp;
-					}
-				}
+				for (i = 0; i < reply_len; i += PRINT_BUFFER_SIZE)
+					wpa_printf(MSG_INFO, "%.*s", PRINT_BUFFER_SIZE, reply + i);
 			}
 		}
 
@@ -197,26 +186,32 @@ int wpa_cmd_receive(int vif_id, int argc, char *argv[])
 ctrl_iface_resp_t *ctrl_iface_receive_response(int vif_id, const char *fmt, ...)
 {
 	struct wpa_supplicant *wpa_s = wpa_get_wpa_from_vif(vif_id);
+	ctrl_iface_resp_t *resp = NULL;
 
 	if (wpa_s)
 	{
-		va_list ap;
+		char *cmd = NULL;
+		int cmd_len = 0;
+		va_list ap, ap_copy;
+
 		va_start(ap, fmt);
 
-		va_list ap_copy;
 		va_copy(ap_copy, ap);
-		int cmd_len = os_strlen(fmt) + os_strlen(va_arg(ap_copy, char*)); /* for certificate length(256 and above) */
+		cmd_len = os_strlen(fmt) + os_strlen(va_arg(ap_copy, char*)); /* for certificate length(256 and above) */
+		if (cmd_len < 256)
+			cmd_len = 256;
 		va_end(ap_copy);
 
-		cmd_len = cmd_len > 256 ? cmd_len : 256;
-		char cmd[cmd_len];
-		ASSERT(_ctrl_iface_lock());
+		cmd = os_malloc(cmd_len);
+		ASSERT(cmd);
 
-		if (vsnprintf(cmd, sizeof(cmd), fmt, ap) > 0)
+		if (vsnprintf(cmd, cmd_len + 1, fmt, ap) > 0)
 		{
-			size_t reply_len;
-			char *reply;
+			size_t reply_len = 0;
+			char *reply = NULL;
 			int i;
+
+			ASSERT(_ctrl_iface_lock());
 
 #if defined(INCLUDE_TRACE_WAKEUP)
 #if !defined(INCLUDE_MEASURE_AIRTIME)
@@ -243,91 +238,90 @@ ctrl_iface_resp_t *ctrl_iface_receive_response(int vif_id, const char *fmt, ...)
 				if (reply_len <= PRINT_BUFFER_SIZE){
 					wpa_printf(MSG_EXCESSIVE, "reply: %s\n", reply);
 				} else {
-					char temp;
-
-					wpa_printf(MSG_EXCESSIVE, "reply: ");
-
-					for (i = 0 ; i < reply_len ; i += PRINT_BUFFER_SIZE) {
-						if ((reply_len - i) < PRINT_BUFFER_SIZE)
-							wpa_printf(MSG_INFO, "%s\n", reply + i);
-						else {
-							temp = reply[i + PRINT_BUFFER_SIZE];
-							reply[i + PRINT_BUFFER_SIZE] = '\0';
-							wpa_printf(MSG_INFO, "%s", reply + i);
-							reply[i + PRINT_BUFFER_SIZE] = temp;
-						}
-					}
+					for (i = 0; i < reply_len; i += PRINT_BUFFER_SIZE)
+						wpa_printf(MSG_INFO, "%.*s", PRINT_BUFFER_SIZE, reply + i);
 				}
 #endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
 #endif /* INCLUDE_TRACE_WAKEUP */
 
-				if (memcmp(reply, "FAIL", 4) != 0 && strcmp(reply, "UNKNOWN COMMAND") != 0)
+				resp = os_malloc(sizeof(ctrl_iface_resp_t));
+				ASSERT(resp);
+
+				resp->len = -1;
+				resp->msg = NULL;
+
+				if (strcmp(reply, "OK") == 0)
+					resp->len = 0;
+				else if (strcmp(reply, "UNKNOWN COMMAND") == 0)
+					resp->len = -ENOTSUP;
+				else if (strcmp(reply, "FAIL-BUSY") == 0)
+					resp->len = -EBUSY;
+				else if (memcmp(reply, "FAIL", 4) != 0) {
+					resp->len = reply_len;
+					resp->msg = reply;
+				}
+
+				switch (resp->len)
 				{
-					static ctrl_iface_resp_t resp;
-
-					if (strcmp(reply, "OK") == 0) {
+					case 0:
+					case -EBUSY:
+					case -ENOTSUP:
 						os_free(reply);
-						reply_len = 0;
-						reply = NULL;
-					}
+						break;
 
-					resp.len = reply_len;
-					resp.msg = reply;
-
-					va_end(ap);
-					ASSERT(_ctrl_iface_unlock());
-
-					return &resp;
+					default:
+						if (resp->len < 0) {
+							os_free(reply);
+							os_free(resp);
+							resp = NULL;
+						}
 				}
 			}
 
-			if (reply) {
-				os_free(reply);
-			}
+			ASSERT(_ctrl_iface_unlock());
 		}
 
+		os_free(cmd);
 		va_end(ap);
-		ASSERT(_ctrl_iface_unlock());
 	}
 
-	return NULL;
+	return resp;
 }
 
 bool CTRL_IFACE_RESP_OK (ctrl_iface_resp_t *resp)
 {
-	if (resp && resp->len == 0)
-		return true;
+	bool ret = (resp && resp->len == 0) ? true : false;
 
 	CTRL_IFACE_RESP_FREE(resp);
-	return false;
+
+	return ret;
 }
 
 bool CTRL_IFACE_RESP_MSG (ctrl_iface_resp_t *resp)
 {
-	if (resp && resp->len > 0 && resp->msg)
-		return true;
+	if (resp) {
+		if (resp->msg) {
+			if (resp->len > 0 && resp->len < 4096)
+				return true;
+			//wpa_printf(MSG_ERROR, "invalid resp->len (%d)", resp->len);
+		}
 
-	CTRL_IFACE_RESP_FREE(resp);
-	return false;
-}
+		CTRL_IFACE_RESP_FREE(resp);
+	}
 
-bool CTRL_IFACE_RESP_ERR (ctrl_iface_resp_t *resp)
-{
-	if (!resp || resp->len < 0)
-		return true;
-
-	CTRL_IFACE_RESP_FREE(resp);
 	return false;
 }
 
 void CTRL_IFACE_RESP_FREE (ctrl_iface_resp_t *resp)
 {
 	if (resp) {
-		if (resp->len > 0 && resp->len < 4096 && resp->msg) {
-			//wpa_printf(MSG_ERROR, "[1] free msg (len:%d msg:0x%x)", resp->len, resp->msg);
+		if (resp->msg) {
+			if (!(resp->len > 0 && resp->len < 4096))
+				wpa_printf(MSG_ERROR, "invalid resp->len (%d)", resp->len);
+
 			os_free(resp->msg);
 		}
-		//wpa_printf(MSG_ERROR, "[2] free resp (resp:0x%x)\n", resp);
+
 		os_free(resp);
 	}
 }

@@ -117,7 +117,7 @@ typedef struct _PER_NODE {
     uint32_t last_probe_us;
     uint8_t get_mcs_count;
     int8_t   rssi_avg;
-    uint32_t tx_total_cnt;     /* tx total count */
+    //uint32_t tx_total_cnt;     /* tx total count */
     uint8_t  c_retry_cnt;		/* continuous retry count */
     uint8_t retry[9];
     PER_RATE rate[NUM_RATES];

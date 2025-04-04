@@ -31,6 +31,7 @@
 
 #include "lwip/dhcp.h"
 #include "netif/bridgeif.h"
+#include "dhcpserver.h"
 #include "driver_nrc.h"
 
 
@@ -91,6 +92,7 @@ static wifi_event_cb_t g_wifi_event_cb[WIFI_EVT_MAX] =
 	[WIFI_EVT_VENDOR_IE] = NULL,
 	[WIFI_EVT_AP_STA_CONNECTED] = NULL,
 	[WIFI_EVT_AP_STA_DISCONNECTED] = NULL,
+	[WIFI_EVT_ASSOC_REJECT] = NULL,
 };
 
 static void _wifi_api_event_handler (int vif_id, tWIFI_EVENT_ID id, int data_len, void *data)
@@ -105,6 +107,7 @@ static void _wifi_api_event_handler (int vif_id, tWIFI_EVENT_ID id, int data_len
 		[WIFI_EVT_VENDOR_IE] = "vendor_ie",
 		[WIFI_EVT_AP_STA_CONNECTED] = "sta_connected",
 		[WIFI_EVT_AP_STA_DISCONNECTED] = "sta_disconnected",
+		[WIFI_EVT_ASSOC_REJECT] = "assocication_reject",
 	};
 
 	if (id < 0 || id >= WIFI_EVT_MAX)
@@ -360,7 +363,7 @@ int wifi_api_get_macaddr (char *macaddr0, char *macaddr1)
 {
 	int vif_id;
 	char *macaddr;
-	
+
 /*	if (!macaddr0 || !macaddr1)
 		return -EINVAL; */
 
@@ -510,7 +513,7 @@ int wifi_api_get_rssi (int8_t *rssi, bool average)
 	tWIFI_STATUS (*get_rssi[2])(int, int8_t *) =
 	{
 		nrc_wifi_get_rssi,
-		nrc_wifi_get_average_rssi		
+		nrc_wifi_get_average_rssi
 	};
 	int vif_id;
 
@@ -520,7 +523,7 @@ int wifi_api_get_rssi (int8_t *rssi, bool average)
 	*rssi = ATCMD_WIFI_RSSI_MIN;
 
 	if (get_rssi[average ? 1 : 0](vif_id_sta, rssi) != WIFI_SUCCESS)
-		return -1;		
+		return -1;
 
 	return 0;
 }
@@ -531,7 +534,7 @@ int wifi_api_get_snr (uint8_t *snr)
 
 	if (!snr)
 		return -EINVAL;
-	   
+
 	if (nrc_wifi_get_snr(vif_id_sta, snr) != WIFI_SUCCESS)
 		return -1;
 
@@ -556,7 +559,7 @@ int wifi_api_get_rate_control (bool *rate_ctrl)
 			wifi_api_set_rate_control(rate_ctrl_0);
 	}
 
-	*rate_ctrl = rate_ctrl_0;	
+	*rate_ctrl = rate_ctrl_0;
 
 	return 0;
 }
@@ -574,7 +577,7 @@ int wifi_api_get_mcs (wifi_mcs_t *index0, wifi_mcs_t *index1)
 
 	if (!index0)
 		return -EINVAL;
-	   
+
 	if (!wifi_api_is_relay_mode())
 	   index1 = NULL;
 	else if (!index1)
@@ -643,7 +646,7 @@ int wifi_api_get_cca_threshold (int *threshold)
 			system_modem_api_set_cca_threshold(1, threshold0);
 	}
 
-	*threshold = threshold0;	
+	*threshold = threshold0;
 
 	return 0;
 }
@@ -690,7 +693,7 @@ int wifi_api_get_tsf (uint64_t *tsf0, uint64_t *tsf1)
 
 	if (!tsf0)
 		return -EINVAL;
-	   
+
 	if (!wifi_api_is_relay_mode())
 	   tsf1 = NULL;
 	else if (!tsf1)
@@ -795,7 +798,25 @@ int wifi_api_set_listen_interval (uint16_t listen_interval)
 
 int wifi_api_start_scan (char *ssid, uint32_t timeout)
 {
-	if (nrc_wifi_scan_timeout(vif_id_sta, timeout, ssid) != WIFI_SUCCESS)
+	switch (nrc_wifi_scan_timeout(vif_id_sta, timeout, ssid))
+	{
+		case WIFI_SUCCESS:
+			return 0;
+
+		case WIFI_TIMEOUT:
+			return -ETIMEDOUT;
+
+		case WIFI_BUSY:
+			return -EBUSY;
+
+		default:
+			return -1;
+	}
+}
+
+int wifi_api_abort_scan (void)
+{
+	if (nrc_wifi_abort_scan(vif_id_sta) != WIFI_SUCCESS)
 		return -1;
 
 	return 0;
@@ -839,8 +860,8 @@ int wifi_api_set_scan_background (int short_interval, int signal_threshold, int 
 
 	return 0;
 #else
-	return -1;	
-#endif	
+	return -1;
+#endif
 }
 
 int wifi_api_set_ssid (char *ssid)
@@ -886,10 +907,10 @@ int wifi_api_set_security (char *security, char *password, int sae_pwe)
 #if defined(CONFIG_ATCMD_SAEPWE)
 		if (sae_pwe < 0 || sae_pwe > 2)
 			return -EINVAL;
-	
+
 		if (nrc_wifi_set_sae_pwe(vif_id_sta, sae_pwe) != WIFI_SUCCESS)
 			return -1;
-#endif		
+#endif
 	}
 #endif
 	else
@@ -965,7 +986,7 @@ int wifi_api_get_ap_info (wifi_ap_info_t *info)
 {
 	AP_INFO ap;
 
-	if (!info)	
+	if (!info)
 		return -EINVAL;
 
 	memset(info, 0, sizeof(wifi_ap_info_t));
@@ -976,8 +997,8 @@ int wifi_api_get_ap_info (wifi_ap_info_t *info)
 	info->channel.bw = ap.bw;
 	info->channel.freq = ap.freq;
 
-	sprintf(info->bssid, "%02X:%02X:%02X:%02X:%02X:%02X", 
-				ap.bssid[0], ap.bssid[1], ap.bssid[2], 
+	sprintf(info->bssid, "%02X:%02X:%02X:%02X:%02X:%02X",
+				ap.bssid[0], ap.bssid[1], ap.bssid[2],
 				ap.bssid[3], ap.bssid[4],ap.bssid[5]);
 
 	if (ap.ssid_len > 0)
@@ -1039,32 +1060,108 @@ int wifi_api_set_ip4_address (char *address, char *netmask, char *gateway)
 	return 0;
 }
 
-int wifi_api_start_dhcp_client (uint32_t timeout_msec)
+static dhcpc_event_cb_t g_dhcpc_event_cb[] =
+{
+	[DHCP_EVENT_RENEWING] = NULL,
+	[DHCP_EVENT_RELEASED] = NULL,
+	[DHCP_EVENT_BOUND] = NULL,
+};
+static bool g_dhcpc_renewing = false;
+
+static void _wifi_api_dhcp_client_event_handler (struct netif *netif, int event)
+{
+	switch (event)
+	{
+		case DHCP_EVENT_RENEWING:
+			_atcmd_info("DHCP_EVENT_RENEWING");
+			g_dhcpc_renewing = true;
+			break;
+
+		case DHCP_EVENT_RELEASED:
+			_atcmd_info("DHCP_EVENT_RELEASED");
+			break;
+
+		case DHCP_EVENT_BOUND:
+			_atcmd_info("DHCP_EVENT_BOUND");
+			if (!g_dhcpc_renewing)
+				return;
+			g_dhcpc_renewing = false;
+			break;
+
+		default:
+			_atcmd_error("invalid dhcp event (%d)", event);
+			return;
+	}
+
+#if 0
+	{
+		atcmd_wifi_ipaddr_t ipaddr, netmask, gateway;
+		int lease_time;
+
+		wifi_api_get_ip4_address(ipaddr, netmask, gateway);
+		lease_time = wifi_api_get_dhcp_lease_time();
+
+		_atcmd_info(" - ipaddr : %s", ipaddr);
+		_atcmd_info(" - netmask : %s", netmask);
+		_atcmd_info(" - gateway :%s", gateway);
+		_atcmd_info(" - lease_time : %d", lease_time);
+	}
+#endif
+
+	if (g_dhcpc_event_cb[event])
+		g_dhcpc_event_cb[event]();
+}
+
+int wifi_api_start_dhcp_client (uint32_t timeout_msec, dhcpc_event_cb_t event_cb[])
 {
 	char *str_ip4addr_any = "0.0.0.0";
-	int vif_id = wifi_api_is_relay_mode() ? vif_id_br : vif_id_sta; 
+	int vif_id = wifi_api_is_relay_mode() ? vif_id_br : vif_id_sta;
 	int ret;
 	int i;
 
 #ifndef CONFIG_ATCMD_FAST_RECOVERY
 	if (set_standalone_hook_dhcp(vif_id) == 0)
 		return DHCP_RECOVERY;
-#endif	
+#endif
 
 	wifi_dhcpc_stop(vif_id);
 
 	if (wifi_api_set_ip4_address(str_ip4addr_any, str_ip4addr_any, str_ip4addr_any) != 0)
 		_atcmd_error("failed to reset ip address");
 
-	if (wifi_dhcpc_start(vif_id) != 0)
+	if (wifi_dhcpc_start_with_event(vif_id, _wifi_api_dhcp_client_event_handler) != 0)
 		return DHCP_FAIL;
 
 	for (i = 0 ; i < timeout_msec ; i += 10)
 	{
 		if (get_dhcp_status(vif_id))
-			return DHCP_SUCCESS;
+		{
+			if (event_cb)
+			{
+				g_dhcpc_renewing = false;
 
-		if (!wifi_dhcpc_status(vif_id)) 
+				for (i = 0 ; i < ATCMD_DHCPC_EVT_MAX ; i++)
+				{
+					if (!event_cb[i])
+						continue;
+
+					switch (i)
+					{
+						case ATCMD_DHCPC_EVT_RELEASE:
+							g_dhcpc_event_cb[DHCP_EVENT_RELEASED] = event_cb[i];
+							break;
+
+						case ATCMD_DHCPC_EVT_RENEW:
+							g_dhcpc_event_cb[DHCP_EVENT_BOUND] = event_cb[i];
+							break;
+					}
+				}
+			}
+
+			return DHCP_SUCCESS;
+		}
+
+		if (!wifi_dhcpc_status(vif_id))
 			return DHCP_STOP;
 
 		_delay_ms(10);
@@ -1075,9 +1172,23 @@ int wifi_api_start_dhcp_client (uint32_t timeout_msec)
 	return DHCP_TIMEOUT;
 }
 
+void wifi_api_stop_dhcp_client (void)
+{
+	int vif_id = wifi_api_is_relay_mode() ? vif_id_br : vif_id_sta;
+	bool dhcpc_started = !!wifi_dhcpc_status(vif_id);
+
+	if (dhcpc_started)
+		wifi_dhcpc_stop(vif_id);
+
+	_atcmd_debug("%s: size=%d", __func__, sizeof(g_dhcpc_event_cb), sizeof(*g_dhcpc_event_cb));
+
+	memset(g_dhcpc_event_cb, 0, sizeof(g_dhcpc_event_cb));
+	g_dhcpc_renewing = false;
+}
+
 int wifi_api_get_dhcp_lease_time (void)
 {
-	int vif_id = wifi_api_is_relay_mode() ? vif_id_br : vif_id_sta; 
+	int vif_id = wifi_api_is_relay_mode() ? vif_id_br : vif_id_sta;
 	int lease_time;
 
 	lease_time = wifi_dhcpc_get_lease_time(vif_id);
@@ -1149,7 +1260,7 @@ bool wifi_api_wakeup_done (void)
 
 #include "umac_info.h"
 
-int wifi_api_start_softap (int bw, int freq, 
+int wifi_api_start_softap (int bw, int freq,
 							char *ssid, int ssid_type,
 							char *security, char *password, int sae_pwe,
 							uint32_t timeout)
@@ -1309,6 +1420,23 @@ int wifi_api_stop_dhcp_server (void)
 	return 0;
 }
 
+int wifi_api_get_sta_ip4_address (uint8_t *macaddr, char *str_ipaddr)
+{
+	ip4_addr_t ipaddr;
+
+	if (!macaddr || !str_ipaddr)
+		return -EINVAL;
+
+	memset(&ipaddr, 0, sizeof(ip4_addr_t));
+
+	if (!ip_from_arp_cache(macaddr, &ipaddr) && !dhcps_get_ip(macaddr, &ipaddr))
+		return -1;
+
+	strcpy(str_ipaddr, ip4addr_ntoa(&ipaddr));
+
+	return 0;	
+}
+
 void wifi_api_get_relay_mode (bool *enable)
 {
 	if (vif_id_ap == vif_id_sta)
@@ -1408,14 +1536,14 @@ static struct
 	bool init;
 	enum WPS_STATUS status[2];
 	wifi_wps_cb_t callback[2];
-} g_wifi_wps_info = 
+} g_wifi_wps_info =
 {
 	.init = false,
 	.status = { WPS_DISABLE, WPS_DISABLE },
 	.callback = { NULL, NULL },
 };
 
-static void _wifi_api_wps_success (void *priv, int net_id, uint8_t *ssid, uint8_t ssid_len, 
+static void _wifi_api_wps_success (void *priv, int net_id, uint8_t *ssid, uint8_t ssid_len,
 										uint8_t security, char *passphrase)
 {
 	struct nrc_wpa_if *intf = (struct nrc_wpa_if *)priv;
@@ -1426,7 +1554,7 @@ static void _wifi_api_wps_success (void *priv, int net_id, uint8_t *ssid, uint8_
 
 /*	_atcmd_debug("WPS_SUCCESS: vif_id=%d", vif_id); */
 
-	if (g_wifi_wps_info.status[vif_id] == WPS_ACTIVE)	
+	if (g_wifi_wps_info.status[vif_id] == WPS_ACTIVE)
 	{
 		if (net_id >= 0)
 		{
@@ -1439,12 +1567,12 @@ static void _wifi_api_wps_success (void *priv, int net_id, uint8_t *ssid, uint8_
 		}
 
 		if (!g_wifi_wps_info.callback[vif_id])
-			g_wifi_wps_info.status[vif_id] = WPS_SUCCESS;	
+			g_wifi_wps_info.status[vif_id] = WPS_SUCCESS;
 		else
 		{
 			g_wifi_wps_info.callback[vif_id](WPS_SUCCESS, vif_id, ssid, str_sec_mode[security], passphrase);
 
-			g_wifi_wps_info.status[vif_id] = WPS_DISABLE;	
+			g_wifi_wps_info.status[vif_id] = WPS_DISABLE;
 			g_wifi_wps_info.callback[vif_id] = NULL;
 		}
 	}
@@ -1457,15 +1585,15 @@ static void _wifi_api_wps_timeout (void *priv)
 
 /*	_atcmd_debug("WPS_TIMEOUT: vif_id=%d", vif_id); */
 
-	if (g_wifi_wps_info.status[vif_id] == WPS_ACTIVE)	
+	if (g_wifi_wps_info.status[vif_id] == WPS_ACTIVE)
 	{
 		if (!g_wifi_wps_info.callback[vif_id])
-			g_wifi_wps_info.status[vif_id] = WPS_TIMEOUT;	
+			g_wifi_wps_info.status[vif_id] = WPS_TIMEOUT;
 		else
 		{
 			g_wifi_wps_info.callback[vif_id](WPS_TIMEOUT, vif_id);
-			
-			g_wifi_wps_info.status[vif_id] = WPS_DISABLE;	
+
+			g_wifi_wps_info.status[vif_id] = WPS_DISABLE;
 			g_wifi_wps_info.callback[vif_id] = NULL;
 		}
 	}
@@ -1478,15 +1606,15 @@ static void _wifi_api_wps_fail (void *priv)
 
 /*	_atcmd_debug("WPS_FAIL: vif_id=%d", vif_id); */
 
-	if (g_wifi_wps_info.status[vif_id] == WPS_ACTIVE)	
-	{	
+	if (g_wifi_wps_info.status[vif_id] == WPS_ACTIVE)
+	{
 		if (!g_wifi_wps_info.callback[vif_id])
-			g_wifi_wps_info.status[vif_id] = WPS_FAIL;	
+			g_wifi_wps_info.status[vif_id] = WPS_FAIL;
 		else
 		{
 			g_wifi_wps_info.callback[vif_id](WPS_FAIL, vif_id);
 
-			g_wifi_wps_info.status[vif_id] = WPS_DISABLE;	
+			g_wifi_wps_info.status[vif_id] = WPS_DISABLE;
 			g_wifi_wps_info.callback[vif_id] = NULL;
 		}
 	}
@@ -1513,15 +1641,15 @@ static void _wifi_api_wps_init (int vif_id, wifi_wps_cb_t cb)
 		g_wifi_wps_info.init = true;
 	}
 
-	g_wifi_wps_info.status[vif_id] = WPS_DISABLE; 
-	g_wifi_wps_info.callback[vif_id] = cb; 
+	g_wifi_wps_info.status[vif_id] = WPS_DISABLE;
+	g_wifi_wps_info.callback[vif_id] = cb;
 }
 
 int wifi_api_enable_wps (const char *bssid, wifi_wps_cb_t cb)
 {
 	int vif_id = 0;
 
-	if (g_wifi_wps_info.status[vif_id] == WPS_ACTIVE)	
+	if (g_wifi_wps_info.status[vif_id] == WPS_ACTIVE)
 		return -EBUSY;
 
 	_wifi_api_wps_init(vif_id, cb);
@@ -1529,7 +1657,7 @@ int wifi_api_enable_wps (const char *bssid, wifi_wps_cb_t cb)
 	if (nrc_wifi_wps_pbc_bssid(vif_id, bssid) != WIFI_SUCCESS)
 		return -1;
 
-	g_wifi_wps_info.status[vif_id] = WPS_ACTIVE; 
+	g_wifi_wps_info.status[vif_id] = WPS_ACTIVE;
 
 	if (!cb)
 	{
@@ -1543,9 +1671,9 @@ int wifi_api_enable_wps (const char *bssid, wifi_wps_cb_t cb)
 
 			switch (g_wifi_wps_info.status[vif_id])
 			{
-				case WPS_SUCCESS: 
-				case WPS_TIMEOUT: 								  
-				case WPS_FAIL: 
+				case WPS_SUCCESS:
+				case WPS_TIMEOUT:
+				case WPS_FAIL:
 					i = timeout;
 					ret = g_wifi_wps_info.status[vif_id];
 

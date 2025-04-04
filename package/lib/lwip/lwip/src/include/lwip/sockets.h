@@ -617,6 +617,20 @@ int lwip_ioctl(int s, long cmd, void *argp);
 int lwip_fcntl(int s, int cmd, int val);
 const char *lwip_inet_ntop(int af, const void *src, char *dst, socklen_t size);
 int lwip_inet_pton(int af, const char *src, void *dst);
+#if defined(LWIP_DEBUG)
+void lwip_show_sockets(void);
+#endif /* defined(LWIP_DEBUG) */
+#if defined(INCLUDE_LWIP_RECOVERY)
+int lwip_get_listen_sockfd(struct sockaddr *local, struct sockaddr *remote);
+int lwip_get_sockfd_array(int type, int sockfd[], struct sockaddr *local, struct sockaddr *remote);
+int lwip_retent_socket(void);
+int lwip_recover_socket(void);
+#else
+__attribute__((weak)) int lwip_get_listen_sockfd(struct sockaddr *local, struct sockaddr *remote) { return -1; }
+__attribute__((weak)) int lwip_get_sockfd_array(int type, int sockfd[], struct sockaddr *local, struct sockaddr *remote) { return -1; }
+__attribute__((weak)) int lwip_retent_socket(void) { return -1; };
+__attribute__((weak)) int lwip_recover_socket(void) { return -1; };
+#endif /* defined(INCLUDE_LWIP_RECOVERY) */
 
 #if LWIP_COMPAT_SOCKETS
 #if LWIP_COMPAT_SOCKETS != 2

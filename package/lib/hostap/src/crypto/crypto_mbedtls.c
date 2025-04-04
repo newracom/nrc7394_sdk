@@ -12,7 +12,6 @@
 #include "crypto.h"
 
 #include "mbedtls/md5.h"
-#include "mbedtls/md4.h"
 #include "mbedtls/des.h"
 
 #include "mbedtls/sha1.h"
@@ -24,7 +23,10 @@
 
 #include "mbedtls/aes.h"
 #include "mbedtls/rsa.h"
+#if (MBEDTLS_VERSION_MAJOR < 3)
+#include "mbedtls/md4.h"
 #include "mbedtls/arc4.h"
+#endif
 
 #include "system.h"
 #include "platform.h"
@@ -45,6 +47,12 @@
 #include "mbedtls/oid.h"
 
 #include "mbedtls/bignum.h"
+
+#ifdef CONFIG_MBEDTLS_ECDH_LEGACY_CONTEXT
+#define ACCESS_ECDH(S, var) S->MBEDTLS_PRIVATE(var)
+#else
+#define ACCESS_ECDH(S, var) S->MBEDTLS_PRIVATE(ctx).MBEDTLS_PRIVATE(mbed_ecdh).MBEDTLS_PRIVATE(var)
+#endif
 
 //Print Elapsed time for ECC Proceeing for SAE/OWE for debug
 #define DEBUG_ECC_PROCESS_TIME 1
@@ -277,6 +285,9 @@ int sha384_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 
 int md4_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 {
+#if (MBEDTLS_VERSION_MAJOR >= 3)
+	return -1;
+#else
 	mbedtls_md4_context ctx;
 	size_t i;
 
@@ -290,6 +301,7 @@ int md4_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 	mbedtls_md4_free(&ctx);
 
 	return 0;
+#endif
 }
 
 
@@ -424,7 +436,9 @@ int crypto_mod_exp(const u8 *base, size_t base_len,
 struct crypto_cipher {
 	enum crypto_cipher_alg alg;
 	union {
+#if (MBEDTLS_VERSION_MAJOR < 3)
 		mbedtls_arc4_context *arc4_ctx;
+#endif
 		mbedtls_aes_context *aes_ctx;
 		struct _des{
 			mbedtls_des_context *dec_ctx;
@@ -448,11 +462,13 @@ struct crypto_cipher * crypto_cipher_init(enum crypto_cipher_alg alg,
 		return NULL;
 
 	switch (alg) {
+#if (MBEDTLS_VERSION_MAJOR < 3)
 	case CRYPTO_CIPHER_ALG_RC4:
 	ctx->alg = CRYPTO_CIPHER_ALG_RC4;
 	ctx->u.arc4_ctx = os_zalloc(sizeof(*ctx->u.arc4_ctx));
 	mbedtls_arc4_setup(ctx->u.arc4_ctx, key, key_len);
 	break;
+#endif
 	case CRYPTO_CIPHER_ALG_AES:
 	ctx->alg = CRYPTO_CIPHER_ALG_AES;
 	ctx->u.aes_ctx = os_zalloc(sizeof(*ctx->u.aes_ctx));
@@ -494,9 +510,11 @@ int crypto_cipher_encrypt(struct crypto_cipher *ctx, const u8 *plain,
 		return -1;
 
 	switch (ctx->alg) {
+#if (MBEDTLS_VERSION_MAJOR < 3)
 		case CRYPTO_CIPHER_ALG_RC4:
 		mbedtls_arc4_crypt(ctx->u.arc4_ctx, len, plain, crypt);
 		break;
+#endif
 		case CRYPTO_CIPHER_ALG_AES:
 		mbedtls_aes_crypt_ecb(ctx->u.aes_ctx, MBEDTLS_AES_ENCRYPT, plain, crypt);
 		break;
@@ -510,6 +528,8 @@ int crypto_cipher_encrypt(struct crypto_cipher *ctx, const u8 *plain,
 		break;
 		case CRYPTO_CIPHER_NULL:
 		break;
+		default:
+		return -1;
 	}
 
 	return 0;
@@ -522,9 +542,11 @@ int crypto_cipher_decrypt(struct crypto_cipher *ctx, const u8 *crypt,
 		return -1;
 
 	switch (ctx->alg) {
+#if (MBEDTLS_VERSION_MAJOR < 3)
 		case CRYPTO_CIPHER_ALG_RC4:
 		mbedtls_arc4_crypt(ctx->u.arc4_ctx, len, crypt, plain);
 		break;
+#endif
 		case CRYPTO_CIPHER_ALG_AES:
 		mbedtls_aes_crypt_ecb(ctx->u.aes_ctx, MBEDTLS_AES_DECRYPT, crypt, plain);
 		break;
@@ -538,6 +560,8 @@ int crypto_cipher_decrypt(struct crypto_cipher *ctx, const u8 *crypt,
 		break;
 		case CRYPTO_CIPHER_NULL:
 		break;
+		default:
+		return -1;
 	}
 
 	return 0;
@@ -549,10 +573,12 @@ void crypto_cipher_deinit(struct crypto_cipher *ctx)
 		return;
 
 	switch (ctx->alg) {
+#if (MBEDTLS_VERSION_MAJOR < 3)
 		case CRYPTO_CIPHER_ALG_RC4:
 		mbedtls_arc4_free(ctx->u.arc4_ctx);
 		os_free(ctx->u.arc4_ctx);
 		break;
+#endif
 		case CRYPTO_CIPHER_ALG_AES:
 		mbedtls_aes_free(ctx->u.aes_ctx);
 		os_free(ctx->u.aes_ctx);
@@ -572,6 +598,8 @@ void crypto_cipher_deinit(struct crypto_cipher *ctx)
 		case CRYPTO_CIPHER_ALG_RC2:
 		break;
 		case CRYPTO_CIPHER_NULL:
+		break;
+		default:
 		break;
 	}
 	os_free(ctx);
@@ -804,7 +832,7 @@ int crypto_ec_point_to_bin(struct crypto_ec *e,
 	int len = mbedtls_mpi_size(&e->group.P);
 
 	if (x) {
-		if(crypto_bignum_to_bin((struct crypto_bignum *) & ((mbedtls_ecp_point *) point)->X,
+		if(crypto_bignum_to_bin((struct crypto_bignum *) & ((mbedtls_ecp_point *) point)->MBEDTLS_PRIVATE(X),
 					x, len, len) < 0) {
 			return -1;
 		}
@@ -812,7 +840,7 @@ int crypto_ec_point_to_bin(struct crypto_ec *e,
 	}
 
 	if (y) {
-		if(crypto_bignum_to_bin((struct crypto_bignum *) & ((mbedtls_ecp_point *) point)->Y,
+		if(crypto_bignum_to_bin((struct crypto_bignum *) & ((mbedtls_ecp_point *) point)->MBEDTLS_PRIVATE(Y),
 					y, len, len) < 0) {
 			return -1;
 		}
@@ -836,9 +864,9 @@ struct crypto_ec_point *crypto_ec_point_from_bin(struct crypto_ec *e,
 	pt = os_zalloc(sizeof(mbedtls_ecp_point));
 	mbedtls_ecp_point_init(pt);
 
-	MBEDTLS_MPI_CHK(mbedtls_mpi_read_binary(&pt->X, val, len));
-	MBEDTLS_MPI_CHK(mbedtls_mpi_read_binary(&pt->Y, val + len, len));
-	MBEDTLS_MPI_CHK(mbedtls_mpi_lset((&pt->Z), 1));
+	MBEDTLS_MPI_CHK(mbedtls_mpi_read_binary(&pt->MBEDTLS_PRIVATE(X), val, len));
+	MBEDTLS_MPI_CHK(mbedtls_mpi_read_binary(&pt->MBEDTLS_PRIVATE(Y), val + len, len));
+	MBEDTLS_MPI_CHK(mbedtls_mpi_lset((&pt->MBEDTLS_PRIVATE(Z)), 1));
 
 	return (struct crypto_ec_point *) pt;
 
@@ -919,8 +947,8 @@ static int ecp_opp(const mbedtls_ecp_group *grp, mbedtls_ecp_point *R, const mbe
 	}
 
 	/* In-place opposite */
-	if (mbedtls_mpi_cmp_int(&R->Y, 0) != 0) {
-		MBEDTLS_MPI_CHK(mbedtls_mpi_sub_mpi(&R->Y, &grp->P, &R->Y));
+	if (mbedtls_mpi_cmp_int(&R->MBEDTLS_PRIVATE(Y), 0) != 0) {
+		MBEDTLS_MPI_CHK(mbedtls_mpi_sub_mpi(&R->MBEDTLS_PRIVATE(Y), &grp->P, &R->MBEDTLS_PRIVATE(Y)));
 	}
 
 cleanup:
@@ -943,51 +971,48 @@ int crypto_ec_point_cmp(const struct crypto_ec *e,
 struct crypto_bignum *crypto_ec_point_compute_y_sqr(struct crypto_ec *e,
 		const struct crypto_bignum *x)
 {
-	mbedtls_mpi temp, temp2, num;
 	int ret = 0;
 
-	mbedtls_mpi *y_sqr = os_zalloc(sizeof(mbedtls_mpi));
-	if (y_sqr == NULL) {
+	mbedtls_mpi *Y = os_zalloc(sizeof(mbedtls_mpi));
+	if (Y == NULL) {
 		return NULL;
 	}
 
-	mbedtls_mpi_init(&temp);
-	mbedtls_mpi_init(&temp2);
-	mbedtls_mpi_init(&num);
-	mbedtls_mpi_init(y_sqr);
+	mbedtls_mpi_init(Y);
+	struct crypto_bignum *y_sqr = (struct crypto_bignum *) Y;
 
-	/* y^2 = x^3 + ax + b  mod  P*/
-	/* mbedtls does not have mod-add or mod-mul apis.
-	 *
-	 */
+	/* Compute X^3 + A X + B as X (X^2 + A) + B */
+	MBEDTLS_MPI_CHK(crypto_bignum_mulmod(x, x,
+		(const struct crypto_bignum *) &e->group.P,
+		y_sqr));
 
-	/* Calculate x^3  mod P*/
-	MBEDTLS_MPI_CHK(mbedtls_mpi_lset(&num, 3));
-	MBEDTLS_MPI_CHK(mbedtls_mpi_exp_mod(&temp, (const mbedtls_mpi *) x, &num, &e->group.P, NULL));
+	/* Special case for A = -3 */
+	if (e->group.A.MBEDTLS_PRIVATE(p) == NULL) {
+		MBEDTLS_MPI_CHK(mbedtls_mpi_sub_int(Y, Y, 3));
+		while (Y->MBEDTLS_PRIVATE(s) < 0 && mbedtls_mpi_cmp_int(Y, 0) != 0)
+			MBEDTLS_MPI_CHK(mbedtls_mpi_add_mpi(Y, Y, &e->group.P));
+	} else {
+		MBEDTLS_MPI_CHK(crypto_bignum_addmod(y_sqr,
+		(const struct crypto_bignum *) &e->group.A,
+		(const struct crypto_bignum *) &e->group.P,
+		y_sqr));
+	}
 
-	/* Calculate ax  mod P*/
-	MBEDTLS_MPI_CHK(mbedtls_mpi_lset(&num, -3));
-	MBEDTLS_MPI_CHK(mbedtls_mpi_mul_mpi(&temp2, (const mbedtls_mpi *) x, &num));
-	MBEDTLS_MPI_CHK(mbedtls_mpi_mod_mpi(&temp2, &temp2, &e->group.P));
-
-	/* Calculate ax + b  mod P. Note that b is already < P*/
-	MBEDTLS_MPI_CHK(mbedtls_mpi_add_mpi(&temp2, &temp2, &e->group.B));
-	MBEDTLS_MPI_CHK(mbedtls_mpi_mod_mpi(&temp2, &temp2, &e->group.P));
-
-	/* Calculate x^3 + ax + b  mod P*/
-	MBEDTLS_MPI_CHK(mbedtls_mpi_add_mpi(&temp2, &temp2, &temp));
-	MBEDTLS_MPI_CHK(mbedtls_mpi_mod_mpi(y_sqr, &temp2, &e->group.P));
+	MBEDTLS_MPI_CHK(crypto_bignum_mulmod(y_sqr, x,
+		(const struct crypto_bignum *) &e->group.P,
+		y_sqr));
+	MBEDTLS_MPI_CHK(crypto_bignum_addmod(y_sqr,
+		(const struct crypto_bignum *) &e->group.B,
+		(const struct crypto_bignum *) &e->group.P,
+		y_sqr));
 
 cleanup:
-	mbedtls_mpi_free(&temp);
-	mbedtls_mpi_free(&temp2);
-	mbedtls_mpi_free(&num);
 	if (ret) {
-		mbedtls_mpi_free(y_sqr);
-		os_free(y_sqr);
+		mbedtls_mpi_free(Y);
+		os_free(Y);
 		return NULL;
 	} else {
-		return (struct crypto_bignum *) y_sqr;
+		return y_sqr;
 	}
 }
 
@@ -1000,11 +1025,11 @@ int crypto_ec_point_solve_y_coord(struct crypto_ec *e,
 	mbedtls_mpi_init(&temp);
 	int ret = 0;
 
-	y = &((mbedtls_ecp_point *)p)->Y;
+	y = &((mbedtls_ecp_point *)p)->MBEDTLS_PRIVATE(Y);
 
 	/* Faster way to find sqrt
 	 * Works only with curves having prime p
-	 * such that p ��E��cO 3 (mod 4)
+	 * such that p ≡ 3 (mod 4)
 	 *  y_ = (y2 ^ ((p+1)/4)) mod p
 	 *
 	 *  if LSB of both x and y are same: y = y_
@@ -1016,16 +1041,15 @@ int crypto_ec_point_solve_y_coord(struct crypto_ec *e,
 	y_sqr = (mbedtls_mpi *) crypto_ec_point_compute_y_sqr(e, x);
 
 	if (y_sqr) {
-
 		MBEDTLS_MPI_CHK(mbedtls_mpi_add_int(&temp, &e->group.P, 1));
-		MBEDTLS_MPI_CHK(mbedtls_mpi_div_int(&temp, NULL, &temp, 4));
+		MBEDTLS_MPI_CHK(mbedtls_mpi_shift_r(&temp, 2));
 		MBEDTLS_MPI_CHK(mbedtls_mpi_exp_mod(y, y_sqr, &temp, &e->group.P, NULL));
 
 		if (y_bit != mbedtls_mpi_get_bit(y, 0))
 			MBEDTLS_MPI_CHK(mbedtls_mpi_sub_mpi(y, &e->group.P, y));
 
-		MBEDTLS_MPI_CHK(mbedtls_mpi_copy(&((mbedtls_ecp_point* )p)->X, (const mbedtls_mpi*) x));
-		MBEDTLS_MPI_CHK(mbedtls_mpi_lset(&((mbedtls_ecp_point *)p)->Z, 1));
+		MBEDTLS_MPI_CHK(mbedtls_mpi_copy(&((mbedtls_ecp_point* )p)->MBEDTLS_PRIVATE(X), (const mbedtls_mpi*) x));
+		MBEDTLS_MPI_CHK(mbedtls_mpi_lset(&((mbedtls_ecp_point *)p)->MBEDTLS_PRIVATE(Z), 1));
 	} else {
 		ret = 1;
 	}
@@ -1049,13 +1073,20 @@ int crypto_ec_point_is_on_curve(struct crypto_ec *e,
 	int ret = 0, on_curve = 0;
 
 	mbedtls_mpi_init(&y_sqr_lhs);
-	mbedtls_mpi_init(&two);
 
 	/* Calculate y^2  mod P*/
+#if defined(INCLUDE_HW_SECURITY_ACC_BN) && defined(INCLUDE_HW_SECURITY_ACC_BN_MUL_MOD)
+	MBEDTLS_MPI_CHK(mbedtls_mpi_mul_mpi_mod_mpi(&y_sqr_lhs,
+		&((const mbedtls_ecp_point *)p)->MBEDTLS_PRIVATE(Y),
+		&((const mbedtls_ecp_point *)p)->MBEDTLS_PRIVATE(Y),
+		&e->group.P));
+#else
+	mbedtls_mpi_init(&two);
 	MBEDTLS_MPI_CHK(mbedtls_mpi_lset(&two, 2));
-	MBEDTLS_MPI_CHK(mbedtls_mpi_exp_mod(&y_sqr_lhs, &((const mbedtls_ecp_point *)p)->Y , &two, &e->group.P, NULL));
-
-	y_sqr_rhs = (mbedtls_mpi *) crypto_ec_point_compute_y_sqr(e, (const struct crypto_bignum *) & ((const mbedtls_ecp_point *)p)->X);
+	MBEDTLS_MPI_CHK(mbedtls_mpi_exp_mod(&y_sqr_lhs, &((const mbedtls_ecp_point *)p)->MBEDTLS_PRIVATE(Y), &two, &e->group.P, NULL));
+	mbedtls_mpi_free(&two);
+#endif /* INCLUDE_HW_SECURITY_ACC_BN && INCLUDE_HW_SECURITY_ACC_BN_MUL_MOD */
+	y_sqr_rhs = (mbedtls_mpi *) crypto_ec_point_compute_y_sqr(e, (const struct crypto_bignum *) & ((const mbedtls_ecp_point *)p)->MBEDTLS_PRIVATE(X));
 
 	if (y_sqr_rhs && (mbedtls_mpi_cmp_mpi(y_sqr_rhs, &y_sqr_lhs) == 0)) {
 		on_curve = 1;
@@ -1063,7 +1094,6 @@ int crypto_ec_point_is_on_curve(struct crypto_ec *e,
 
 cleanup:
 	mbedtls_mpi_free(&y_sqr_lhs);
-	mbedtls_mpi_free(&two);
 	mbedtls_mpi_free(y_sqr_rhs);
 	os_free(y_sqr_rhs);
 	return (ret == 0) && (on_curve == 1);
@@ -1123,18 +1153,15 @@ int crypto_bignum_addmod(const struct crypto_bignum *a,
 									 const struct crypto_bignum *c,
 										 struct crypto_bignum *d)
 {
-	struct crypto_bignum *tmp = crypto_bignum_init();
 	int ret = -1;
 
-	if (mbedtls_mpi_add_mpi((mbedtls_mpi *) tmp, (const mbedtls_mpi *) a, (const mbedtls_mpi *) b) < 0)
-		goto fail;
+	MBEDTLS_MPI_CHK(mbedtls_mpi_add_mpi((mbedtls_mpi *) d,
+		(const mbedtls_mpi *) a, (const mbedtls_mpi *) b));
+	while (mbedtls_mpi_cmp_mpi((const mbedtls_mpi *) d, (const mbedtls_mpi *) c) >= 0)
+		MBEDTLS_MPI_CHK(mbedtls_mpi_sub_abs((mbedtls_mpi *) d,
+			(const mbedtls_mpi *) d, (const mbedtls_mpi *) c));
 
-	if (mbedtls_mpi_mod_mpi( (mbedtls_mpi *) d, (const mbedtls_mpi *) tmp, (const mbedtls_mpi *) c) < 0)
-		goto fail;
-
-	ret = 0;
-fail:
-	crypto_bignum_deinit(tmp, 0);
+cleanup:
 	return ret;
 }
 
@@ -1264,6 +1291,9 @@ int crypto_bignum_mulmod(const struct crypto_bignum *a,
 {
     int res;
 #if ALLOW_EVEN_MOD || !CONFIG_MBEDTLS_HARDWARE_MPI // Must enable ALLOW_EVEN_MOD if c is even
+#if defined(INCLUDE_HW_SECURITY_ACC_BN) && defined(INCLUDE_HW_SECURITY_ACC_BN_MUL_MOD)
+    res = mbedtls_mpi_mul_mpi_mod_mpi((mbedtls_mpi *) d, (mbedtls_mpi *) a, (mbedtls_mpi *) b, (mbedtls_mpi *) c);
+#else
     mbedtls_mpi temp;
     mbedtls_mpi_init(&temp);
 
@@ -1275,6 +1305,7 @@ int crypto_bignum_mulmod(const struct crypto_bignum *a,
     res = mbedtls_mpi_mod_mpi((mbedtls_mpi *) d, &temp, (mbedtls_mpi *) c);
 
     mbedtls_mpi_free(&temp);
+#endif /* INCLUDE_HW_SECURITY_ACC_BN && INCLUDE_HW_SECURITY_ACC_BN_MUL_MOD */
 #else
     // Works with odd modulus only, but it is faster with HW acceleration
     res = esp_mpi_mul_mpi_mod((mbedtls_mpi *) d, (mbedtls_mpi *) a, (mbedtls_mpi *) b, (mbedtls_mpi *) c);
@@ -1387,6 +1418,9 @@ struct crypto_ecdh * crypto_ecdh_init(int group)
 	//INIT ECDH 
 	ecdh = os_zalloc(sizeof(*ecdh));
 	mbedtls_ecdh_init(&ecdh->ctx);
+#ifndef CONFIG_MBEDTLS_ECDH_LEGACY_CONTEXT
+	ecdh->ctx.MBEDTLS_PRIVATE(var) = MBEDTLS_ECDH_VARIANT_MBEDTLS_2_0;
+#endif
 	if(mbedtls_ecdh_setup(&ecdh->ctx, grp_id) != 0)
 	{
 		wpa_msg(0, MSG_DEBUG, "OWE : Fail to setup ECDH\n");
@@ -1434,14 +1468,17 @@ struct wpabuf * crypto_ecdh_get_pubkey(struct crypto_ecdh *ecdh, int inc_y)
 {
 	struct wpabuf *buf = NULL;
 	// int len = ecdh->ctx.Q.X.n * 2 + 2;
-	int len = (ecdh->ctx.grp.pbits >> 3) + 2;
+	mbedtls_ecdh_context *ctx = (mbedtls_ecdh_context *) &ecdh->ctx;
+	int len = (ACCESS_ECDH(ctx, grp).pbits >> 3) + 2;
 	size_t olen = 0;
 
 	buf = wpabuf_alloc(len);
 
-	wpa_msg(0, MSG_DEBUG, "LEN : %d, T_size : %d pbits : %d, nbits :  %d\n", len, ecdh->ctx.grp.T_size, ecdh->ctx.grp.pbits, ecdh->ctx.grp.nbits);
+	wpa_msg(0, MSG_DEBUG, "LEN : %d, T_size : %d pbits : %d, nbits :  %d\n", len,
+		ACCESS_ECDH(ctx, grp).MBEDTLS_PRIVATE(T_size),
+		ACCESS_ECDH(ctx, grp).pbits, ACCESS_ECDH(ctx, grp).nbits);
 
-	if(mbedtls_mpi_write_binary(&ecdh->ctx.Q.X, wpabuf_put(buf, len), len) != 0)
+	if(mbedtls_mpi_write_binary(ACCESS_ECDH(&ctx, Q).MBEDTLS_PRIVATE(X), wpabuf_put(buf, len), len) != 0)
 	{
 		wpa_msg(0, MSG_DEBUG, "OWE : Fail to get public-key\n");
 		if(buf)
@@ -1464,6 +1501,8 @@ struct wpabuf * crypto_ecdh_set_peerkey(struct crypto_ecdh *ecdh, int inc_y,
 	size_t res_len;
 	int res = 0;
 
+	mbedtls_ecdh_context *ctx = (mbedtls_ecdh_context *) &ecdh->ctx;
+
 	mbedtls_entropy_context entropy;
 	mbedtls_ctr_drbg_context ctr_drbg;
 
@@ -1480,21 +1519,21 @@ struct wpabuf * crypto_ecdh_set_peerkey(struct crypto_ecdh *ecdh, int inc_y,
 	mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, NULL, 0);
 
 	mbedtls_ecp_point *peerKey;
-	peerKey = &ecdh->ctx.Qp;
+	peerKey = &ACCESS_ECDH(ctx, Qp);
 
-	if(mbedtls_mpi_read_binary(&peerKey->X, key, len) != 0)
+	if(mbedtls_mpi_read_binary(&peerKey->MBEDTLS_PRIVATE(X), key, len) != 0)
 	{
 		wpa_msg(0, MSG_DEBUG, "OWE : [%s, %d] Fail to read peer public-key(point X)", __func__, __LINE__);
 		goto clean;
 	}
 
-	if(mbedtls_mpi_lset(&peerKey->Z, 1) != 0)
+	if(mbedtls_mpi_lset(&peerKey->MBEDTLS_PRIVATE(Z), 1) != 0)
 	{
 		wpa_msg(0, MSG_DEBUG, "OWE : [%s, %d] Fail to Set bit in public-key(point Z)", __func__, __LINE__);
 		goto clean;
 	}
 
-	if(crypto_ec_point_solve_y_coord((void *)ecdh, (void *) peerKey, (void *) &peerKey->X, 0))
+	if(crypto_ec_point_solve_y_coord((struct crypto_ec *) &ACCESS_ECDH(ctx, grp), (void *) peerKey, (void *) &peerKey->MBEDTLS_PRIVATE(X), 0))
 	{
 		wpa_msg(0, MSG_DEBUG, "OWE : [%s, %d] Fail to calc Y using X(y^2 = x^3 + ax + b  mod  P)", __func__, __LINE__);
 		goto clean;

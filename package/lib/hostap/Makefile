@@ -13,8 +13,8 @@ INCLUDE += -I$(TOPDIR)/lib/lwip/port/include
 INCLUDE += -I$(TOPDIR)/lib/lwip/lwip/src/include
 
 # MBEDTLS headers
-INCLUDE += -I$(TOPDIR)/lib/mbedtls/mbedtls/include
-INCLUDE += -I$(TOPDIR)/lib/mbedtls/port/include
+INCLUDE += -I$(MBEDTLS_BASE)/mbedtls/include
+INCLUDE += -I$(MBEDTLS_BASE)/port/include
 
 VPATH += $(WPA_SUPP_ROOT)/src/utils
 VPATH += $(WPA_SUPP_ROOT)/src/common

@@ -71,33 +71,7 @@ int standalone_main()
 	bool net_init = true;
 	bool ps_callback = false;
 	initVersion();
-
-#if defined(SUPPORT_NVS_FLASH)
-	nvs_handle_t tmp_nvs_handle;
-	nvs_err_t err = NVS_OK;
-	/* initialize Non-volatile storage key/value subsystem */
-	/* Application will need to call nvs_open to utilize NVS. */
-	/* There's no need to call nvs_flash_deinit() */
-	/* since the system will never return. */
-	I(TT_SYS, "Initializing NVS...\n");
-	err = nvs_flash_init();
-	if (err == NVS_ERR_NVS_NO_FREE_PAGES || err == NVS_ERR_NVS_NEW_VERSION_FOUND) {
-		if ((err = nvs_flash_erase()) == NVS_OK) {
-			err = nvs_flash_init();
-		}
-	} else {
-		/* make sure that there's a default namespace set by opening with NVS_READWRITE, */
-		/* so that subsequent nvs_open with NVS_READONLY for default name space succeeds. */
-		I(TT_SYS, "Try opening NVS with read/write for default namespace (%s)...\n", NVS_DEFAULT_NAMESPACE);
-		if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &tmp_nvs_handle) == NVS_OK) {
-			I(TT_SYS, "NVS Open successful, continue...\n");
-			nvs_close(tmp_nvs_handle);
-		} else {
-			E(TT_SYS, "Fatal error, nvs_open\n");
-		}
-	}
-#endif
-
+    
 #if defined (INCLUDE_PS_SCHEDULE)
 	system_modem_api_ps_check_network_init(&net_init, &ps_callback);
 #endif /* INCLUDE_PS_SCHEDULE */
@@ -261,3 +235,16 @@ int set_standalone_hook_static(int vif_id)
 	WPA_DRIVER_PS_HOOK(WPA_PS_HOOK_TYPE_STATIC, &vif_id, NULL, 0);
 	return -1;
 }
+
+#ifdef USE_EEPROM
+#include "nrc_config.h"
+#include "system_eeprom.h"
+
+void update_sysconfig_location(void)
+{
+	nrc_config_set_config_location(CONFIG_IN_EEPROM);
+	system_eeprom_set_config(EEPROM_I2C_CH, EEPROM_I2C_SCL,EEPROM_I2C_SDA,
+		EEPROM_I2C_CLK, EEPROM_I2C_DEV_ADDR, EEPROM_WP_PIN, EEPROM_PAGE_WRITE_BUF_SIZE);
+	system_eeprom_init();
+}
+#endif

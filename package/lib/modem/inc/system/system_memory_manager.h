@@ -86,6 +86,7 @@ uint8_t* system_memory_pool_base_addr(uint8_t pool_id);
 uint16_t system_memory_pool_buf_size(uint8_t pool_id);
 
 struct _SYS_BUF* sys_buf_alloc(uint8_t pool_id , uint16_t hif_len);
+bool sys_buf_allocable(uint8_t pool_id , uint16_t hif_len);
 #if !defined(RELEASE)
 struct _SYS_BUF* sys_buf_alloc_for_lb(uint8_t pool_id , uint16_t hif_len);
 #endif

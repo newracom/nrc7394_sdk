@@ -49,7 +49,7 @@ typedef uintptr_t          mem_ptr_t;
 /* Plaform specific diagnostic output */
 #define LWIP_PLATFORM_DIAG( x, ... ) do{ system_printf x; } while( 0 );
 #define LWIP_PLATFORM_ASSERT(x) do {system_printf("Assertion \"%s\" failed at line %d in %s\n", \
-                                     x, __LINE__, __FILE__);    vPortEnterCritical(  );    for( ;; );} while(0)
+                                     x, __LINE__, __FILE__);    vPortEnterCritical(  );  util_trace_stack_dump(NULL);  for( ;; );} while(0)
 
 /* Define (sn)printf formatters for these lwIP types */
 #define X8_F  "02x"

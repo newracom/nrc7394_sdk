@@ -135,6 +135,92 @@ void lwif_input_from_net80211_pbuf(struct pbuf* p)
 }
 #endif
 
+#if STATIC_ARP_ENTRY_DHCP_SERVER
+#include "lwip/prot/dhcp.h"
+static uint8_t saved_dhcp_server_mac[6];
+static ip4_addr_t saved_dhcp_server_ip;
+#define DPHC_SERVER_ARP_ENTRY_DELAY_MS 2000
+
+static void add_dhcp_server_arp_entry(void *arg)
+{
+	err_t res = etharp_add_static_entry(&saved_dhcp_server_ip, (struct eth_addr *)saved_dhcp_server_mac);
+	if (res == ERR_OK) {
+		LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE,
+			("add_dhcp_server_arp_entry(): Static ARP entry for DHCP server added successfully.\n"));
+	} else {
+		LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE,
+			("add_dhcp_server_arp_entry(): Failed to add static ARP entry for DHCP server. Error code: %d\n", res));
+	}
+}
+
+void process_dhcp_ack(struct pbuf *p)
+{
+	if (!p) {
+		return;
+	}
+
+	struct eth_hdr *eth = (struct eth_hdr *)p->payload;
+	struct ip_hdr *iph = (struct ip_hdr *)((uint8_t *)eth + sizeof(struct eth_hdr));
+	struct udp_hdr *udph = (struct udp_hdr *)((uint8_t *)iph + (IPH_HL(iph) * 4));
+	struct dhcp_msg *dhcp = (struct dhcp_msg *)((uint8_t *)udph + sizeof(struct udp_hdr));
+
+	if (IPH_PROTO(iph) != IP_PROTO_UDP) {
+		return;
+	}
+
+	if (ntohl(dhcp->cookie) != DHCP_MAGIC_COOKIE) {
+		return;
+	}
+
+	uint8_t *options = dhcp->options;
+	int option_len = p->len - ((uint8_t *)options - (uint8_t *)p->payload);
+	uint8_t dhcp_message_type = 0;
+
+	for (int i = 0; i < option_len - 2; i++) {
+		if (options[i] == DHCP_OPTION_MESSAGE_TYPE && options[i + 1] == 1) {
+			dhcp_message_type = options[i + 2];
+			break;
+		}
+	}
+
+	if (dhcp_message_type != DHCP_ACK) {
+		LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE,
+				("process_dhcp_ack(): Not a DHCP ACK packet (Message Type: %d)\n", dhcp_message_type));
+		return;
+	}
+
+	uint8_t dhcp_server_mac[6];
+	memcpy(dhcp_server_mac, eth->src.addr, 6);
+
+	uint32_t dhcp_server_ip_addr = 0;
+	for (int i = 0; i < option_len - 2; i++) {
+		if (options[i] == DHCP_OPTION_SERVER_ID && options[i + 1] == 4) {
+			memcpy(&dhcp_server_ip_addr, &options[i + 2], 4);
+			break;
+		}
+	}
+
+	if (dhcp_server_ip_addr == 0) {
+		LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("process_dhcp_ack(): Failed to extract DHCP server IP address\n"));
+		return;
+	}
+
+	memcpy(saved_dhcp_server_mac, dhcp_server_mac, sizeof(saved_dhcp_server_mac));
+	saved_dhcp_server_ip.addr = dhcp_server_ip_addr;
+
+
+	LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("process_dhcp_ack(): DHCP ACK received\n"));
+	LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("process_dhcp_ack(): DHCP Server MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
+			dhcp_server_mac[0], dhcp_server_mac[1], dhcp_server_mac[2],
+			dhcp_server_mac[3], dhcp_server_mac[4], dhcp_server_mac[5]));
+	LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("process_dhcp_ack(): DHCP Server IP: "));
+	ip4_addr_debug_print(DHCP_DEBUG | LWIP_DBG_TRACE, &saved_dhcp_server_ip);
+	LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("\n"));
+
+	sys_timeout(DPHC_SERVER_ARP_ENTRY_DELAY_MS, add_dhcp_server_arp_entry, NULL);
+}
+#endif /* STATIC_ARP_ENTRY_DHCP_SERVER */
+
 void lwif_input(struct nrc_wpa_if* intf, void *buffer, int data_len)
 {
 	struct eth_hdr *ethhdr;
@@ -163,6 +249,7 @@ void lwif_input(struct nrc_wpa_if* intf, void *buffer, int data_len)
 	}
 	else
 	{
+		E(TT_NET, "[%s] pbuf_alloc failed\n", __func__);
 		LINK_STATS_INC(link.memerr);
 		LINK_STATS_INC(link.drop);
 		return;
@@ -235,6 +322,18 @@ void lwif_input(struct nrc_wpa_if* intf, void *buffer, int data_len)
 			}
 	next:
 #endif
+
+#if STATIC_ARP_ENTRY_DHCP_SERVER
+			{
+				struct netif *dhcp_netif;
+				dhcp_netif = nrc_netif_get_by_idx((intf->vif_id == 0) ? WLAN0_INTERFACE : BRIDGE_INTERFACE);
+				if (dhcp_get_state(dhcp_netif) == DHCP_STATE_REQUESTING) {
+					LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("DHCP_STATE_REQUESTING %d\n", dhcp_get_state(dhcp_netif)));
+					process_dhcp_ack(p);
+				}
+			}
+#endif /* STATIC_ARP_ENTRY_DHCP_SERVER */
+
 			/* full packet send to tcpip_thread to process */
 			if (netif->input(p, netif)!=ERR_OK) {
 				LWIP_DEBUGF(NETIF_DEBUG, ("ethernetif_input: IP input error\n"));

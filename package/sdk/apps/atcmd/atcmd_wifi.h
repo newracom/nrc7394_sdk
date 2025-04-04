@@ -120,6 +120,14 @@ enum ATCMD_WIFI_EVENT
 	ATCMD_WIFI_EVT_MAX
 };
 
+enum ATCMD_DHCPC_EVENT
+{
+	ATCMD_DHCPC_EVT_RELEASE = 0,
+	ATCMD_DHCPC_EVT_RENEW,
+
+	ATCMD_DHCPC_EVT_MAX,
+};
+
 /**********************************************************************************************/
 
 typedef uint8_t atcmd_wifi_power_t;

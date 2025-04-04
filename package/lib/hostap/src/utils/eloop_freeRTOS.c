@@ -128,9 +128,9 @@ static void unlock_timeout_list()
 }
 
 //-----------------------------------------------------------------------//
-// README: Changed it from static void to void because it is called to 
-//  trigger eloop in the function below. 
-//    - wpa_cmd_receive() @crtl_iface_freeRTOS.c 
+// README: Changed it from static void to void because it is called to
+//  trigger eloop in the function below.
+//    - wpa_cmd_receive() @crtl_iface_freeRTOS.c
 //    - wpa_cli_send_and_resp() @api_wifi.c
 //-----------------------------------------------------------------------//
 void eloop_run_signal()
@@ -284,7 +284,7 @@ int eloop_register_timeout(unsigned int secs, unsigned int usecs,
 
 	if (secs == 0 && usecs == 0) {
 		//-------------------------------------------------------------//
-		// README: Protected eloop.execute list with an interrupt mask 
+		// README: Protected eloop.execute list with an interrupt mask
 		//  due to the lack of protection. eloop.execute is accessed
 		//  through the follwing functions.
 		//  - eloop_rearrange_timeout()
@@ -299,7 +299,7 @@ int eloop_register_timeout(unsigned int secs, unsigned int usecs,
 		system_irq_restore(flags);
 
 		unlock_timeout_list();
-		eloop_run_signal();		
+		eloop_run_signal();
 		return 0;
 	}
 
@@ -314,10 +314,10 @@ int eloop_register_timeout(unsigned int secs, unsigned int usecs,
 	if (dl_list_empty(&eloop.timeout)) {
 		dl_list_add_tail(&eloop.timeout, &timeout->list);
 		//-------------------------------------------------------------//
-		// README: If calling eloop while holding the semaphore for 
-		//  eloop.timeout, other tasks may not be able to acquire the 
-		//  semaphore and could end up in a waiting state, potentially 
-		//  causing malfunction. 
+		// README: If calling eloop while holding the semaphore for
+		//  eloop.timeout, other tasks may not be able to acquire the
+		//  semaphore and could end up in a waiting state, potentially
+		//  causing malfunction.
 		//-------------------------------------------------------------//
 		unlock_timeout_list();
 		eloop_run_signal();
@@ -558,9 +558,9 @@ int eloop_register_signal_terminate(eloop_signal_handler handler,
 int eloop_register_signal_reconfig(eloop_signal_handler handler,
 		void *user_data)
 {
-#if !defined(INCLUDE_MEASURE_AIRTIME)	
+#if !defined(INCLUDE_MEASURE_AIRTIME)
 	wpa_printf(MSG_INFO, "eloop: %s", __func__);
-#endif /* !defined(INCLUDE_MEASURE_AIRTIME)	*/	
+#endif /* !defined(INCLUDE_MEASURE_AIRTIME)	*/
 	return 0;
 }
 
@@ -573,7 +573,7 @@ void eloop_run(void)
 		eloop_trigger_timeout();
 		next = eloop_rearrange_timeout();
 		//-------------------------------------------------------------//
-		// README: Protected eloop.execute list with an interrupt mask 
+		// README: Protected eloop.execute list with an interrupt mask
 		//  due to the lack of protection.
 		//-------------------------------------------------------------//
 		uint32_t flags = system_irq_save();
@@ -588,43 +588,23 @@ void eloop_run(void)
 		//---------------------------------------------------------------------//
 		// README: If a wpa command is invoked via cli or api_wifi, a Message is
 		//  sent through the following function.
-		//   - wpa_cmd_receive() @ctrl_iface_freeRTOS.c 
+		//   - wpa_cmd_receive() @ctrl_iface_freeRTOS.c
 		//   - wpa_cli_send_and_resp() @api_wifi.c
 		//---------------------------------------------------------------------//
-		if (xQueueReceive(eloop_message_queue_req, &eloop_msg, 0) == pdPASS)
-		{
+		if (xQueueReceive(eloop_message_queue_req, &eloop_msg, 0) != pdPASS) {
+			wpa_printf(MSG_ERROR, "eloop: %s, xQueueReceive() failed", __func__);
+		} else {
 			if (eloop_msg->wait_rsp) {
-				ctrl_iface_resp_t* resp = NULL;
-				ctrl_iface_resp_t* resp_ret = NULL;
-
-				resp_ret = ctrl_iface_receive_response(eloop_msg->vif_id, eloop_msg->buf);
-
-				//create resonse (OK : len_0, msg_NULL, MSG:len_n, msg_XX, FAIL: len_-1, msg_NULL)
-				resp = os_malloc(sizeof(ctrl_iface_resp_t));
-				if (resp) {
-					if (resp_ret && resp_ret->len < 4096) {
-						resp->len = resp_ret->len;
-						resp->msg = resp_ret->msg;
-					} else {
-						resp->len = -1;
-						resp->msg = NULL;
-					}
-				} else {
-					wpa_printf(MSG_INFO, "[%s] fail to allocate resp", __func__);
+				ctrl_iface_resp_t *resp = ctrl_iface_receive_response(eloop_msg->vif_id, eloop_msg->buf);
+				if (xQueueSend(eloop_message_queue_rsp, &resp, 0) != pdPASS) {
+					wpa_printf(MSG_ERROR, "eloop: %s, xQueueSend() failed", __func__);
+					CTRL_IFACE_RESP_FREE(resp);
 				}
-
-				resp_ret->msg = NULL;
-				resp_ret->len = 0;
-
-				os_free(eloop_msg->buf);
-				os_free(eloop_msg);
-
-				xQueueSend(eloop_message_queue_rsp, &resp, 0);
 			} else {
 				ctrl_iface_receive(eloop_msg->vif_id, eloop_msg->buf);
-				os_free(eloop_msg->buf);
-				os_free(eloop_msg);
 			}
+			os_free(eloop_msg->buf);
+			os_free(eloop_msg);
 		}
 	}
 	eloop.terminate = 0;

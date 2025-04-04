@@ -53,6 +53,7 @@ typedef enum {
 	GPIO_15 = 15,	/**< GPIO_15 */
 	GPIO_16 = 16,	/**< GPIO_16 */
 	GPIO_17 = 17,	/**< GPIO_17 */
+	GPIO_MAX
 } NRC_GPIO_PIN;
 #elif defined(NRC7394)
 typedef enum {
@@ -87,6 +88,7 @@ typedef enum {
 	GPIO_28 = 28,	/**< GPIO_28 */ /* HSPI_CS on EVK */
 	GPIO_29 = 29,	/**< GPIO_29 */ /* HSPI_MISO on EVK */
 	GPIO_30 = 30,	/**< GPIO_30 */ /* HSPI_EIRQ on EVK */
+	GPIO_MAX
 } NRC_GPIO_PIN;
 #endif
 

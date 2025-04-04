@@ -2,7 +2,9 @@ SECTIONS
 {
 	.text :
 	{
+        __isr_vector_start = .;
 		KEEP(*(.isr_vector))
+        __isr_vector_end = .;
 		/* *(.text) */
 		/* *(.text*) */
 		*(EXCLUDE_FILE(*lmac*.c.o *umac_s1g*.c.o *ec*.c.o *bignum*.c.o).text)

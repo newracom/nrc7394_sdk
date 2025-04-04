@@ -260,7 +260,7 @@ char *atcmd_param_to_str (const char *param, char *str, int len)
 
 	param_len = strlen(param);
 
-	if (param_len <= 2 || (param_len - 2) > (len - 1))
+	if (param_len < 2 || (param_len - 2) > (len - 1))
 		return NULL;
 
 	if (param[0] != '"' || param[param_len - 1] != '"')

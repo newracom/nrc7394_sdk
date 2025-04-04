@@ -40,7 +40,7 @@
 
 #define ATCMD_VER_MAJOR			(1)
 #define ATCMD_VER_MINOR			(26)
-#define ATCMD_VER_REVISION		(8)
+#define ATCMD_VER_REVISION		(11)
 
 /**********************************************************************************************/
 
@@ -121,6 +121,7 @@ enum ATCMD_ERROR
 	ATCMD_ERROR_BUSY,
 	ATCMD_ERROR_FAIL,
 	ATCMD_ERROR_TIMEOUT,
+	ATCMD_ERROR_NOMEM,
 
 	ATCMD_ERROR_NUM,
 
@@ -186,6 +187,7 @@ enum ATCMD_ID
  *************************/
 	ATCMD_BASIC_VERSION = 0,
 	ATCMD_BASIC_BOOT,
+	ATCMD_BASIC_HEAP,
 #if defined(NRC7394)
 	ATCMD_BASIC_XTAL,
 #endif
@@ -263,7 +265,6 @@ enum ATCMD_ID
 	ATCMD_SOCKET_CLOSE,
 	ATCMD_SOCKET_LIST,
 	ATCMD_SOCKET_SEND,
-	ATCMD_SOCKET_SEND_RETRY,
 	ATCMD_SOCKET_SEND_EXIT,
 	ATCMD_SOCKET_RECV,
 	ATCMD_SOCKET_RECV_MODE,
@@ -272,6 +273,7 @@ enum ATCMD_ID
 	ATCMD_SOCKET_ADDR_INFO,
 	ATCMD_SOCKET_TCP_KEEPALIVE,
 	ATCMD_SOCKET_TCP_NODELAY,
+	ATCMD_SOCKET_UDP_MULTICAST,
 	ATCMD_SOCKET_TIMEOUT,
 
 	ATCMD_SOCKET_MAX,
@@ -306,6 +308,31 @@ enum ATCMD_KEY
 	ATCMD_KEY_PGDN,
 };
 
+enum ATCMD_DATA_TYPE
+{
+	ATCMD_DATA_NONE,
+	ATCMD_DATA_SSEND = 0,
+#if defined(CONFIG_ATCMD_FWUPDATE)
+	ATCMD_DATA_FWBINDL,
+#endif	
+#if defined(CONFIG_ATCMD_SFUSER)
+	ATCMD_DATA_SFUSER,
+#endif
+
+	ATCMD_DATA_TYPE_MAX
+};
+
+/**********************************************************************************************/
+
+typedef struct atcmd_list
+{
+	struct atcmd_list *next, *prev;
+} atcmd_list_t;
+
+extern void atcmd_list_init (atcmd_list_t *list);
+extern void atcmd_list_add (atcmd_list_t *head, atcmd_list_t *list);
+extern void atcmd_list_del (atcmd_list_t *list);
+
 /**********************************************************************************************/
 
 typedef struct
@@ -313,11 +340,6 @@ typedef struct
 	int cnt;
 	char cmd[ATCMD_MSG_LEN_MAX + 1];
 } atcmd_buf_t;
-
-typedef struct atcmd_list
-{
-	struct atcmd_list *next, *prev;
-} atcmd_list_t;
 
 typedef struct
 {
@@ -345,6 +367,32 @@ typedef struct
 
 	atcmd_handler_t handler[ATCMD_HANDLER_NUM];
 } atcmd_info_t;
+
+typedef struct
+{
+	enum ATCMD_DATA_TYPE data_type;
+
+	int id;
+	uint32_t len;
+ 	uint32_t timeout; /* msec */	
+	bool done_event;
+	const char *exit_cmd;
+
+	union
+	{
+		struct
+		{
+			bool passthrough;
+		} ssend;
+
+#if defined(CONFIG_ATCMD_SFUSER)
+		struct
+		{
+			uint32_t offset;
+		} sfuser;
+#endif	
+	};
+} atcmd_data_mode_params_t;
 
 /**********************************************************************************************/
 
@@ -395,12 +443,6 @@ inline uint32_t atcmd_sys_now (void)
 	return xTaskGetTickCount() * portTICK_PERIOD_MS;
 }
 
-extern int atcmd_data_mode_enable (atcmd_socket_t *socket, int32_t len, bool done_event, uint32_t timeout, char *exit_cmd);
-extern int atcmd_firmware_download_enable (int32_t len, uint32_t timeout);
-#if defined(CONFIG_ATCMD_SFUSER)
-extern int atcmd_sf_user_mode_enable (int32_t offset, int32_t len, uint32_t timeout);
-#endif
-
 extern void atcmd_group_print (void);
 extern atcmd_group_t *atcmd_group_search (enum ATCMD_GROUP_ID id);
 extern int atcmd_group_register (atcmd_group_t *group);
@@ -410,6 +452,9 @@ extern void atcmd_info_print (atcmd_group_t *group);
 extern atcmd_info_t *atcmd_search (atcmd_group_t *group, enum ATCMD_ID id);
 extern int atcmd_info_register (enum ATCMD_GROUP_ID gid, atcmd_info_t *info);
 extern void atcmd_info_unregister (enum ATCMD_GROUP_ID gid, enum ATCMD_ID id);
+
+extern void atcmd_data_mode_init_params (enum ATCMD_DATA_TYPE data_type, atcmd_data_mode_params_t *params);
+extern int atcmd_data_mode_enable (atcmd_data_mode_params_t *params);
 
 extern void atcmd_receive (char *data, int size);
 extern int atcmd_receive_command (char *data, int size);

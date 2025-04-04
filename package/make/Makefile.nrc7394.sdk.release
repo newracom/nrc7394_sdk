@@ -14,101 +14,29 @@ endif
 #//--------------------------------------------------
 #// CONFIG
 #//--------------------------------------------------
-# S1G HOOK for 11ah
-CONFIG_S1G_HOOK=y
 
-# Background Scan
-CONFIG_BG_SCAN=y
-
-# Modem Recovery
-CONFIG_MODEM_RECOVERY=y
-
-# RF TX CALIBRATION
-CONFIG_APPLY_TX_GAIN_1_5_WITH_TXLO_TXIMG_CAL=y
-
-# Temp sensor
-CONFIG_USE_TEMP_SENSOR=n
-
-# SW-based Encryption for PMF //only for Standalone
-CONFIG_PMF_SWENC=n
-
-# Board data
-CONFIG_BD=y
-
-# Power Save - Non PS-Poll
-CONFIG_PS_NONPOLL=y
-
-# SET WIM command via task(Work Queue)
-CONFIG_SET_WIM_BY_WQ=n
-
-# TX Frame via task(Work Queue)
-CONFIG_DL_TRANSMIT_BY_WQ=n
-
-# TASK RENEW
-CONFIG_NEW_TASK_ARCH=y
-
-# Avoid FragAttack
-CONFIG_AVOID_FRAG_ATTACK=n
-
-# Fragmentation on target to support low MCS
-# Disable until SAM FW support assemble of fragmented frame
-CONFIG_DYNAMIC_FRAG=y
-
-# Support defragmentation at lmac for both HM & SAM mode
-CONFIG_DEFRAG=y
-
-# Support Multi STA Rate Control
-CONFIG_MULTI_STA_RC=y
-
-# WATCHDOG TIMER
-ifeq ($(CONFIG_NEW_TASK_ARCH),y)
-CONFIG_WDT=y
-endif
-
-# CLI Support (y: Support n: Not Support)
-CONFIG_CLI=y
-ifeq ($(CONFIG_CLI),y)
-# Support Minimum CLI (y: Support minimum-set of CLIs used by cli_app n: Support all)
-CONFIG_CLI_MINIMUM=y
-endif
-
-# DEBUG (DEBUG, TRACKER, Statistics, etc.)
-CONFIG_DEBUG=n
-
-# PRINT Console LOG
-CONFIG_LOG=n
-
-# USE CENTER LO for 1M BW
-CONFIG_1MBW_CENTER_LO=y
-
-# Use KR Wireless MIC detection for KR-MIC Band
-CONFIG_KR_MIC_SCAN=y
-
-# (only for CM3) USE PRIMASK-based INT Lock (y:PRIMASK, n:BASEPRI)
-CONFIG_PRIMASK_INT_LOCK=n
-
+# SoftAP-Role ONLY
+CONFIG_ONLY_AP=n
 # STA-Role ONLY
 CONFIG_ONLY_STA=n
+ifeq ($(CONFIG_ONLY_AP),y)
+CONFIG_ONLY_STA=n
+endif
+
+ifeq ($(CONFIG_ONLY_AP),y)
+LIB_ROLE	= AP
+else ifeq ($(CONFIG_ONLY_STA),y)
+LIB_ROLE	= STA
+endif
+
+# Synchronize with the library's config.
+LIB_CONFIG_FILE       =   lib/modem/libModem$(LIB_ROLE).config
+ifneq ($(wildcard $(LIB_CONFIG_FILE)),)
+include $(LIB_CONFIG_FILE)
+endif
 
 # HW Security Accelerator
 CONFIG_USE_HW_SECURITY_ACC_SHA=n
-CONFIG_USE_HW_SECURITY_ACC_BN=y
-
-ifeq ($(CONFIG_ONLY_STA),n)
-# only for AP
-# Gather STA's SIGNAL INFO (RSSI,SNR,MCS) on AP
-CONFIG_STA_SIG_INFO=y
-# Probe Response Offloading
-CONFIG_UMAC_PRESP=y
-endif
-
-# When Dynamic Frag is on, need to gather STA's RSSI info.
-ifeq ($(CONFIG_DYNAMIC_FRAG),y)
-CONFIG_STA_SIG_INFO=y
-endif
-
-# USE SMALL MEMORY for pool and heap
-CONFIG_USE_SMALL_MEM=n
 
 # major lmac/umac codes are run on RAM
 ifneq ($(findstring norunram, $(ALIAS)), )
@@ -117,114 +45,15 @@ else
 CONFIG_RUNRAM=y
 endif
 
-# Measurement Airtime
-CONFIG_MEASURE_AIRTIME=n
-
-# PowerSave Debug Mode w/always on memory
-CONFIG_PS_DEBUG_ALWAYSONMEM=n
-
-# For use of Authentication control
-CONFIG_AUTH_CONTROL=y
-
-# For use of broadcast fota in STA side
-CONFIG_BCAST_FOTA_STA=y
-
-# Ucode
-CONFIG_UCODE=y
-# Power-Save HOOK for deep sleep //only for Standalone
-CONFIG_WPS_PS_HOOK=y
-
-# GDMA COPY for Data & BSS
-CONFIG_DMA_COPY=y
-
-# RF ON/OFF for airplane mode or idle period on STA
-CONFIG_RF_KILL=n
-
-# RSN EXT Support
-CONFIG_RSN_EXTENTION=y
-
-# Support Channel Switch Annoucement on STA
-CONFIG_STA_CSA_SUPPORT=y
-
-# Support Scanning mode
-CONFIG_SCAN_MODE=y
-
-# Workaround feature only for NRC7393 and NRC7394
-CONFIG_7393_7394_WORKAROUND=y
-
-# (AP only) AP sends 1/2/4M BW probe response according to BW of probe request
-CONFIG_MATCH_OP_BW_PREQ_PRSP=y
-ifeq ($(CONFIG_ONLY_STA),y)
-CONFIG_MATCH_OP_BW_PREQ_PRSP=n
-endif
-
-# Operation with 8MHz Bandwidth AP
-CONFIG_STA_SUPPORT_8M=y
-
-# Duty Cycle
-CONFIG_DUTYCYCLE=y
-
-# Auto triggering to create Tx aggregation session.
-CONFIG_AMPDU_AUTO_TX=y
-
-# AMPDU reordering(draft version : need to tune more)
-CONFIG_AMPDU_REORDER=n
-
-# Use new printf
-CONFIG_NEW_V_SNPRINTF_SUPPORT=n
-
-# Remote command (via vendor specific IE) feature
-CONFIG_REMOTECMD=n
-
-# RTC Always On
-CONFIG_RTC_ALWAYS_ON=y
-
-# RTC Dynamic PS timeout
-CONFIG_RTC_DYNAMIC_PS=y
-
-# Scan Debugging (temporary configuration)
-CONFIG_SCAN_DEBUG=n
-
+ifeq ($(CONFIG_ONLY_STA),n)
 # SoftAP OWE support
 CONFIG_SOFTAP_OWE=y
+endif
 
-# SDK wifi console command
-CONFIG_CLI_API_WIFI=n
-
-# Schedule Callbacks after deep sleep
-CONFIG_PS_SCHEDULE=y
-
-# Legacy ACK feature
-CONFIG_LEGACY_ACK=y
-
-# Support for beacon bypass feature
-CONFIG_BEACON_BYPASS=n
-
-# Set # of max MPDU in AMPDU by manual (not reset after reconnect)
-CONFIG_MANUAL_AGG_NUM=y
-
-# TSF Sync by Vendor IE
-CONFIG_TSF_SYNC_VENDOR_IE=y
-
-# TSF Sync by probe req
-CONFIG_TSF_SYNC_PROBE_REQ=y
-
-# Support Modem Sleep (on/off BB during PS)
-CONFIG_MODEM_SLEEP=n
-
-# Serial Flash Deep power down mode
-CONFIG_SFLASH_DP=y
-
-# Serial Flash Page Program mode
-CONFIG_SFLASH_PAGE_PROG=y
-
-# Manual Continuous Tx support
-CONFIG_MANUAL_CONT_TX_SUPPORT=y
+# lwIP socket recovery
+CONFIG_LWIP_RECOVERY=n
 
 # RELEASE FW
-CONFIG_CLI=n
-CONFIG_CLI_MINIMUM=n
-CONFIG_DEBUG=n
 CONFIG_LOG=n
 
 #// --------------------------------------------------
@@ -242,6 +71,18 @@ else ifneq ($(findstring 2m, $(ALIAS_LOWER)), )
 CONFIG_FLASH_SIZE = 2M
 else
 CONFIG_FLASH_SIZE = $(CONFIG_DEFAULT_FLASH_SIZE)
+endif
+
+# EEPROM
+ifneq ($(findstring eeprom, $(ALIAS)), )
+DEFINE				+= -DUSE_EEPROM
+DEFINE				+= -DEEPROM_I2C_CH=0
+DEFINE				+= -DEEPROM_I2C_SCL=20
+DEFINE				+= -DEEPROM_I2C_SDA=14
+DEFINE				+= -DEEPROM_I2C_CLK=400000
+DEFINE				+= -DEEPROM_I2C_DEV_ADDR=0xA0
+DEFINE				+= -DEEPROM_WP_PIN=25
+DEFINE				+= -DEEPROM_PAGE_WRITE_BUF_SIZE=32
 endif
 
 #// --------------------------------------------------
@@ -328,7 +169,12 @@ DEFINE				+=	-DCACHE_XIP
 DEFINE				+=	-DSF_WRITABLE
 DEFINE				+=	-DSDK_SYSTEM_NAME=\"$(SYSTEM)\"
 DEFINE				+=	-DSDK_TARGET_NAME=\"$(TARGET)\"
+
+ifneq ($(findstring eeprom, $(ALIAS)), )
+OUTPUT				=	$(SYSTEM)_$(TARGET)_$(BUILD_NAME)_$(CONFIG_FLASH_SIZE)_eeprom
+else
 OUTPUT				=	$(SYSTEM)_$(TARGET)_$(BUILD_NAME)_$(CONFIG_FLASH_SIZE)
+endif
 
 #// -------------------------------------------------
 #// 11AH Features (common)
@@ -349,7 +195,7 @@ ifeq ($(CONFIG_ONLY_STA),n)
 DEFINE				+=	-DINCLUDE_ACCESS_POINT
 DEFINE				+=	-DINCLUDE_UMAC_BEACON
 DEFINE                          +=      -DINCLUDE_BEACON_AP_BEACON
-#DEFINE                          +=      -DINCLUDE_BEACON_BCMC
+DEFINE                          +=      -DINCLUDE_BEACON_BCMC
 DEFINE				+=	-DMAX_STA=75
 else
 DEFINE				+=	-DMAX_STA=1
@@ -406,6 +252,8 @@ DEFINE				+=	-DUTIL_TRACE_STACK
 
 ifeq ($(CONFIG_USE_HW_SECURITY_ACC_BN), y)
 DEFINE				+=	-DINCLUDE_HW_SECURITY_ACC_BN
+DEFINE				+=	-DINCLUDE_HW_SECURITY_ACC_BN_MOD
+DEFINE				+=	-DINCLUDE_HW_SECURITY_ACC_BN_MUL_MOD
 endif
 
 #//-------------------------------------------------
@@ -417,25 +265,10 @@ DEFINE				+=	-DLMAC_CONFIG_BUFFER_SIZE=512
 ifeq ($(CONFIG_USE_SMALL_MEM),y)
 # 32KB Pool
 DEFINE				+=	-DLMAC_CONFIG_DL_DESCRIPTOR=16
-DEFINE 				+=	-DLMAC_CONFIG_POOL_0_RESERVED_NUM=4
-DEFINE 				+=	-DLMAC_CONFIG_POOL_0_NUM=32
-DEFINE 				+=	-DLMAC_CONFIG_POOL_1_NUM=32
 else
 # 40.5KB Pool
 DEFINE				+=	-DLMAC_CONFIG_DL_DESCRIPTOR=32
-DEFINE 				+=	-DLMAC_CONFIG_POOL_0_RESERVED_NUM=4
-ifeq ($(CONFIG_DEFRAG),y)
-DEFINE 				+=	-DLMAC_CONFIG_POOL_0_NUM=55
-else
-DEFINE 				+=	-DLMAC_CONFIG_POOL_0_NUM=45
 endif
-DEFINE 				+=	-DLMAC_CONFIG_POOL_1_NUM=36
-endif
-
-DEFINE 				+=	-DLMAC_CONFIG_CREDIT_QM0=8
-DEFINE 				+=	-DLMAC_CONFIG_CREDIT_QM1=8
-DEFINE 				+=	-DLMAC_CONFIG_CREDIT_QM2=8
-DEFINE 				+=	-DLMAC_CONFIG_CREDIT_QM3=9
 
 ifeq ($(CONFIG_AUTH_CONTROL),y)
 DEFINE				+=	-DLMAC_MODEM_RECOVERY_TIME_MS=120000
@@ -443,7 +276,6 @@ else
 DEFINE				+=	-DLMAC_MODEM_RECOVERY_TIME_MS=10000
 endif
 DEFINE				+=	-DLMAC_WDT_RESET_TIME_MS=20000
-DEFINE				+=	-DLMAC_BMT_LOSS_CNT=30
 
 DEFINE 				+= -DEXCLUDE_FDK_MAC
 
@@ -530,18 +362,14 @@ include make/configure-in.os
 #// --------------------------------------------------
 ifeq ($(CONFIG_RUNRAM), y)
 ifeq ($(CONFIG_EXT_RAM), y)
-LD_CM_FILE_NAME = cm3_common_extram_runram.ld
 LD_FILE_NAME = cm3_$(TARGET)_extram_runram.ld
 else
-LD_CM_FILE_NAME = cm3_common_runram.ld
 LD_FILE_NAME = cm3_$(TARGET)_runram.ld
 endif
 else
 ifeq ($(CONFIG_EXT_RAM), y)
-LD_CM_FILE_NAME = cm3_common_extram.ld
 LD_FILE_NAME = cm3_$(TARGET)_extram.ld
 else
-LD_CM_FILE_NAME = cm3_common.ld
 LD_FILE_NAME = cm3_$(TARGET).ld
 endif
 endif
@@ -576,7 +404,7 @@ else
 DEFINE	+= -DconfigTOTAL_HEAP_SIZE=511960
 endif
 else
-DEFINE	+= -DconfigTOTAL_HEAP_SIZE=370000
+DEFINE	+= -DconfigTOTAL_HEAP_SIZE=320000
 endif
 endif #ipv6
 endif #small ram

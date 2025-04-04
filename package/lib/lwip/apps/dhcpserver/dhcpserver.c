@@ -19,6 +19,7 @@
 #include "lwip/udp.h"
 #include "lwip/mem.h"
 #include "dhcpserver.h"
+#include "lwip/etharp.h"
 
 #include "netif/wlif.h"
 #include "nrc_lwip.h"
@@ -26,6 +27,7 @@
 #if LWIP_IPV4 && LWIP_DHCPS /* don't build if not configured for use in makefile */
 
 #define DHCPS_DEBUG_DATA	0
+#define STATIC_ARP_ENTRY_ENABLE
 
 extern struct netif* nrc_netif[MAX_IF];    /* global variable containing MAC Config*/
 
@@ -85,6 +87,17 @@ void node_insert_to_list(list_node** phead, list_node* pinsert)
 			}
 		}
 	}
+#ifdef STATIC_ARP_ENTRY_ENABLE
+	struct dhcps_pool* current_node = (struct dhcps_pool*)pinsert->pnode;
+	if (current_node) {
+		etharp_add_static_entry(&current_node->ip, (struct eth_addr*)current_node->mac);
+		LWIP_DEBUGF(DHCPS_DEBUG | LWIP_DBG_TRACE,
+			("Added static ARP entry: IP = %s, MAC = %02X:%02X:%02X:%02X:%02X:%02X\n",
+				ip4addr_ntoa(&current_node->ip),
+				current_node->mac[0], current_node->mac[1], current_node->mac[2],
+				current_node->mac[3], current_node->mac[4], current_node->mac[5]));
+	}
+#endif
 }
 
 /******************************************************************************
@@ -116,6 +129,14 @@ void node_remove_from_list(list_node** phead, list_node* pdelete)
 			}
 		}
 	}
+#ifdef STATIC_ARP_ENTRY_ENABLE
+	struct dhcps_pool* current_node = (struct dhcps_pool*)pdelete->pnode;
+	if (current_node) {
+		etharp_remove_static_entry(&current_node->ip);
+		LWIP_DEBUGF(DHCPS_DEBUG | LWIP_DBG_TRACE,
+			("Removed static ARP entry: IP = %s\n", ip4addr_ntoa(&current_node->ip)));
+	}
+#endif /* STATIC_ARP_ENTRY_ENABLE */
 }
 
 /******************************************************************************
@@ -1115,6 +1136,24 @@ u32_t wifi_softap_get_dhcps_lease_time(void) // minute
 	return dhcps_lease_time;
 }
 
+bool dhcps_get_ip (u8_t *mac, ip4_addr_t *ip)
+{
+	struct dhcps_pool *pdhcps_pool = NULL;
+	list_node *pnode = plist;
+
+	while (pnode != NULL) {
+		pdhcps_pool = pnode->pnode;
+		if (memcmp(pdhcps_pool->mac, mac, 6) == 0) {
+			memcpy(ip, &pdhcps_pool->ip, sizeof(ip4_addr_t));
+			return true;
+		}
+
+		pnode = pnode->pnext;
+	}
+
+	return false;
+}
+
 int dhcps_status(void)
 {
 	u8_t num_dhcps_pool = 0;
@@ -1122,23 +1161,28 @@ int dhcps_status(void)
 	list_node* pnode = NULL;
 	struct dhcps_pool* pdhcps_pool = NULL;
 	pnode = plist;
-	A("\n-------------------------- DHCP Server Status ------------------------------\n");
-	A(" DHCP Server:%s   \tInterface:%d\n",
+	CPA("\n-------------------------- DHCP Server Status ------------------------------\n");
+	CPA(" DHCP Server:%s   \tInterface:%d\n",
 	  wifi_softap_dhcps_status()== DHCP_STARTED ? "On":"Off", (dhcps_get_interface())->num);
-	A(" Lease Time:%d(min)\tMax Lease Number:%d\n", dhcps_lease_time, DHCPS_MAX_LEASE);
+	CPA(" Lease Time:%d(min)\tMax Lease Number:%d\n", dhcps_lease_time, DHCPS_MAX_LEASE);
 	while (pnode != NULL) {
 		pdhcps_pool = pnode->pnode;
-		A("[%2d] MAC address : " MACSTR "\t", num_dhcps_pool, MAC2STR(pdhcps_pool->mac));
-		A("ip address : %"U16_F".%"U16_F".%"U16_F".%"U16_F"\n",
+		CPA("[%2d] MAC address : " MACSTR "\t", num_dhcps_pool, MAC2STR(pdhcps_pool->mac));
+		CPA("ip address : %"U16_F".%"U16_F".%"U16_F".%"U16_F"\n",
 			ip4_addr1_16(&pdhcps_pool->ip), ip4_addr2_16(&pdhcps_pool->ip),
 			ip4_addr3_16(&pdhcps_pool->ip), ip4_addr4_16(&pdhcps_pool->ip));
 
 		pnode = pnode ->pnext;
 		num_dhcps_pool ++;
 	}
-	A("----------------------------------------------------------------------------\n");
+	CPA("----------------------------------------------------------------------------\n");
 
 	return 0;
+}
+
+list_node* dhcps_get_list(void)
+{
+	return plist;
 }
 
 struct netif *dhcps_get_interface(void)

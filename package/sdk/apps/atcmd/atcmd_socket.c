@@ -39,8 +39,16 @@ static int _atcmd_socket_close (int id, int err);
 
 /**********************************************************************************************/
 
-static const char *str_proto[ATCMD_SOCKET_PROTO_NUM] = { "UDP", "TCP" };
-static const char *str_proto_lwr[ATCMD_SOCKET_PROTO_NUM] = { "udp", "tcp" };
+static const char *str_proto[ATCMD_SOCKET_PROTO_NUM] = 
+{
+	[ATCMD_SOCKET_PROTO_UDP] = "UDP",
+   	[ATCMD_SOCKET_PROTO_TCP] = "TCP" 
+};
+static const char *str_proto_lwr[ATCMD_SOCKET_PROTO_NUM] =
+{
+	[ATCMD_SOCKET_PROTO_UDP] = "udp",
+   	[ATCMD_SOCKET_PROTO_TCP] = "tcp" 
+};
 
 //#define CONFIG_ATCMD_SOCKET_STATIC
 #ifdef CONFIG_ATCMD_SOCKET_STATIC
@@ -117,30 +125,37 @@ static struct
 
 static void _atcmd_socket_print (atcmd_socket_t *socket)
 {
-	if (!socket || socket->id < 0)
+	if (!socket)
 		return;
 
 	_atcmd_info("[ Socket Info ]");
-	_atcmd_info(" - id : %d", socket->id);
+	_atcmd_info(" - id: %d", socket->id);
 
 	switch (socket->protocol)
 	{
 		case ATCMD_SOCKET_PROTO_UDP:
 		case ATCMD_SOCKET_PROTO_TCP:
-			_atcmd_info(" - protocol : %s", str_proto_lwr[socket->protocol]);
+			_atcmd_info(" - protocol: %s", str_proto_lwr[socket->protocol]);
 			break;
 
 		default:
-			_atcmd_info(" - protocol : unknown");
+			_atcmd_info(" - protocol: unknown");
 	}
 
-	_atcmd_info(" - local_port : %d", socket->local_port);
+	_atcmd_info(" - local_port: %d", socket->local_port);
 
 	if (socket->remote_port > 0)
 	{
 		_atcmd_info(" - remote");
-		_atcmd_info(" -- port : %d", socket->remote_port);
-		_atcmd_info(" -- address : %s", ipaddr_ntoa(&socket->remote_addr));
+		_atcmd_info(" -- port: %d", socket->remote_port);
+		_atcmd_info(" -- address: %s", ipaddr_ntoa(&socket->remote_addr));
+	}
+
+	if (socket->protocol == ATCMD_SOCKET_PROTO_UDP)
+	{		
+		_atcmd_info(" - multicast");
+		_atcmd_info(" -- group: %u", socket->multicast.group);
+		_atcmd_info(" -- ttl: %u", socket->multicast.ttl);
 	}
 }
 
@@ -606,9 +621,9 @@ static void _atcmd_socket_send_handler (int id)
 			g_atcmd_socket_event_send.len = 0;
 			g_atcmd_socket_event_send.ret = ret;
 			g_atcmd_socket_event_send.done = done;
-
-			_lwip_socket_send_done(id);
 		}
+			
+		_lwip_socket_send_done(id);
 	}
 }
 
@@ -842,7 +857,7 @@ static int _atcmd_socket_deinit (void)
 	return _lwip_socket_deinit();
 }
 
-static int _atcmd_socket_open (atcmd_socket_t *socket, bool ipv6, bool reuse_addr)
+static int _atcmd_socket_open (atcmd_socket_t *socket, bool ipv6)
 {
 	int i;
 
@@ -899,9 +914,9 @@ static int _atcmd_socket_open (atcmd_socket_t *socket, bool ipv6, bool reuse_add
 		int ret = -EINVAL;
 
 		if (socket->protocol == ATCMD_SOCKET_PROTO_UDP)
-			ret = _lwip_socket_open_udp(&id, socket->local_port, ipv6, reuse_addr);
+			ret = _lwip_socket_open_udp(&id, socket->local_port, socket->multicast.ttl, ipv6);
 		else if (socket->local_port > 0 && socket->remote_port == 0)
-			ret = _lwip_socket_open_tcp_server(&id, socket->local_port, ipv6, reuse_addr);
+			ret = _lwip_socket_open_tcp_server(&id, socket->local_port, ipv6);
 		else if (socket->local_port == 0 && socket->remote_port > 0)
 		{
 			uint32_t timeout_msec;
@@ -915,7 +930,7 @@ static int _atcmd_socket_open (atcmd_socket_t *socket, bool ipv6, bool reuse_add
 				timeout_msec = 30 * 1000;
 
 			ret = _lwip_socket_open_tcp_client(&id, &socket->remote_addr, socket->remote_port,
-												timeout_msec, ipv6, reuse_addr);
+												timeout_msec, ipv6);
 			if (ret == 0)
 			{
 				if (_lwip_socket_get_local(id, NULL, &socket->local_port) != 0)
@@ -992,8 +1007,10 @@ static int _atcmd_socket_close (int id, int err)
 
 static int __atcmd_socket_open_set (int argc, char *argv[], enum ATCMD_SOCKET_PROTO proto, bool ipv6)
 {
-	char *param_reuse_addr = NULL;
-	bool reuse_addr = false;
+	char *param_local_port = NULL;
+	char *param_server_addr = NULL;
+	char *param_server_port = NULL;
+	char *param_multicast_ttl = NULL;
 	atcmd_socket_t socket;
 	int ret;
 
@@ -1008,88 +1025,141 @@ static int __atcmd_socket_open_set (int argc, char *argv[], enum ATCMD_SOCKET_PR
 
 	switch (argc)
 	{
-		case 3:
-			param_reuse_addr = argv[2];
-
-		case 2: /* tcp client */
-		{
-			char str_server_addr[ATCMD_MSG_LEN_MAX];
-			char *param_server_addr = argv[0];
-			char *param_server_port = argv[1];
-
-			if (atcmd_param_to_str(param_server_addr, str_server_addr, sizeof(str_server_addr)))
+		case 2: /* udp, tcp client */
+			if (proto == ATCMD_SOCKET_PROTO_UDP)
+				param_multicast_ttl = argv[1];
+			else
 			{
-				if (!ipaddr_aton(str_server_addr, &socket.remote_addr))
-				{
-					char addr[ATCMD_STR_SIZE(ATCMD_IPADDR_LEN_MAX)];
-					int ret;
-
-					ret = _lwip_socket_addr_info_2(str_server_addr, param_server_port, addr, sizeof(addr));
-					if (ret != 0)
-						return ret;
-
-					if (!ipaddr_aton(addr, &socket.remote_addr))
-						return -EINVAL;
-				}
-
-				if (!ipv6 && IP_GET_TYPE(&socket.remote_addr) != IPADDR_TYPE_V4)
-				{
-					_atcmd_info("invalid address: ipv4");
-					return -EINVAL;
-				}
-				else if (ipv6 && IP_GET_TYPE(&socket.remote_addr) != IPADDR_TYPE_V6)
-				{
-					_atcmd_info("invalid address: ipv6");
-					return -EINVAL;
-				}
-
-				socket.remote_port = atoi(param_server_port);
-				if (!_atcmd_socket_valid_port(socket.remote_port))
-					return -EINVAL;
-
+				param_server_port = argv[1];
+				param_server_addr = argv[0];			
 				break;
 			}
-			else if (param_reuse_addr)
-				return -EINVAL;
-			else
-				param_reuse_addr = argv[1];
-		}
 
-		case 1: /* tcp server, udp server/client */
-		{
-			char *param_local_port = argv[0];
-
-			socket.local_port = atoi(param_local_port);
-			if (!_atcmd_socket_valid_port(socket.local_port))
-				return -EINVAL;
-
+		case 1: /* udp, tcp server */
+			param_local_port = argv[0];
 			break;
-		}
-
+		
 		default:
 			return -EINVAL;
 	}
 
-	if (param_reuse_addr)
+	if (proto == ATCMD_SOCKET_PROTO_TCP)
 	{
-		switch (atoi(param_reuse_addr))
+		if (argc == 1) /* tcp server */
 		{
-			case 0:
-				reuse_addr = false;
-				break;
+			int local_port = atoi(param_local_port);
 
-			case 1:
-				reuse_addr = true;
-				break;
+			if (!_atcmd_socket_valid_port(local_port))
+			{
+				_atcmd_info("%s_%s: invalid local port (%s)", 
+						str_proto_lwr[proto], (ipv6 ? "open6" : "open"),
+						param_local_port);
 
-			default:
 				return -EINVAL;
+			}
+
+			socket.local_port = local_port;
+		}
+		else /* tcp client */
+		{
+			char server_addr[ATCMD_STR_SIZE(ATCMD_IPADDR_LEN_MAX)];
+			bool valid_server_addr = false;
+			int server_port = atoi(param_server_port);
+
+			if (!_atcmd_socket_valid_port(server_port))
+			{
+				_atcmd_info("%s_%s: invalid server port (%s)", 
+							str_proto_lwr[proto], (ipv6 ? "open6" : "open"),
+							param_server_port);
+
+				return -EINVAL;
+			}
+
+			socket.remote_port = server_port;
+
+			if (atcmd_param_to_str(param_server_addr, server_addr, sizeof(server_addr)))
+			{
+				valid_server_addr = true;
+
+				if (!ipaddr_aton(server_addr, &socket.remote_addr))
+				{
+					char addr[ATCMD_STR_SIZE(ATCMD_IPADDR_LEN_MAX)];
+					int ret;
+
+					ret = _lwip_socket_addr_info_2(server_addr, param_server_port, addr, sizeof(addr));
+					if (ret != 0)
+					{
+						_atcmd_info("%s_%s: failed to get server address (%s)", 
+								str_proto_lwr[proto], (ipv6 ? "open6" : "open"),
+								param_server_addr);
+
+						return ret;
+					}
+
+					if (!ipaddr_aton(addr, &socket.remote_addr))
+						valid_server_addr = false;
+				}
+
+				if (valid_server_addr)
+				{
+					if (!ipv6 && IP_GET_TYPE(&socket.remote_addr) != IPADDR_TYPE_V4)
+					{
+						if (ipv6 && IP_GET_TYPE(&socket.remote_addr) != IPADDR_TYPE_V6)
+							valid_server_addr = false;
+					}
+				}
+			}
+					
+			if (!valid_server_addr)
+			{
+				_atcmd_info("%s_%s: invalid server address (%s)", 
+							str_proto_lwr[proto], (ipv6 ? "open6" : "open"),
+							param_server_addr);
+
+				return -EINVAL;
+			}
+		}
+	}
+	else /* udp */
+	{
+		int local_port = atoi(param_local_port);
+		int i;
+
+		if (!_atcmd_socket_valid_port(local_port))
+		{
+			_atcmd_info("%s_%s: invalid local port (%s)", 
+					str_proto_lwr[proto], (ipv6 ? "open6" : "open"),
+					param_local_port);
+
+			return -EINVAL;
+		}
+
+		socket.local_port = local_port;
+
+		socket.multicast.group = 0;
+		socket.multicast.ttl = 255;
+		
+		for (i = 0 ; i < ATCMD_SOCKET_MULTICAST_GROUP_MAX ; i++)
+			ip_addr_set_zero(&socket.multicast.group_addr[i]);
+
+		if (argc == 2)
+		{
+			int multicast_ttl = atoi(param_multicast_ttl);
+
+			if (multicast_ttl < 0 || multicast_ttl > 255)
+			{
+				_atcmd_info("%s_%s: invalid multicast ttl (%s)", 
+						str_proto_lwr[proto], (ipv6 ? "open6" : "open"),
+						param_multicast_ttl);
+
+				return -EINVAL;
+			}
+
+			socket.multicast.ttl = multicast_ttl;
 		}
 	}
 
-	ret = _atcmd_socket_open(&socket, ipv6, reuse_addr);
-	if (ret < 0)
-		_atcmd_info("socket_open: ipv6=%d reuse_addr=%d ret=%d", ipv6, reuse_addr, ret);
+	ret = _atcmd_socket_open(&socket, ipv6);
 
 	return ret;
 }
@@ -1102,19 +1172,17 @@ static int _atcmd_socket_open_set (int argc, char *argv[])
 	switch (argc)
 	{
 		case 0:
-			ATCMD_MSG_HELP("AT+SOPEN=\"udp\",<local_port>[,<reuse_addr>]");
-			ATCMD_MSG_HELP("AT+SOPEN=\"tcp\",<local_port>[,<reuse_addr>]");
-			ATCMD_MSG_HELP("AT+SOPEN=\"tcp\",\"<server_address>\",<server_port>[,<reuse_addr>]");
+			ATCMD_MSG_HELP("AT+SOPEN=\"UDP\",<local_port>[,<multicast_ttl>]");
+			ATCMD_MSG_HELP("AT+SOPEN=\"TCP\",<local_port>");
+			ATCMD_MSG_HELP("AT+SOPEN=\"TCP\",\"<server_address>\",<server_port>");
 			break;
 
 #ifdef CONFIG_ATCMD_IPV6
-		case 7:
-		case 6:
-		case 5:
-			argc -= 3;
+		case 13:
+		case 12:
+			argc -= 10;
 			ipv6 = true;
 #endif
-		case 4:
 		case 3:
 		case 2:
 		{
@@ -1137,6 +1205,9 @@ static int _atcmd_socket_open_set (int argc, char *argv[])
 				{
 					case 0:
 						return ATCMD_SUCCESS;
+
+					case -ENOTSUP:
+						return ATCMD_ERROR_NOTSUPP;
 
 					case -EINVAL:
 						return ATCMD_ERROR_INVAL;
@@ -1181,15 +1252,14 @@ static int _atcmd_socket_open6_set (int argc, char *argv[])
 	switch (argc)
 	{
 		case 0:
-			ATCMD_MSG_HELP("AT+SOPEN6=\"udp\",<local_port>[,<reuse_addr>]");
-			ATCMD_MSG_HELP("AT+SOPEN6=\"tcp\",<local_port>[,<reuse_addr>]");
-			ATCMD_MSG_HELP("AT+SOPEN6=\"tcp\",\"<server_address>\",server_port>[,<reuse_addr>]");
+			ATCMD_MSG_HELP("AT+SOPEN6=\"UDP\",<local_port>[,<multicast_ttl>]");
+			ATCMD_MSG_HELP("AT+SOPEN6=\"tcp\",<local_port>");
+			ATCMD_MSG_HELP("AT+SOPEN6=\"tcp\",\"<server_address>\",server_port>");
 			break;
 
-		case 4:
 		case 3:
 		case 2:
-			return _atcmd_socket_open_set(argc + 3, argv);
+			return _atcmd_socket_open_set(argc + 10, argv);
 
 		default:
 			return ATCMD_ERROR_INVAL;
@@ -1265,6 +1335,8 @@ static atcmd_info_t g_atcmd_socket_close =
 static int __atcmd_socket_list_get (enum ATCMD_SOCKET_PROTO proto)
 {
 	atcmd_socket_t *socket;
+	char msg[ATCMD_MSG_LEN_MAX];
+	int len;
 	int i;
 
 	for (i = 0 ; i < ATCMD_SOCKET_NUM_MAX ; i++)
@@ -1277,10 +1349,33 @@ static int __atcmd_socket_list_get (enum ATCMD_SOCKET_PROTO proto)
 		if (proto != ATCMD_SOCKET_PROTO_ALL && socket->protocol != proto)
 			continue;
 
-		ATCMD_MSG_INFO("SLIST", "%d,\"%s\",\"%s\",%d,%d",
-						socket->id, str_proto[socket->protocol],
-						ipaddr_ntoa(&socket->remote_addr), socket->remote_port,
-						socket->local_port);
+		len = sprintf(msg, "%d,\"%s\"", socket->id, str_proto[socket->protocol]);
+
+		if (socket->protocol == ATCMD_SOCKET_PROTO_UDP)
+		{
+			uint8_t ttl;
+
+			if (_lwip_socket_udp_get_multicast_ttl(socket->id, &ttl, false) == 0)
+			{
+				if (ttl != socket->multicast.ttl)
+				{
+					_atcmd_info("udp_list: id=%d ttl=\"%u -> %u\"", 
+							socket->id, socket->multicast.ttl, ttl); 
+
+					socket->multicast.ttl = ttl;
+				}
+			}
+
+			len += sprintf(msg + len, ",\"0.0.0.0\",0,%u,%u,%u", 
+					socket->local_port, socket->multicast.ttl, socket->multicast.group);			
+		}
+		else
+		{
+			len += sprintf(msg + len, ",\"%s\",%u,%u", 
+					ipaddr_ntoa(&socket->remote_addr), socket->remote_port, socket->local_port);
+		}
+
+		ATCMD_MSG_INFO("SLIST", "%s", msg);
 	}
 
 	return 0;
@@ -1363,6 +1458,7 @@ static int _atcmd_socket_send_set (int argc, char *argv[])
 				int32_t len = 0;
 				bool done_event = false;
 				char *exit_cmd = NULL;
+				atcmd_data_mode_params_t data_mode_params;
 				uint32_t timeout_msec;
 
 				if (argc >= 3)
@@ -1435,7 +1531,16 @@ static int _atcmd_socket_send_set (int argc, char *argv[])
 								socket->id, ipaddr_ntoa(&socket->remote_addr), socket->remote_port,
 								len, done_event); */
 
-				if (atcmd_data_mode_enable(socket, len, done_event, 1000, exit_cmd)  != 0)
+				atcmd_data_mode_init_params(ATCMD_DATA_SSEND, &data_mode_params);
+
+				data_mode_params.id = socket->id;
+				data_mode_params.len = abs(len);
+				data_mode_params.timeout = 1000;
+				data_mode_params.done_event = done_event;
+				data_mode_params.exit_cmd = exit_cmd;
+				data_mode_params.ssend.passthrough = len <= 0 ? true : false;
+
+				if (atcmd_data_mode_enable(&data_mode_params) != 0)
 					return ATCMD_ERROR_FAIL;
 
 				break;
@@ -1640,6 +1745,37 @@ static int _atcmd_socket_recv_set (int argc, char *argv[])
 				if (len > 0)
 				{
 					int ret;
+
+					ret = _lwip_socket_recv_len(id);
+					if (ret < 0)
+						return ATCMD_ERROR_FAIL;
+					else if (ret == 0)
+					{
+						if (argc == 2)
+							return ATCMD_ERROR_FAIL;
+						else
+						{
+							uint32_t timeout_ms = _atcmd_timeout_value("SRECV");
+							uint32_t t;
+
+							if (timeout_ms == 0)
+								timeout_ms = ~0;
+
+							for (t = 0 ; t < timeout_ms ; t++)
+							{
+								ret = _lwip_socket_recv_len(id);
+								if (ret > 0)
+									break;
+								else if (ret < 0)
+									return ATCMD_ERROR_FAIL;
+
+								_delay_ms(1);
+							}
+
+							if (t >= timeout_ms)
+								return ATCMD_ERROR_TIMEOUT;
+						}	
+					}
 
 					ret = __atcmd_socket_recv_handler(id, len, true);
 
@@ -2207,6 +2343,234 @@ static atcmd_info_t g_atcmd_socket_tcp_nodelay =
 
 /**********************************************************************************************/
 
+static int _atcmd_socket_udp_multicast_add_group_addr (atcmd_socket_t *socket, ip_addr_t *group_addr)
+{
+	int i;
+									   	
+	if (!ip_addr_ismulticast(group_addr))
+	{
+		_atcmd_info("udp_multicast_add: invalid (%s)", ipaddr_ntoa(group_addr)); 
+
+		return ATCMD_ERROR_INVAL;
+	}
+
+	for (i = 0 ; i < ATCMD_SOCKET_MULTICAST_GROUP_MAX ; i++)
+	{
+		if (ip_addr_cmp(&socket->multicast.group_addr[i], group_addr))
+		{
+			_atcmd_info("udp_multicast_add: exist (%s)", ipaddr_ntoa(group_addr)); 
+
+			return ATCMD_ERROR_INVAL;
+		}
+	}
+
+	for (i = 0 ; i < ATCMD_SOCKET_MULTICAST_GROUP_MAX ; i++)
+	{
+		if (ip_addr_isany_val(socket->multicast.group_addr[i]))
+		{
+			_atcmd_info("udp_multicast_add: %s", ipaddr_ntoa(group_addr)); 
+
+			if (_lwip_socket_udp_add_multicast_group(socket->id, group_addr, false) != 0)
+				return ATCMD_ERROR_FAIL;
+
+			ip_addr_set(&socket->multicast.group_addr[i], group_addr);
+			socket->multicast.group++;
+
+			return ATCMD_SUCCESS;
+		}
+	}
+		
+	_atcmd_info("udp_multicast_add: full (%s)", ipaddr_ntoa(group_addr)); 
+
+	return ATCMD_ERROR_NOMEM;
+}
+
+static int _atcmd_socket_udp_multicast_drop_group_addr (atcmd_socket_t *socket, ip_addr_t *group_addr)
+{
+	int i;
+
+	if (ip_addr_isany_val(*group_addr))
+	{
+		for (i = 0 ; i < ATCMD_SOCKET_MULTICAST_GROUP_MAX ; i++)
+		{
+			if (!ip_addr_isany_val(socket->multicast.group_addr[i]))
+				_lwip_socket_udp_drop_multicast_group(socket->id, &socket->multicast.group_addr[i], false);
+
+			ip_addr_set_zero(&socket->multicast.group_addr[i]);
+		}
+
+		socket->multicast.group = 0;
+
+		return ATCMD_SUCCESS;
+	}
+
+	if (!ip_addr_ismulticast(group_addr))
+	{
+		_atcmd_info("udp_multicast_drop: invalid (%s)", ipaddr_ntoa(group_addr)); 
+
+		return ATCMD_ERROR_INVAL;
+	}
+
+	for (i = 0 ; i < ATCMD_SOCKET_MULTICAST_GROUP_MAX ; i++)
+	{
+		if (ip_addr_cmp(group_addr, &socket->multicast.group_addr[i]))
+		{
+			_atcmd_info("udp_multicast_drop: %s", ipaddr_ntoa(group_addr)); 
+
+			if (_lwip_socket_udp_drop_multicast_group(socket->id, group_addr, false) != 0)
+				return ATCMD_ERROR_FAIL;
+
+			ip_addr_set_zero(&socket->multicast.group_addr[i]);
+			socket->multicast.group--;
+
+			return ATCMD_SUCCESS;
+		}
+	}
+
+	_atcmd_info("udp_multicast_drop: no exist (%s)", ipaddr_ntoa(group_addr)); 
+
+	return ATCMD_ERROR_INVAL;
+}
+
+static int _atcmd_socket_udp_multicast_get (int argc, char *argv[])
+{
+	switch (argc)
+	{
+		case 0:
+		{
+			atcmd_socket_t *socket;
+			int i, j;
+
+			for (i = 0 ; i < ATCMD_SOCKET_NUM_MAX ; i++)
+			{
+				socket = &g_atcmd_socket[i];
+
+				if (socket->id < 0)
+					continue;
+
+				if (socket->protocol == ATCMD_SOCKET_PROTO_TCP)
+					continue;
+
+				if (socket->multicast.group == 0)
+					continue;
+
+				_atcmd_info("udp_multicast_get: id=%d group=%u", socket->id, socket->multicast.group); 
+
+				for (j = 0 ; j < ATCMD_SOCKET_MULTICAST_GROUP_MAX ; j++)
+				{
+					_atcmd_debug(" %d: %s", j, ipaddr_ntoa(&socket->multicast.group_addr[j])); 
+
+					if (ip_addr_isany_val(socket->multicast.group_addr[j]))
+						continue;
+					
+					ATCMD_MSG_INFO("SMCAST", "%d,\"%s\"", 
+							socket->id, ipaddr_ntoa(&socket->multicast.group_addr[j]));
+				}
+			}
+
+			break;
+		}
+
+		default:
+			return ATCMD_ERROR_INVAL;
+	}
+
+	return ATCMD_SUCCESS;
+}
+
+static int _atcmd_socket_udp_multicast_set (int argc, char *argv[])
+{
+	switch (argc)
+	{
+		case 0:
+			ATCMD_MSG_HELP("AT+SMCAST=<socket_ID>,\"{add|drop}\",\"<group_addr>\""); 
+			break;
+
+		case 3:
+		{
+			int id = atoi(argv[0]);
+
+			if (id < 0 || id >= ATCMD_SOCKET_NUM_MAX)
+				_atcmd_info("udp_multicast_set: invalid id (%s)", argv[0]); 
+			else
+			{
+				atcmd_socket_t *socket = _atcmd_socket_search_id(id);
+
+				if (!socket || socket->protocol == ATCMD_SOCKET_PROTO_TCP)
+					_atcmd_info("udp_multicast_set: invalid id (%s)", argv[0]); 
+				else
+				{
+					char str_mode[4 + 1];
+					int mode = 0;
+
+					if (atcmd_param_to_str(argv[1], str_mode, sizeof(str_mode)))
+					{
+						if (strcmp(str_mode, "add") == 0 || strcmp(str_mode, "ADD") == 0)
+						   mode = 1;
+						else if (strcmp(str_mode, "drop") == 0 || strcmp(str_mode, "DROP") == 0)
+						   mode = 2;
+					}
+
+					switch (mode)
+					{
+						case 1:
+						case 2:
+						{
+							char str_group_addr[ATCMD_STR_SIZE(ATCMD_IPADDR_LEN_MAX)];
+
+							if (atcmd_param_to_str(argv[2], str_group_addr, sizeof(str_group_addr)))
+							{
+								ip_addr_t group_addr;
+
+								if (mode == 2 && strlen(str_group_addr) == 0)
+									strcpy(str_group_addr, "0.0.0.0");
+							
+/*								_atcmd_debug("udp_multicast_%s: id=%d addr=%s", str_mode, id, str_group_addr); */
+
+								if (ipaddr_aton(str_group_addr, &group_addr) && IP_IS_V4_VAL(group_addr))
+								{
+									if (mode == 1)
+										return _atcmd_socket_udp_multicast_add_group_addr(socket, &group_addr);
+									else
+										return _atcmd_socket_udp_multicast_drop_group_addr(socket, &group_addr);
+								}
+							}
+						
+							_atcmd_info("udp_multicast_%s: invalid (%s)", str_mode, argv[2]); 
+							break;
+						}
+
+						default:					
+							_atcmd_info("udp_multicast_set: invalid mode (%s)", argv[1]); 
+					}
+				}
+			}
+		}
+
+		default:
+			return ATCMD_ERROR_INVAL;
+	}
+
+	return ATCMD_SUCCESS;
+}
+
+static atcmd_info_t g_atcmd_socket_udp_multicast =
+{
+	.list.next = NULL,
+	.list.prev = NULL,
+
+	.group = ATCMD_GROUP_SOCKET,
+
+	.cmd = "MCAST",
+	.id = ATCMD_SOCKET_UDP_MULTICAST,
+
+	.handler[ATCMD_HANDLER_RUN] = NULL,
+	.handler[ATCMD_HANDLER_GET] = _atcmd_socket_udp_multicast_get,
+	.handler[ATCMD_HANDLER_SET] = _atcmd_socket_udp_multicast_set,
+};
+
+/**********************************************************************************************/
+
 extern int _atcmd_basic_timeout_get (int argc, char *argv[]);
 extern int _atcmd_basic_timeout_set (int argc, char *argv[]);
 
@@ -2294,6 +2658,7 @@ static atcmd_info_t *g_atcmd_info_socket[] =
 	&g_atcmd_socket_addr_info,
 	&g_atcmd_socket_tcp_keepalive,
 	&g_atcmd_socket_tcp_nodelay,
+	&g_atcmd_socket_udp_multicast,
 	&g_atcmd_socket_timeout,
 
 	NULL
@@ -2355,38 +2720,34 @@ void atcmd_socket_disable (void)
 	_atcmd_free(g_atcmd_socket);
 }
 
-int atcmd_socket_send_data (atcmd_socket_t *socket, char *data, int len, bool done_event)
+int atcmd_socket_send_data (int id, char *data, int len)
 {
-	int id = socket->id;
+	atcmd_socket_t *socket = _atcmd_socket_search_id(id);
 	int done = 0;
-	int ret;
 
-	ret = _atcmd_socket_send_data(socket, data, len, &done);
-
-	if (ret == 0 && done == len)
-	{
-		if (done_event)
-			_atcmd_socket_event_handler(ATCMD_SOCKET_EVENT_SEND_DONE, id, done);
-	}
-	else
-	{
-		if (ret < 0)
-			_atcmd_socket_event_handler(ATCMD_SOCKET_EVENT_SEND_ERROR, id, ret);
-
-		if (done < len)
-			_atcmd_socket_event_handler(ATCMD_SOCKET_EVENT_SEND_DROP, id, len - done);
-	}
+	if (socket)
+		_atcmd_socket_send_data(socket, data, len, &done);
 
 	return done;
 }
 
-void atcmd_socket_send_timeout (int id, uint32_t done, uint32_t drop, uint32_t wait)
+void atcmd_socket_event_send_done (int id, uint32_t done)
 {
-	if (!g_atcmd_socket_sending)
-		_atcmd_socket_event_handler(ATCMD_SOCKET_EVENT_SEND_IDLE, id, done, drop, wait);
+	_atcmd_socket_event_handler(ATCMD_SOCKET_EVENT_SEND_DONE, id, done);
 }
 
-void atcmd_socket_send_exit (int id, uint32_t done, uint32_t drop)
+void atcmd_socket_event_send_idle (int id, uint32_t done, uint32_t drop, uint32_t wait, uint32_t time)
+{
+	if (!g_atcmd_socket_sending)
+		_atcmd_socket_event_handler(ATCMD_SOCKET_EVENT_SEND_IDLE, id, done, drop, wait, time);
+}
+
+void atcmd_socket_event_send_drop (int id, uint32_t drop)
+{
+	_atcmd_socket_event_handler(ATCMD_SOCKET_EVENT_SEND_DROP, id, drop);
+}
+
+void atcmd_socket_event_send_exit (int id, uint32_t done, uint32_t drop)
 {
 	_atcmd_socket_event_handler(ATCMD_SOCKET_EVENT_SEND_EXIT, id, done, drop);
 }

@@ -143,6 +143,7 @@ typedef enum {
 typedef enum {
 	WIFI_SUCCESS			= 0,
 	WIFI_NOMEM				= -1,
+	WIFI_BUSY				= -2,
 
 	WIFI_INVALID			= -5,
 	WIFI_INVALID_STATE		= (WIFI_INVALID - 1),

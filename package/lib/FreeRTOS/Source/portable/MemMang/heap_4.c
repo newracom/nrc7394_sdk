@@ -73,7 +73,9 @@ typedef struct A_BLOCK_LINK
 {
 	struct A_BLOCK_LINK *pxNextFreeBlock;	/*<< The next free block in the list. */
 	size_t xBlockSize;						/*<< The size of the free block. */
-	uint32_t extra;
+#if defined(INCLUDE_BUF_TRACKER)
+	uint32_t extra;							/*<< Store caller and waste additional 4 bytes per each block. */
+#endif
 } BlockLink_t;
 
 /*-----------------------------------------------------------*/
@@ -211,7 +213,6 @@ void *pvPortMalloc2( size_t xWantedSize, uint32_t extra )
 						single block. */
 						pxNewBlockLink->xBlockSize = pxBlock->xBlockSize - xWantedSize;
 						pxBlock->xBlockSize = xWantedSize;
-						pxBlock->extra = extra;
 
 						/* Insert the new block into the list of free blocks. */
 						prvInsertBlockIntoFreeList( pxNewBlockLink );
@@ -236,6 +237,9 @@ void *pvPortMalloc2( size_t xWantedSize, uint32_t extra )
 					by the application and has no "next" block. */
 					pxBlock->xBlockSize |= xBlockAllocatedBit;
 					pxBlock->pxNextFreeBlock = NULL;
+#if defined(INCLUDE_BUF_TRACKER)
+					pxBlock->extra = extra;
+#endif
 				}
 				else
 				{
@@ -277,8 +281,10 @@ void *pvPortMalloc2( size_t xWantedSize, uint32_t extra )
 void *pvPortMalloc( size_t xWantedSize )
 {
 	register size_t result = 0;
+#if defined(INCLUDE_BUF_TRACKER)
 #if (__arm__)
 	__asm volatile ("MOV %0, LR\n" : "=r" (result) );
+#endif
 #endif
 	return pvPortMalloc2( xWantedSize, result );
 }
@@ -488,7 +494,11 @@ void vPortGetBlockInfo(void (*cb)(void *addr, size_t size, uint32_t extra))
 
 				cb((uint8_t *) pxBlock + xHeapStructSize,
 					uxBlockSize - xHeapStructSize,
+#if defined(INCLUDE_BUF_TRACKER)
 					pxBlock->extra);
+#else
+					0);
+#endif
 			}
 			pxBlock = (void *) ((uint8_t *) pxBlock + uxBlockSize);
 		}
@@ -502,8 +512,10 @@ void *pvPortCalloc( size_t nmemb, size_t size )
 	size_t len=nmemb*size;
 	register size_t result = 0;
 
+#if defined(INCLUDE_BUF_TRACKER)
 #if (__arm__)
 	__asm volatile ("MOV %0, LR\n" : "=r" (result) );
+#endif
 #endif
 
 	pvReturn = pvPortMalloc2(len, result);

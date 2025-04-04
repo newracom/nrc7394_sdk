@@ -13,6 +13,8 @@
 #include "hal_pmsspi.h"
 #include "system_efuse.h"
 #include "system_pmsspi.h"
+#include "system_eeprom.h"
+
 #define MAX_MCS 11
 #endif
 
@@ -79,6 +81,16 @@ typedef struct {
 	st_efuse_t          drv_efuse_info;
 } hal_modem_ret_info_t;
 
+typedef struct {
+	int32_t a_200;
+	int32_t a_500;
+	int32_t a_800;
+	int32_t a_temp;
+	int32_t a_temperature_comp;
+} adc_constants_t;
+
+extern adc_constants_t adc_constants;
+
 // HAL API
 #if defined(UCODE)
 void            hal_modem_init_ucode();
@@ -91,12 +103,15 @@ void            hal_modem_set_freq_bw_prim(uint32_t freq , bw_t bw , uint8_t loc
 #if !defined(EXCLUDE_FDK_MAC)
 send_result_t   hal_modem_send_buffer(uint8_t *buffer , uint32_t size , ac_t ac , bool sync_flag);
 #endif
-uint16_t        hal_modem_convert_auxadc_raw_to_mv(uint32_t a_raw);
+uint32_t        hal_modem_convert_auxadc_raw_to_auxadc_comp(int32_t a_raw);
+int16_t         hal_modem_convert_temperature_to_power_offset(int16_t temp_celcius, bool bounded);
+uint32_t        hal_modem_convert_auxadc_raw_to_auxadc_comp(int32_t a_raw);
 uint8_t         hal_modem_get_compensated_rxgain(uint8_t rxgain);
 void            hal_modem_apply_rf_cal_data();
 int16_t         hal_modem_temp_sensor_get_temp_celcius(void);
 int16_t         hal_modem_temp_sensor_get_power_offset(bool recovery);
 void            hal_modem_find_txpwr_optimal_gains(int16_t txpwr, uint8_t *optimal_txgain, uint16_t *optimal_dig_lpf_gain , bool doppler, int16_t temp_power_offset);
+uint32_t        hal_modem_get_auxadc_raw(void);
 #if !defined(EXCLUDE_FDK_MAC)
 uint8_t hal_modem_set_txpwr(int16_t txpwr);
 #else

@@ -112,11 +112,24 @@ void dhcps_stop(void);
 
 void dhcps_coarse_tmr(void);
 
+/* Get IP address with matching mac address */
+bool dhcps_get_ip(u8_t *mac, ip4_addr_t *ip);
 int dhcps_status(void);
 struct netif *dhcps_get_interface(void);
 bool wifi_softap_set_dhcps_lease_time(u32_t minute);
 bool wifi_softap_reset_dhcps_lease_time(void);
 u32_t wifi_softap_get_dhcps_lease_time(void); // minute
+list_node* dhcps_get_list(void);
+#define dhcps_for_each(node, pool, ipaddr, macaddr) \
+	for (ipaddr = pool? &pool->ip : NULL, \
+		macaddr = pool? pool->mac : NULL; \
+		node != NULL; \
+		node = node->pnext, \
+		pool = node? node->pnode : NULL, \
+		ipaddr = pool? &pool->ip : NULL, \
+		macaddr = pool? pool->mac : NULL \
+	)
+
 #endif /* LWIP_IPV4 && LWIP_DHCPS */
 #endif /* __DHCPS_H__ */
 

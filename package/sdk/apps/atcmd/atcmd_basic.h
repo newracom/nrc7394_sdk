@@ -51,17 +51,23 @@ extern void atcmd_boot_reason (void);
 
 extern bool atcmd_gpio_pin_valid (int pin);
 
-extern int atcmd_firmware_write (char *buf, int len);
-extern void atcmd_firmware_download_timeout (uint32_t len, uint32_t cnt);
-extern void atcmd_firmware_download_drop (uint32_t len);
+#if defined(CONFIG_ATCMD_FWUPDATE)
+extern int atcmd_firmware_download (char *buf, int len);
+extern void atcmd_firmware_download_event_idle (uint32_t len, uint32_t cnt);
+extern void atcmd_firmware_download_event_drop (uint32_t len);
+extern void atcmd_firmware_download_event_fail (uint32_t len);
+extern void atcmd_firmware_download_event_done (uint32_t len);
+#endif
 
 #if defined(CONFIG_ATCMD_SFUSER)
 #define ATCMD_MSG_RXD_SFUSER(buf, len, fmt, ...)	\
 		atcmd_msg_snprint(ATCMD_MSG_TYPE_EVENT, buf, len, "RXD_SFUSER:" fmt, ##__VA_ARGS__)
 
 extern int atcmd_sf_user_write (uint32_t offset, uint32_t length, char *data);
-extern void atcmd_sf_user_write_timeout (uint32_t offset, uint32_t length, uint32_t count);
-extern void atcmd_sf_user_write_drop (uint32_t offset, uint32_t length);
+extern void atcmd_sf_user_write_event_idle (uint32_t offset, uint32_t length, uint32_t count);
+extern void atcmd_sf_user_write_event_drop (uint32_t offset, uint32_t length);
+extern void atcmd_sf_user_write_event_fail (uint32_t offset, uint32_t length);
+extern void atcmd_sf_user_write_event_done (uint32_t offset, uint32_t length);
 #endif
 
 #if defined(CONFIG_ATCMD_SFSYSUSER)

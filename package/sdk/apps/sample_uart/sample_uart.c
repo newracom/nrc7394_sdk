@@ -37,7 +37,6 @@
 
 #define MAX_BUFFER_BYTE 1000
 
-
 /* Connection param */
 #define REMOTE_PORT 8088
 #define RECV_BUF_SIZE (1024 * 2)
@@ -111,8 +110,12 @@ void user_init(void)
 
 #ifdef NRC7292
 	uart_config.ch = NRC_UART_CH2;	// USE UART2
+	uart_config.tx = GPIO_00;
+	uart_config.rx = GPIO_01;
 #else
 	uart_config.ch = NRC_UART_CH1;	// USE UART1
+	uart_config.tx = GPIO_12;
+	uart_config.rx = GPIO_13;
 #endif
 	uart_config.db = NRC_UART_DB8;
 	uart_config.br = 115200;
@@ -121,8 +124,9 @@ void user_init(void)
 	uart_config.hw_flow_ctrl = NRC_UART_HFC_DISABLE;
 	//uart_config.fifo = NRC_UART_FIFO_DISABLE;
 	uart_config.fifo = NRC_UART_FIFO_ENABLE;
+	uart_config.rts = -1;
+	uart_config.cts = -1;
 
 	uart_init(&uart_config); // UART INIT
 	SendtoDevice(&uart_config, 50000);
-
 }

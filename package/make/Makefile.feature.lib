@@ -5,6 +5,18 @@
 ifeq ($(CONFIG_LWIP), y)
 	LWIP_BASE = $(LIB_PATH)/lwip
 	include $(LWIP_BASE)/module.mk
+	ifeq ($(CONFIG_LWIP_RECOVERY), y)
+		DEFINE += -DINCLUDE_LWIP_RECOVERY
+		ifneq ($(MAX_UDP_RETENT_SESSIONS),)
+			DEFINE += -DMAX_UDP_RETENT_SESSIONS=$(MAX_UDP_RETENT_SESSIONS)
+		endif #MAX_UDP_RETENT_SESSIONS
+		ifneq ($(MAX_TCP_LISTEN_RETENT_SESSIONS),)
+			DEFINE += -DMAX_TCP_LISTEN_RETENT_SESSIONS=$(MAX_TCP_LISTEN_RETENT_SESSIONS)
+		endif #MAX_TCP_LISTEN_RETENT_SESSIONS
+		ifneq ($(MAX_TCP_RETENT_SESSIONS),)
+			DEFINE += -DMAX_TCP_RETENT_SESSIONS=$(MAX_TCP_RETENT_SESSIONS)
+		endif #MAX_TCP_RETENT_SESSIONS
+	endif #CONFIG_LWIP_RECOVERY
 endif #CONFIG_LWIP
 
 ifeq ($(CONFIG_IPV6), y)
@@ -22,8 +34,12 @@ endif
 #// LIB
 #// mbedtls
 #// --------------------------------------------------
+ifeq ($(CONFIG_FLASH_SIZE), 4M)
+	MBEDTLS_BASE = $(LIB_PATH)/mbedtls/v3
+else
+	MBEDTLS_BASE = $(LIB_PATH)/mbedtls/v2
+endif
 ifeq ($(CONFIG_MBEDTLS), y)
-	MBEDTLS_BASE = $(LIB_PATH)/mbedtls
 	include $(MBEDTLS_BASE)/module.mk
 endif #CONFIG_MBEDTLS
 

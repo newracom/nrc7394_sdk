@@ -27,6 +27,8 @@
 #define __ATCMD_WIFI_API_H__
 /**********************************************************************************************/
 
+#include "lwip/dhcp.h"
+
 enum IF_MODE
 {
 	IF_MODE_APSTA = 0,
@@ -44,7 +46,7 @@ enum TX_POWER_TYPE
 	TX_POWER_TYPE_MAX
 };
 
-enum
+enum DHCP_RESULT
 {
 	DHCP_TIMEOUT = -4,
 	DHCP_STOP = -3,
@@ -54,7 +56,7 @@ enum
 	DHCP_RECOVERY = 1
 };
 
-enum WPS_STATUS 
+enum WPS_STATUS
 {
 	WPS_TIMEOUT = -ETIMEDOUT,
 	WPS_FAIL = -1,
@@ -111,14 +113,15 @@ typedef struct
 	} channel;
 
 	char bssid[STR_WIFI_BSSID_LEN + 1];
-	char ssid[STR_WIFI_SSID_LEN_MAX + 1];	
+	char ssid[STR_WIFI_SSID_LEN_MAX + 1];
 	char security[STR_WIFI_SECURITY_LEN_MAX + 1];
 /*	char password[STR_WIFI_PASSWORD_LEN_MAX + 1]; */
 } wifi_ap_info_t;
 
 typedef void (*wifi_event_cb_t) (int, void *, int);
-
 typedef void (*wifi_wps_cb_t) (enum WPS_STATUS, int, ...);
+
+typedef void (*dhcpc_event_cb_t) (void);
 
 /**********************************************************************************************/
 
@@ -185,6 +188,7 @@ extern bool wifi_api_connected (void);
 extern bool wifi_api_disconnected (void);
 
 extern int wifi_api_start_scan (char *ssid, uint32_t timeout);
+extern int wifi_api_abort_scan (void);
 extern int wifi_api_get_scan_results (SCAN_RESULTS *results);
 extern int wifi_api_get_scan_freq (uint16_t freq[], uint8_t *n_freq);
 extern int wifi_api_set_scan_freq (uint16_t freq[], uint8_t n_freq);
@@ -212,7 +216,8 @@ extern int wifi_api_get_ap_info (wifi_ap_info_t *info);
 extern int wifi_api_get_ip4_address (char *address, char *netmask, char *gateway);
 extern int wifi_api_set_ip4_address (char *address, char *netmask, char *gateway);
 
-extern int wifi_api_start_dhcp_client (uint32_t timeout_msec);
+extern int wifi_api_start_dhcp_client (uint32_t timeout_msec, dhcpc_event_cb_t event_cb[]);
+extern void wifi_api_stop_dhcp_client (void);
 extern int wifi_api_get_dhcp_lease_time (void);
 
 extern int wifi_api_start_deep_sleep (uint32_t timeout, uint8_t gpio);
@@ -235,6 +240,8 @@ extern int wifi_api_set_bss_max_idle (uint16_t period, uint8_t retry_cnt);
 
 extern int wifi_api_start_dhcp_server (void);
 extern int wifi_api_stop_dhcp_server (void);
+
+extern int wifi_api_get_sta_ip4_address (uint8_t *macaddr, char *str_ipaddr);
 
 extern bool wifi_api_is_relay_mode (void);
 extern void wifi_api_get_relay_mode (bool *enable);

@@ -111,7 +111,7 @@ bool 		hal_sf_check_slot_sig(uint32_t* signature);
 bool 		hal_sf_update_slot(uint32_t address, uint8_t *data, size_t size);
 bool 		system_sflash_read_slot_info(uint32_t address, sf_slot_t *data);
 bool 		system_sflash_read_slot_data(uint32_t address, size_t size, uint8_t *buffer);
-bool 		system_sflash_get_flash_sector_data(uint32_t address, uint8_t *buffer, size_t size);
+bool 		system_sflash_get_sector_data(uint32_t address, uint8_t *buffer, size_t size);
 bool 		hal_sf_write_common(uint32_t mem_map_entry, uint32_t user_data_offset, uint8_t* data, uint32_t size);
 bool 		hal_sf_read_common(uint32_t mem_map_entry, uint8_t* data, uint32_t user_data_offset, uint32_t size);
 uint32_t    hal_sf_get_user_data_area_address(void);
@@ -125,6 +125,7 @@ bool		nrc_sf_fota_support(void);
 uint32_t	nrc_sf_fota_max_fw_size(void);
 uint32_t	nrc_sf_fota_addr(void);
 uint32_t	nrc_sf_fota_info_addr(void);
+bool 		system_sflash_update_slot(uint32_t address, uint8_t *data, size_t size);
 
 
 /* ----------------------------------

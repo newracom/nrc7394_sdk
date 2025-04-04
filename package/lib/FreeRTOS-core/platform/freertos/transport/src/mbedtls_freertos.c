@@ -108,7 +108,11 @@ MbedTLSStatus_t MbedTLS_Connect(NetworkContext_t * pNetworkContext,
 	ret = mbedtls_pk_parse_key(&(pMbedTLSParams->pkey),
 							   (const unsigned char *)pMbedTLSCredentials->pPrivateKey,
 							   strlen(pMbedTLSCredentials->pPrivateKey) + 1,
-							   (const unsigned char *)"", strlen(""));
+							   (const unsigned char *)"", strlen("")
+						#if (MBEDTLS_VERSION_MAJOR >= 3)
+							   , mbedtls_ctr_drbg_random, &(pMbedTLSParams->ctr_drbg)
+						#endif
+							   );
 
 	if(ret != 0) {
 		LogError((" failed\n  !  mbedtls_pk_parse_key returned -0x%x while parsing private key\n\n", -ret));

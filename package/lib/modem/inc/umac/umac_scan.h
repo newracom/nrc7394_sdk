@@ -48,6 +48,7 @@ void	umac_scan_set_channel(uint16_t channel);
 bool	umac_scan_check_bg_supported(void);
 void	umac_scan_probe();
 bool	umac_scan_check_ch();
+bool	umac_scan_change_dwell_time(int vif_id, uint32_t time);
 #if defined(INCLUDE_SCAN_MODE)
 void	umac_scan_change_period(uint32_t multiply);
 #endif

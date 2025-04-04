@@ -935,7 +935,7 @@ static void wpa_supplicant_wps_event(void *ctx, enum wps_event event,
 				}
 			}
 #else
-			wps_pbc_ops->nrc_wifi_wps_pbc_success(wpa_s->drv_priv, -1, NULL, NULL, NULL, NULL);
+			wps_pbc_ops->nrc_wifi_wps_pbc_success(wpa_s->drv_priv, -1, NULL, 0, 0, NULL);
 #endif /* CONFIG_NO_CONFIG_WRITE */
 		}
 #endif /* WPS_SDK_CB */

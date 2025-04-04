@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 
-#if defined(UCODE) || !defined(INCLUDE_TRACE_ALWAYS)
+#if defined(UCODE)
     #define SPACE_INDENT(f,x)
 #else
     #define SPACE_INDENT(f,x) util_print_add_space_indentation(f,x)
@@ -13,7 +13,7 @@
 
 typedef void (*print_func)(const char *f, ...);
 
-#if defined(UCODE) || !defined(INCLUDE_TRACE_ALWAYS)
+#if defined(UCODE)
     #define util_print_add_space_indentation(a,b)
     #define util_print_hexdump(a,b,c,d)
 #else

@@ -30,8 +30,8 @@ INCLUDE += -I$(TOPDIR)/lib/lwip/lwip/src/include
 INCLUDE += -I$(TOPDIR)/lib/http_parser
 
 # mbedtls headers
-INCLUDE += -I$(TOPDIR)/lib/mbedtls/mbedtls/include
-INCLUDE += -I$(TOPDIR)/lib/mbedtls/port/include
+INCLUDE += -I$(MBEDTLS_BASE)/mbedtls/include
+INCLUDE += -I$(MBEDTLS_BASE)/port/include
 
 # api_uart.h
 INCLUDE += -I$(TOPDIR)/sdk/include

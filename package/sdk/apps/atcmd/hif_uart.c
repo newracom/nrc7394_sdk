@@ -664,22 +664,42 @@ static const _hif_uart_pin_t g_hif_uart_pin[_HIF_UART_CHANNEL_MAX] =
 {
 	[0] = {  4,  5, -1, -1 },
 	[1] = { -1, -1, -1, -1 },
+#if defined(CONFIG_ATCMD_UART_HFC)
 	[2] = {  0,  1,  2,  3 },
+#else
+	[2] = {  0,  1,  -1,  -1 },
+#endif
 	[3] = {  6,  7, -1, -1 },
 };
 #elif defined(NRC7394)
 static const _hif_uart_pin_t g_hif_uart_pin[_HIF_UART_CHANNEL_MAX] =
 {
 	[0] = {  8,  9, -1, -1 },
+#if defined(CONFIG_ATCMD_UART_HFC)
 	[1] = { 12, 13, 20, 14 },
+#else
+	[1] = { 12, 13, -1, -1},
+#endif
 };
 #endif
 
-static void _hif_uart_pin_enable (int channel)
+static int _hif_uart_pin_enable(int channel, enum uart_hardware_flow_control hfc)
 {
 	const _hif_uart_pin_t *uart_pin = &g_hif_uart_pin[channel];
 	gpio_io_t gpio;
 	uio_sel_t uio;
+	gpio_io_t pd_pullup = {0};
+	int8_t tx = uart_pin->tx;
+	int8_t rx = uart_pin->rx;
+	int8_t rts = uart_pin->rts;
+	int8_t cts = uart_pin->cts;
+	int uio_sel_uart = UIO_SEL_UART0 + channel;
+
+	// Validate TX/RX pins
+	if (tx == -1 || rx == -1) {
+		_hif_info("Invalid UART pins: TX:%d RX:%d", tx, rx);
+		return -1;
+	}
 
 #if defined(NRC7394)
 	/*
@@ -698,64 +718,75 @@ static void _hif_uart_pin_enable (int channel)
 	}
 #endif
 
-	/* GPIO_ATL0 */
+	// Retrieve current GPIO and UIO settings
 	nrc_gpio_get_alt(&gpio);
-	_hif_uart_pin_info("GPIO_ALT0: 0x%08X\n", gpio.word);
+	nrc_gpio_get_uio_sel(uio_sel_uart, &uio);
+	_hif_uart_pin_info("GPIO_ALT0: 0x%08X, UIO_SEL_UART%d: 0x%08X\n", gpio.word, channel, uio.word);
 
-	gpio.word |= (uart_pin->tx >= 0) ? (1 << uart_pin->tx) : 0;
-	gpio.word |= (uart_pin->rx >= 0) ? (1 << uart_pin->rx) : 0;
-	gpio.word |= (uart_pin->rts >= 0) ? (1 << uart_pin->rts) : 0;
-	gpio.word |= (uart_pin->cts >= 0) ? (1 << uart_pin->cts) : 0;
+	// Configure TX/RX pins
+	gpio.word |= (1 << tx) | (1 << rx);
+	uio.bit.sel7_0 = tx;
+	uio.bit.sel15_8 = rx;
 
+	// Configure RTS/CTS if hardware flow control is enabled
+	if (hfc) {
+		if (rts == -1 || cts == -1) {
+			_hif_info("Invalid UART pins: RTS:%d CTS:%d", rts, cts);
+			return -1;
+		}
+		gpio.word |= (1 << rts) | (1 << cts);
+		uio.bit.sel23_16 = rts;
+		uio.bit.sel31_24 = cts;
+	} else {
+		uio.bit.sel23_16 = 0xFF;
+		uio.bit.sel31_24 = 0xFF;
+	}
+
+	// Apply updated settings
 	nrc_gpio_set_alt(&gpio);
+	nrc_gpio_set_uio_sel(uio_sel_uart, &uio);
+
+	// Enable RX pull-up
+	nrc_gpio_get_pullup(&pd_pullup);
+	pd_pullup.word |= (1 << rx);
+	nrc_gpio_config_pullup(&pd_pullup);
+
+	// Log final GPIO and UIO state
 	nrc_gpio_get_alt(&gpio);
-	_hif_uart_pin_info("GPIO_ALT0: 0x%08X\n", gpio.word);
+	nrc_gpio_get_uio_sel(uio_sel_uart, &uio);
+	_hif_uart_pin_info("GPIO_ALT0: 0x%08X, UIO_SEL_UART%d: 0x%08X\n", gpio.word, channel, uio.word);
 
-	/* UIO_SEL */
-	nrc_gpio_get_uio_sel(UIO_SEL_UART0 + channel, &uio);
-	_hif_uart_pin_info("UIO_SEL_UART%d: 0x%08X\n", channel, uio.word);
-
-	uio.bit.sel7_0 = uart_pin->tx;
-	uio.bit.sel15_8 = uart_pin->rx;
-	uio.bit.sel23_16 = uart_pin->rts;
-	uio.bit.sel31_24 = uart_pin->cts;
-
-	nrc_gpio_set_uio_sel(UIO_SEL_UART0 + channel, &uio);
-	nrc_gpio_get_uio_sel(UIO_SEL_UART0 + channel, &uio);
-	_hif_uart_pin_info("UIO_SEL_UART%d: 0x%08X\n", channel, uio.word);
+	return 0;
 }
+
 
 static void _hif_uart_pin_disable (int channel)
 {
 	const _hif_uart_pin_t *uart_pin = &g_hif_uart_pin[channel];
 	gpio_io_t gpio;
 	uio_sel_t uio;
+	int uio_sel_uart = UIO_SEL_UART0 + channel;
 
-	/* GPIO_ATL0 */
+	// Retrieve current GPIO and UIO settings
 	nrc_gpio_get_alt(&gpio);
-	_hif_uart_pin_info("GPIO_ALT0: 0x%08X\n", gpio.word);
+	nrc_gpio_get_uio_sel(uio_sel_uart, &uio);
+	_hif_uart_pin_info("GPIO_ALT0: 0x%08X, UIO_SEL_UART%d: 0x%08X\n", gpio.word, channel, uio.word);
 
-	gpio.word &= (uart_pin->tx >= 0) ? ~(1 << uart_pin->tx) : ~0;
-	gpio.word &= (uart_pin->rx >= 0) ? ~(1 << uart_pin->rx) : ~0;
-	gpio.word &= (uart_pin->rts >= 0) ? ~(1 << uart_pin->rts) : ~0;
-	gpio.word &= (uart_pin->cts >= 0) ? ~(1 << uart_pin->cts) : ~0;
+	uint8_t sel_values[] = { uio.bit.sel7_0, uio.bit.sel15_8, uio.bit.sel23_16, uio.bit.sel31_24 };
+	for (int i = 0; i < 4; i++) {
+		if (sel_values[i] != 0xFF) {
+			gpio.word &= ~(1 << sel_values[i]);
+			sel_values[i] = 0xFF;
+		}
+	}
 
+	// Apply the updated settings
 	nrc_gpio_set_alt(&gpio);
+	nrc_gpio_set_uio_sel(uio_sel_uart, &uio);
+
 	nrc_gpio_get_alt(&gpio);
-	_hif_uart_pin_info("GPIO_ALT0: 0x%08X\n", gpio.word);
-
-	/* UIO_SEL */
-	nrc_gpio_get_uio_sel(UIO_SEL_UART0 + channel, &uio);
-	_hif_uart_pin_info("UIO_SEL_UART%d: 0x%08X\n", channel, uio.word);
-
-	uio.bit.sel7_0 = 0xff;
-	uio.bit.sel15_8 = 0xff;
-	uio.bit.sel23_16 = 0xff;
-	uio.bit.sel31_24 = 0xff;
-
-	nrc_gpio_set_uio_sel(UIO_SEL_UART0 + channel, &uio);
-	nrc_gpio_get_uio_sel(UIO_SEL_UART0 + channel, &uio);
-	_hif_uart_pin_info("UIO_SEL_UART%d: 0x%08X\n", channel, uio.word);
+	nrc_gpio_get_uio_sel(uio_sel_uart, &uio);
+	_hif_uart_pin_info("GPIO_ALT0: 0x%08X, UIO_SEL_UART%d: 0x%08X\n", gpio.word, channel, uio.word);
 }
 
 static int _hif_uart_enable (_hif_uart_t *uart)
@@ -794,7 +825,10 @@ static int _hif_uart_enable (_hif_uart_t *uart)
 		system_irq_unmask(_hif_uart_channel_to_vector(uart->channel));
 	}
 
-	_hif_uart_pin_enable(uart->channel);
+	if(_hif_uart_pin_enable(uart->channel ,uart->hfc) < 0){
+		_hif_info("Failed to configure UART pins");
+		return -1;
+	}
 
 	_hif_uart_set_info(uart);
 

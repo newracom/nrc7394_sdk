@@ -120,16 +120,17 @@ enum ATCMD_CB_TYPE
 	ATCMD_CB_RXD
 };
 
-enum ATCMD_RXD_TYPE
+enum ATCMD_DATA_TYPE
 {
-	ATCMD_RXD_SOCKET = 0,
-	ATCMD_RXD_SFUSER,
-	ATCMD_RXD_SFSYSUSER
+	ATCMD_DATA_SOCKET = 0,
+	ATCMD_DATA_FWBIN,
+	ATCMD_DATA_SFUSER,
+	ATCMD_DATA_SFSYSUSER
 };
 
 typedef struct
 {
-	enum ATCMD_RXD_TYPE type;
+	enum ATCMD_DATA_TYPE type;
 	int length;
 
 	union
@@ -168,12 +169,14 @@ extern void nrc_atcmd_recv (char *buf, int len);
 extern int nrc_atcmd_register_callback (int type, void *func);
 extern int nrc_atcmd_unregister_callback (int type);
 
-extern void nrc_atcmd_log_on (void);
-extern void nrc_atcmd_log_off (void);
-extern bool nrc_atcmd_log_is_on (void);
+extern bool nrc_atcmd_log_print (int log);
+#define nrc_atcmd_log_on()		nrc_atcmd_log_print(1)
+#define nrc_atcmd_log_off()		nrc_atcmd_log_print(0)
+#define nrc_atcmd_log_is_on()	nrc_atcmd_log_print(-1)
 
-extern void nrc_atcmd_data_info (uint64_t *send, uint64_t *recv);
 extern void nrc_atcmd_data_reset (void);
+extern void nrc_atcmd_data_info (uint64_t *send, uint64_t *recv);
+extern int nrc_atcmd_data_print (int send, int recv);
 
 extern int nrc_atcmd_firmware_download (char *bin_data, int bin_size, uint32_t bin_crc32, int verify);
 

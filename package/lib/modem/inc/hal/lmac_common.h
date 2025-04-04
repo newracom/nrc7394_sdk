@@ -30,6 +30,9 @@ typedef struct _CCA_RESULT_4M
     double cca_2m_sec;
 } CCA_RESULT_4M;
 
+#define LMAC_DEFAULT_RXGAIN 88
+#define LMAC_DEFAULT_CCA_THRESHOLD 0x99999999 //-103
+
 #if !defined (INCLUDE_NO_USE_LMAC_SEM)
 #define LMAC_PS_SEM_TAKE(a) do{lmac_take_modem_semaphore(a);}while(0)
 #define LMAC_PS_SEM_TAKE_RET(a) lmac_take_modem_semaphore(a)
@@ -113,6 +116,18 @@ typedef struct _CCA_RESULT_4M
 #define lmac_get_enable_auth_ctrl()		get_enable_auth_ctrl()
 #endif
 
+#define lmac_set_group_mcs(x)		set_group_mcs(x)
+#define lmac_get_group_mcs()		get_group_mcs()
+#define lmac_set_dhcp_mcs(x)		set_dhcp_mcs(x)
+#define lmac_get_dhcp_mcs()		get_dhcp_mcs()
+
+void set_group_mcs(int8_t mcs);
+
+int8_t get_group_mcs();
+
+void set_dhcp_mcs(int8_t mcs);
+int8_t get_dhcp_mcs();
+
 #else
 void        lmac_set_pv1(int vif_id, bool en);
 bool        lmac_sec_set_akm(int vif_id, uint8_t akm);
@@ -181,6 +196,7 @@ int         lmac_get_cipher_icv_length(int type);
 bool        lmac_sec_add_key(int vif_id, struct cipher_def *lmc, bool dummy);
 bool        lmac_sec_del_key(int vif_id, struct cipher_def *lmc);
 bool        lmac_sec_del_key_all(int vif_id);
+bool        lmac_sec_wait_for_result(int result);
 void        lmac_set_basic_rate(int vif_id, uint32_t basic_rate_set);
 uint32_t    lmac_get_tsf_timer_high(int vif_id);
 uint32_t    lmac_get_tsf_timer_low(int vif_id);
@@ -280,6 +296,7 @@ uint32_t    lmac_get_idle_hook_count();
 #if defined (DEBUG_MAC_STATS)
 void        lmac_init_mac_stats();
 void        lmac_update_stats(uint8_t dir, void *hdr, uint8_t mcs, uint8_t status);
+void        lmac_update_txfail_complete();
 #endif /* DEBUG_MAC_STATS */
 uint8_t     get_run_rx_gain_auto_test();
 int         lmac_get_cca_device_type(void);

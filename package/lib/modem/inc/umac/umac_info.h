@@ -26,7 +26,7 @@
 
 /* STA's State */
 typedef enum _STA_STATE{
-	INVALID = 0xFF,
+	INVALID = 0xF,
 	AUTH	= 0,
 	ASSOC	= 1
 } STA_STATE;
@@ -121,10 +121,13 @@ typedef struct _SECURITY_INFO {
 
 /*Cipher Info */
 typedef struct _CIPHER_INFO {
-	bool key_enable;
-	enum key_type key_type;
-	uint8_t key_id;
+	uint8_t key_enable : 1;
+	enum key_type key_type : 2;
+	uint8_t key_id : 2;
+	uint8_t reserved : 3;
+#if !defined(INCLUDE_REMOVE_KEY_MEMORY)
 	uint32_t key[MAX_KEY_LEN];
+#endif
 #if defined(INCLUDE_DYNAMIC_FRAG)
 	uint64_t tx_pn;
 #endif
@@ -138,8 +141,6 @@ typedef struct _CIPHER_INFO {
 
 /* Key Info */
 typedef struct _KEY_INFO {
-	uint16_t key_aid;
-	uint8_t key_addr[MAC_ADDR_LEN];
 #if defined (INCLUDE_IBSS) && defined(NRC7394)
     /* Each IBSS STA has own GTK. Array 0, 1 for PTK0/1 and 2,3 for GTK1/2 */
 	CIPHER_INFO cipher_info[4];
@@ -189,10 +190,10 @@ typedef struct _SIGNAL_INFO {
 typedef struct _DEFRAG_ENTRY {
 	struct sysbuf_queue dfque;
 	unsigned long first_frag_time;
-	uint8_t tid;
 	uint8_t num_buf;
 	uint8_t last_frag;
-	uint16_t sn;
+	uint16_t tid : 4;
+	uint16_t sn : 12;
 #if defined (INCLUDE_DEFRAG_CHECK_PN)
 	uint8_t last_pn[6]; /* PN of the last fragment */
 #endif
@@ -200,7 +201,7 @@ typedef struct _DEFRAG_ENTRY {
 
 typedef struct _DEFRAG_INFO {
 	DEFRAG_ENTRY entries[DEFRAG_ENTRY_MAX];
-	unsigned int next;
+	uint8_t next; // index of entries
 }__attribute__((packed)) DEFRAG_INFO;
 #endif/* INCLUDE_DEFRAG */
 
@@ -248,7 +249,12 @@ typedef struct _APINFO{
 		- AP/MESH : peer(STA)'s info (allocated from heap whenever STA is connected)
 **************************************************************/
 typedef struct _STAINFO {
-	STA_STATE m_state;
+	STA_STATE m_state : 4;
+#if defined(INCLUDE_MANAGE_BLACKLIST)
+	uint8_t tx_retry_limit_cnt : 4;
+#else
+	uint8_t reserved : 4;
+#endif
 	STA_BASIC_INFO m_binfo;
 	AMPDU_INFO m_ampdu[MAX_AC];
 	// BSS_IDLE_INFO m_bssidle;
@@ -275,9 +281,6 @@ typedef struct _STAINFO {
 	PER_NODE m_rc_node;
 #endif
 	PER_NODE *m_rc_node_p;
-#endif
-#if defined(INCLUDE_MANAGE_BLACKLIST)
-	uint8_t tx_retry_limit_cnt;
 #endif
 } __attribute__((packed)) STAINFO;
 

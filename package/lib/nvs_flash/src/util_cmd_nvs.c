@@ -185,7 +185,7 @@ static void nvs_cli_get(char *key, char *value)
 	(void)value;
 
 	nvs_handle_t nvs_handle;
-	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READONLY, &nvs_handle) == NVS_OK) {
+	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		char value[256];
 		size_t length = sizeof(value);
 
@@ -205,7 +205,7 @@ static void nvs_cli_get_u8(char *key, char *value)
 	(void)value;
 
 	nvs_handle_t nvs_handle;
-	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READONLY, &nvs_handle) == NVS_OK) {
+	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		uint8_t value;
 
 		if (nvs_get_u8(nvs_handle, key, &value) != NVS_OK) {
@@ -224,7 +224,7 @@ static void nvs_cli_get_i8(char *key, char *value)
 	(void)value;
 
 	nvs_handle_t nvs_handle;
-	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READONLY, &nvs_handle) == NVS_OK) {
+	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		int8_t value;
 
 		if (nvs_get_i8(nvs_handle, key, &value) != NVS_OK) {
@@ -243,7 +243,7 @@ static void nvs_cli_get_u16(char *key, char *value)
 	(void)value;
 
 	nvs_handle_t nvs_handle;
-	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READONLY, &nvs_handle) == NVS_OK) {
+	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		uint16_t value;
 
 		if (nvs_get_u16(nvs_handle, key, &value) != NVS_OK) {
@@ -262,7 +262,7 @@ static void nvs_cli_get_i16(char *key, char *value)
 	(void)value;
 
 	nvs_handle_t nvs_handle;
-	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READONLY, &nvs_handle) == NVS_OK) {
+	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		int16_t value;
 
 		if (nvs_get_i16(nvs_handle, key, &value) != NVS_OK) {
@@ -281,7 +281,7 @@ static void nvs_cli_get_u32(char *key, char *value)
 	(void)value;
 
 	nvs_handle_t nvs_handle;
-	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READONLY, &nvs_handle) == NVS_OK) {
+	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		uint32_t value;
 
 		if (nvs_get_u32(nvs_handle, key, &value) != NVS_OK) {
@@ -300,7 +300,7 @@ static void nvs_cli_get_i32(char *key, char *value)
 	(void)value;
 
 	nvs_handle_t nvs_handle;
-	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READONLY, &nvs_handle) == NVS_OK) {
+	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		int32_t value;
 
 		if (nvs_get_i32(nvs_handle, key, &value) != NVS_OK) {
@@ -319,7 +319,7 @@ static void nvs_cli_get_u64(char *key, char *value)
 	(void)value;
 
 	nvs_handle_t nvs_handle;
-	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READONLY, &nvs_handle) == NVS_OK) {
+	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		uint64_t value;
 
 		if (nvs_get_u64(nvs_handle, key, &value) != NVS_OK) {
@@ -338,7 +338,7 @@ static void nvs_cli_get_i64(char *key, char *value)
 	(void)value;
 
 	nvs_handle_t nvs_handle;
-	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READONLY, &nvs_handle) == NVS_OK) {
+	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		int64_t value;
 
 		if (nvs_get_i64(nvs_handle, key, &value) != NVS_OK) {
@@ -360,7 +360,7 @@ static void nvs_cli_show(char *key, char *value)
 	nvs_handle_t nvs_handle;
 	size_t used_entries = 0;
 
-	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READONLY, &nvs_handle) == NVS_OK) {
+	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		if (nvs_get_used_entry_count(nvs_handle, &used_entries) == NVS_OK) {
 		} else {
 			CPA("nvs show failed.\n");

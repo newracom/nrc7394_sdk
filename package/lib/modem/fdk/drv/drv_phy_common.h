@@ -29,6 +29,7 @@ bw_t  drv_phy_get_op_bw();
 void drv_phy_set_prim_1m_loc(uint8_t loc);
 uint8_t drv_phy_get_prim_1m_loc();
 void drv_phy_set_rx_initial_gain(uint8_t rxgain);
+uint16_t drv_phy_get_rx_initial_gain(void);
 void drv_phy_set_tx_gain(uint8_t txgain);
 void drv_phy_set_dig_lpf_gain(uint16_t lpf_gain);
 void drv_phy_enable();
@@ -51,7 +52,6 @@ void drv_phy_rxgain_lut_write_sunmi();
 void drv_phy_txgain_lut_write();
 void drv_phy_rxgain_sbr_lut_write();
 
-uint8_t drv_phy_get_rx_initial_gain();
 
 typedef enum {
 	TXGAIN_FIXED = 0,

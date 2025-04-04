@@ -4,6 +4,7 @@
 #include "lwip/sockets.h"
 #include "lwip/dns.h"
 #include "lwip/mem.h"
+#include "lwip/etharp.h"
 #include "lwip/apps/sntp.h"
 #include "netif/wlif.h"
 #if LWIP_IPV6
@@ -148,10 +149,11 @@ int dhcp_run(int vif)
 	return 0;
 }
 
-int wifi_dhcpc_start(int vif)
+static int _wifi_dhcpc_start(int vif, dhcp_event_handler_t event_handler)
 {
 	struct netif *target_if;
 	char if_name[6];
+	err_t result;
 
 	switch (vif) {
 #ifdef SUPPORT_ETHERNET_ACCESSPOINT
@@ -169,7 +171,7 @@ int wifi_dhcpc_start(int vif)
 			target_if = nrc_netif_get_by_idx(vif);
 			break;
 
-		case BRIDGE_INTERFACE: 
+		case BRIDGE_INTERFACE:
 			target_if = &br_netif;
 			break;
 
@@ -188,19 +190,33 @@ int wifi_dhcpc_start(int vif)
 		ip_addr_set_zero(&target_if->gw);
 	}
 
-	if (dhcp_start(target_if) == 0)
-		dhcpc_start_flag[vif] = true;
-	else
-		dhcpc_start_flag[vif] = false;
+	result = dhcp_start(target_if);
+
+#if LWIP_DHCP_EVENT
+	if (result == ERR_OK && event_handler)
+		dhcp_event_enable(target_if, event_handler);
+#endif
+
+	dhcpc_start_flag[vif] = !result;
 
 	if (vif == BRIDGE_INTERFACE)
-		snprintf(if_name, sizeof(if_name), "br"); 
+		snprintf(if_name, sizeof(if_name), "br");
 	else
-		snprintf(if_name, sizeof(if_name), "wlan%d", vif); 
+		snprintf(if_name, sizeof(if_name), "wlan%d", vif);
 
 	I(TT_NET, "%s%s dhcp client start, flag:%d\n", module_name(), if_name, dhcpc_start_flag[vif]);
 
-    return dhcpc_start_flag[vif] ? 0 : -1;
+    return result != ERR_OK ? -1 : 0;
+}
+
+int wifi_dhcpc_start(int vif)
+{
+	return _wifi_dhcpc_start(vif, NULL);
+}
+
+int wifi_dhcpc_start_with_event (int vif, dhcp_event_handler_t event_handler)
+{
+	return _wifi_dhcpc_start(vif, event_handler);
 }
 
 int wifi_dhcpc_stop(int vif)
@@ -224,7 +240,7 @@ int wifi_dhcpc_stop(int vif)
 			target_if = nrc_netif_get_by_idx(vif);
 			break;
 
-		case BRIDGE_INTERFACE: 
+		case BRIDGE_INTERFACE:
 			target_if = &br_netif;
 			break;
 
@@ -233,14 +249,17 @@ int wifi_dhcpc_stop(int vif)
 			return -EINVAL;
 	}
 
+#if LWIP_DHCP_EVENT
+	dhcp_event_disable(target_if);
+#endif
 	dhcp_stop(target_if);
 	dhcp_cleanup(target_if);
 	dhcpc_start_flag[vif] = false;
 
 	if (vif == BRIDGE_INTERFACE)
-		snprintf(if_name, sizeof(if_name), "br"); 
+		snprintf(if_name, sizeof(if_name), "br");
 	else
-		snprintf(if_name, sizeof(if_name), "wlan%d", vif); 
+		snprintf(if_name, sizeof(if_name), "wlan%d", vif);
 
 	I(TT_NET, "%s%s dhcp client stop\n", module_name(), if_name);
 
@@ -268,7 +287,7 @@ int wifi_dhcpc_get_lease_time(int vif)
 			target_if = nrc_netif_get_by_idx(vif);
 			break;
 
-		case BRIDGE_INTERFACE: 
+		case BRIDGE_INTERFACE:
 			target_if = &br_netif;
 			break;
 
@@ -364,7 +383,7 @@ bool wifi_get_ip_address(int vif_id, char **ip_addr)
 	if (!ip_addr)
 		return false;
 
-	target_if = nrc_netif[vif_id];
+	target_if = (netif_is_up(&br_netif)) ? &br_netif : nrc_netif[vif_id];
 
 #ifdef SUPPORT_ETHERNET_ACCESSPOINT
 #if LWIP_BRIDGE
@@ -372,7 +391,6 @@ bool wifi_get_ip_address(int vif_id, char **ip_addr)
 		target_if = &br_netif;
 #endif /* LWIP_BRIDGE */
 #endif /* SUPPORT_ETHERNET_ACCESSPOINT */
-
 	*ip_addr = ip4addr_ntoa(netif_ip4_addr(target_if));
 	return true;
 #else
@@ -1251,4 +1269,25 @@ int initialize_sntp(const char *server, u32_t timeout) /* sec */
 	sntp_init_log("%s: timeout=%dms\n", __func__, timeout);
 
 	return -1;
+}
+
+bool ip_from_arp_cache(uint8_t *macaddr, ip4_addr_t *ipaddr)
+{
+	if (!macaddr || !ipaddr) {
+		return false;
+	}
+
+	for (int i = 0; i < ARP_TABLE_SIZE; i++) {
+		ip4_addr_t *ip;
+		struct netif *netif;
+		struct eth_addr *ethaddr;
+
+		if (etharp_get_entry(i, &ip, &netif, &ethaddr)) {
+			if (memcmp(macaddr, ethaddr->addr, ETH_HWADDR_LEN) == 0) {
+				memcpy(ipaddr, ip, sizeof(ip4_addr_t));
+				return true;
+			}
+		}
+	}
+	return false;
 }

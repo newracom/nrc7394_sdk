@@ -30,11 +30,13 @@
 #include <stdbool.h>
 
 #include "mbedtls/platform.h"
-#include "mbedtls/net.h"
+#include "mbedtls/net_sockets.h"
 #include "mbedtls/ssl.h"
 #include "mbedtls/entropy.h"
 #include "mbedtls/ctr_drbg.h"
+#if (MBEDTLS_VERSION_MAJOR < 3)
 #include "mbedtls/certs.h"
+#endif
 #include "mbedtls/x509.h"
 #include "mbedtls/error.h"
 #include "mbedtls/debug.h"

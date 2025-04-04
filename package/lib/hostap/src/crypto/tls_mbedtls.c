@@ -12,15 +12,20 @@
 #include "crypto/md5.h"
 #include "crypto/sha256.h"
 #include "crypto/sha384.h"
-#include "mbedtls/ssl_internal.h"
+#include "mbedtls/debug.h"
 #include "mbedtls/ctr_drbg.h"
 #include "mbedtls/entropy.h"
-//#include "mbedtls/debug.h"
+#if (MBEDTLS_VERSION_MAJOR >= 3)
+#include "mbedtls/ssl.h"
+#include "mbedtls/ssl_ciphersuites.h"
+#else
+#include "mbedtls/ssl_internal.h"
 #ifdef ESPRESSIF_USE
 #include "mbedtls/esp_debug.h"
 #include "mbedtls/esp_config.h"
 #else
 #include "mbedtls/config.h"
+#endif
 #endif
 #include <assert.h>
 
@@ -152,7 +157,11 @@ static int set_pki_context(tls_context_t *tls, const struct tls_connection_param
 
 	ret = mbedtls_pk_parse_key(&tls->clientkey, cfg->private_key_blob, cfg->private_key_blob_len,
 				   (const unsigned char *)cfg->private_key_passwd,
-				   cfg->private_key_passwd ? os_strlen(cfg->private_key_passwd) : 0);
+				   cfg->private_key_passwd ? os_strlen(cfg->private_key_passwd) : 0
+				#if (MBEDTLS_VERSION_MAJOR >= 3)
+				   , mbedtls_ctr_drbg_random, &tls->ctr_drbg
+				#endif
+				   );
 	if (ret < 0) {
 		wpa_printf(MSG_ERROR, "mbedtls_pk_parse_keyfile returned -0x%x", -ret);
 		return ret;
@@ -631,6 +640,28 @@ int tls_connection_set_verify(void *tls_ctx, struct tls_connection *conn,
 	return -1;
 }
 
+#if (MBEDTLS_VERSION_MAJOR >= 3)
+int get_ciphersuite_info(const mbedtls_ssl_context *ssl, const mbedtls_ssl_ciphersuite_t **ciphersuite_info)
+{
+	mbedtls_ssl_session session;
+	const char *ciphersuite_name;
+	int ciphersuite_id;
+
+	mbedtls_ssl_session_init(&session);
+
+	if (mbedtls_ssl_get_session(ssl, &session) == 0) {
+		ciphersuite_name = mbedtls_ssl_get_ciphersuite_name(session.ciphersuite);
+		ciphersuite_id = session.ciphersuite;
+		*ciphersuite_info = mbedtls_ssl_ciphersuite_from_id(ciphersuite_id);
+	} else {
+		*ciphersuite_info = NULL;
+	}
+	mbedtls_ssl_session_free(&session);
+
+	return 0;
+}
+#endif
+
 struct wpabuf * tls_connection_handshake(void *tls_ctx,
 					 struct tls_connection *conn,
 					 const struct wpabuf *in_data,
@@ -651,9 +682,16 @@ struct wpabuf * tls_connection_handshake(void *tls_ctx,
 		if (tls->ssl.state == MBEDTLS_SSL_CLIENT_CERTIFICATE) {
 			/* Read random data before session completes, not present after handshake */
 			if (tls->ssl.handshake) {
+#if (MBEDTLS_VERSION_MAJOR >= 3)
+				const mbedtls_ssl_ciphersuite_t *ciphersuite_info;
+				mbedtls_ctr_drbg_random(&tls->ctr_drbg, conn->randbytes, TLS_RANDOM_LEN * 2);
+				get_ciphersuite_info(&tls->ssl, &ciphersuite_info);
+				conn->mac = ciphersuite_info->mac;
+#else
 				os_memcpy(conn->randbytes, tls->ssl.handshake->randbytes,
-					  TLS_RANDOM_LEN * 2);
+						 TLS_RANDOM_LEN * 2);
 				//conn->mac = tls->ssl.handshake->ciphersuite_info->mac;
+#endif
 			}
 		}
 		ret = mbedtls_ssl_handshake_step(&tls->ssl);
@@ -753,14 +791,26 @@ cleanup:
 #undef MAX_PHASE2_BUFFER
 }
 
-
 int tls_connection_resumed(void *tls_ctx, struct tls_connection *conn)
 {
+#if (MBEDTLS_VERSION_MAJOR >= 3)
+	mbedtls_ssl_session session; // Declare a session object
+	if (!conn || !conn->tls) {
+		return 0;
+	}
+
+	if (mbedtls_ssl_get_session(&conn->tls->ssl, &session) == 0) {
+		if (session.id_len > 0) {
+			return 1;
+		}
+	}
+	return 0;
+#else
 	if (conn && conn->tls && conn->tls->ssl.handshake) {
 		return conn->tls->ssl.handshake->resume;
 	}
-
 	return 0;
+#endif
 }
 
 /* cipher array should contain cipher number in mbedtls num as per IANA
@@ -897,6 +947,7 @@ static int tls_connection_prf(void *tls_ctx, struct tls_connection *conn,
 	int ret;
 	u8 seed[2 * TLS_RANDOM_LEN];
 	mbedtls_ssl_context *ssl = &conn->tls->ssl;
+	int ciphersuite_info_mac;
 
 	if (!ssl || !ssl->transform) {
 		wpa_printf(MSG_ERROR, "TLS: %s, session ingo is null", __func__);
@@ -917,10 +968,18 @@ static int tls_connection_prf(void *tls_ctx, struct tls_connection *conn,
 	wpa_hexdump_key(MSG_MSGDUMP, "random", seed, 2 * TLS_RANDOM_LEN);
 	wpa_hexdump_key(MSG_MSGDUMP, "master", ssl->session->master, TLS_MASTER_SECRET_LEN);
 
-	if (ssl->transform->ciphersuite_info->mac == MBEDTLS_MD_SHA384) {
+#if (MBEDTLS_VERSION_MAJOR >= 3)
+	const mbedtls_ssl_ciphersuite_t *ciphersuite_info;
+	get_ciphersuite_info(ssl, &ciphersuite_info);
+	ciphersuite_info_mac = ciphersuite_info->mac;
+#else
+	ciphersuite_info_mac = ssl->transform->ciphersuite_info->mac;
+#endif
+
+	if (ciphersuite_info_mac == MBEDTLS_MD_SHA384) {
 		ret = tls_prf_sha384(ssl->session->master, TLS_MASTER_SECRET_LEN,
 				label, seed, 2 * TLS_RANDOM_LEN, out, out_len);
-	} else if (ssl->transform->ciphersuite_info->mac == MBEDTLS_MD_SHA256) {
+	} else if (ciphersuite_info_mac == MBEDTLS_MD_SHA256) {
 		ret = tls_prf_sha256(ssl->session->master, TLS_MASTER_SECRET_LEN,
 				label, seed, 2 * TLS_RANDOM_LEN, out, out_len);
 	} else {

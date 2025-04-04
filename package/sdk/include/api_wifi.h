@@ -750,6 +750,39 @@ tWIFI_STATUS nrc_wifi_abort_scan (int vif_id);
 
 
 /**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_auto_reconnect (int vif_id, int enable)
+ *
+ * @brief Control WiFi auto reconnect enable or disable if the device is disconnected from
+ *        AP after connection. Default is enabled and the station will automatically connect
+ *        back to AP if it ever disconnects.
+ *
+ * @param vif_id: Network interface index
+ *
+ * @param enable: set to 0 to disable, 1 to enable. (default is 1)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_auto_reconnect(int vif_id, int enable);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_select_network (int vif_id)
+ *
+ * @brief select network already configured for network interface (vif_id)
+ *        If station is disconnected from AP and want to connect to different AP,
+ *        set appropriate parameters such as SSID and call this function.
+ *        It will use the new parameters to select network associated with
+ *        the network interface to enable the Wifi network.
+ *        Note: nrc_wifi_connect must not be called after calling nrc_wifi_select_network.
+ *
+ * @param vif_id: Network interface index
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_select_network(int vif_id);
+
+
+/**********************************************
  * @fn tWIFI_STATUS nrc_wifi_connect (int vif_id, uint32_t timeout)
  *
  * @brief Start connection
@@ -1265,6 +1298,21 @@ tWIFI_STATUS nrc_wifi_set_tx_aggr_auto(int vif_id, tWIFI_TID tid, uint8_t max_ag
  ***********************************************/
 tWIFI_STATUS nrc_wifi_set_passive_scan(bool passive_scan_on);
 
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_scan_dwell_time(uint32_t time)
+ *
+ * @brief set scan dwell time
+ *
+ * @param vif_id: Network interface index
+ *
+ * @param time (ms)
+ *
+ * @return If enabled, then WIFI_SUCCESS. Otherwise, WIFI_FAIL is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_scan_dwell_time(int vif_id, uint32_t time_ms);
+
+
 /**********************************************
  * @fn tWIFI_STATUS nrc_wifi_set_simple_bgscan(int vif_id, uint16_t short_interval, int signal_threshold, uint16_t long_interval)
  *
@@ -1281,6 +1329,7 @@ tWIFI_STATUS nrc_wifi_set_passive_scan(bool passive_scan_on);
  * @return If enabled, then WIFI_SUCCESS. Otherwise, WIFI_FAIL is returned.
  ***********************************************/
 tWIFI_STATUS nrc_wifi_set_simple_bgscan(int vif_id, uint16_t short_interval, int signal_threshold, uint16_t long_interval);
+
 
 
 /**********************************************
@@ -1541,6 +1590,93 @@ tWIFI_STATUS nrc_wifi_get_auth_control_scale(uint8_t *scale_factor);
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
 tWIFI_STATUS nrc_wifi_get_auth_current_ti(int *ti);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_get_auth_bo_cnt(int *cnt);
+ *
+ * @brief get auth ctrl backoff count
+ *
+ * @param ti cnt
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_auth_bo_cnt(int *cnt);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_get_tsf(int vif_id, uint64_t *tsf)
+ *
+ * @brief get TSF (Timing Synchronization Function)
+ *
+ * @param vif_id : vif_id
+ * @param tsf : TSF value
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_tsf(int vif_id, uint64_t *tsf);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_tsf(int vif_id, uint64_t tsf)
+ *
+ * @brief set TSF (Timing Synchronization Function)
+ *
+ * @param vif_id : vif_id
+ * @param tsf : TSF value
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_tsf(int vif_id, uint64_t tsf);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_get_bcmc_mcs(int8_t *mcs)
+ *
+ * @brief get current mcs for bcmc frames
+ *
+ * @param mcs (10 or [0-7] : enabled, -1 : disabled (follow system setting))
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_bcmc_mcs(int8_t *mcs);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_bcmc_mcs(int8_t mcs)
+ *
+ * @brief set mcs for bcmc frames
+ *
+ * @param mcs (10 or [0-7] : enable, -1 : disable (follow system setting))
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_bcmc_mcs(int8_t mcs);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_get_dhcp_mcs(int8_t *mcs)
+ *
+ * @brief get current mcs for dhcp frames
+ *
+ * @param mcs (10 or [0-7] : enabled (manual setting), -1 : disabled (system setting))
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_dhcp_mcs(int8_t *mcs);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_dhcp_mcs(int8_t mcs)
+ *
+ * @brief set mcs for dhcp frames
+ *
+ * @param mcs (10 or [0-7] : enable (manual setting), -1 : disable (system setting))
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_dhcp_mcs(int8_t mcs);
+
 
 #ifdef __cplusplus
 }

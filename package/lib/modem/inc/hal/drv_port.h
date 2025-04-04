@@ -12,13 +12,11 @@
 #include "drv_trx_gain_table.h"
 #include "hal_rf.h"
 
-#define STR(s) #s
-
 #define PROFILE_START() { uint32_t now ,  line = __LINE__; \
                         now = NOW;
 
 #define PROFILE_END(A) now = NOW - now; \
-                        DBG("                                                     " STR(A) "\n"); \
+                        DBG("                                                     " #A "\n"); \
                         DBG("%30s()" , __FUNCTION__);\
                         DBG(" line %4d - %4d : %10d us\n" , line , __LINE__ , now); }
 

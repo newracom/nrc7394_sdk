@@ -120,6 +120,9 @@ u8_t dhcp_supplied_address(const struct netif *netif);
 void dhcp_coarse_tmr(void);
 /* to be called every half second */
 void dhcp_fine_tmr(void);
+#if STATIC_ARP_ENTRY_DHCP_SERVER
+int dhcp_get_state(struct netif *netif);
+#endif /* STATIC_ARP_ENTRY_DHCP_SERVER */
 
 #if LWIP_DHCP_GET_NTP_SRV
 /** This function must exist, in other to add offered NTP servers to
@@ -127,6 +130,19 @@ void dhcp_fine_tmr(void);
  * See LWIP_DHCP_MAX_NTP_SERVERS */
 extern void dhcp_set_ntp_servers(u8_t num_ntp_servers, const ip4_addr_t* ntp_server_addrs);
 #endif /* LWIP_DHCP_GET_NTP_SRV */
+
+#if LWIP_DHCP_EVENT
+typedef enum {
+	DHCP_EVENT_RENEWING,
+	DHCP_EVENT_RELEASED,
+	DHCP_EVENT_BOUND,
+} dhcp_event_t;
+
+typedef void (*dhcp_event_handler_t) (struct netif *netif, int event);
+
+err_t dhcp_event_enable (struct netif *netif, dhcp_event_handler_t handler);
+void dhcp_event_disable (struct netif *netif);
+#endif
 
 #define netif_dhcp_data(netif) ((struct dhcp*)netif_get_client_data(netif, LWIP_NETIF_CLIENT_DATA_INDEX_DHCP))
 

@@ -318,6 +318,16 @@ struct ret_rcinfo {
 } __attribute__ ((packed));
 #define RET_RC_INFO_SIZE sizeof(struct ret_rcinfo)
 
+#if defined(NRC7394)
+// 1024B
+#define RET_USER_DATA_SIZE 1024
+struct ret_userData {
+	uint8_t data[RET_USER_DATA_SIZE];
+} __attribute__ ((packed));
+#else
+#define RET_USER_DATA_SIZE 0
+#endif
+
 #if defined (INCLUDE_WOWLAN_PATTERN)
 // 56B
 /* This must be matched with wim_pm_param */
@@ -477,6 +487,7 @@ struct retention_info {
 #if defined(NRC7394)
 #if !(defined(BOOT_LOADER) || (MASKROM) || (INCLUDE_RF_NRC7292RFE) || (LMAC_TEST))
 	nrc_ret_info_t			nrc_ret_info;
+	struct ret_userData		user_data;		//User data (1KB)
 #endif
 #endif
 	struct ret_stainfo		sta_info;		//station info (20B)
@@ -743,5 +754,8 @@ uint32_t ps_get_gpio_pullup(void);
 int nrc_ps_event_user_get(enum ps_event event);
 int nrc_ps_event_user_clear(enum ps_event event);
 bool nrc_ps_check_fast_connect(void);
+bool nrc_ps_set_user_data(void* data, uint16_t size);
+bool nrc_ps_get_user_data(void* data, uint16_t size);
+uint16_t nrc_ps_get_user_data_size(void);
 
 #endif /*__NRC_PS_API_H__*/

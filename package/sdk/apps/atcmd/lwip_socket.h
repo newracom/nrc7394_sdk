@@ -77,6 +77,13 @@ typedef union
 
 typedef struct
 {
+	ip_addr_t group_addr;
+	bool loopback;
+	uint8_t ttl;
+} lwip_udp_multicast_t;
+
+typedef struct
+{
 	void (*send_ready) (int fd);
 	void (*recv_ready) (int fd);
 	void (*tcp_connect) (int fd, ip_addr_t *remote_addr, uint16_t remote_port);
@@ -128,14 +135,20 @@ extern int _lwip_socket_tcp_get_nodelay (int fd, bool *enabled);
 extern int _lwip_socket_tcp_set_nodelay (int fd, bool enable);
 extern int _lwip_socket_udp_get_broadcast (int fd, bool *enabled);
 extern int _lwip_socket_udp_set_broadcast (int fd, bool enable);
+extern int _lwip_socket_udp_add_multicast_group (int fd, ip_addr_t *addr, bool ipv6);
+extern int _lwip_socket_udp_drop_multicast_group (int fd, ip_addr_t *addr, bool ipv6);
+extern int _lwip_socket_udp_get_multicast_loopback (int fd, bool *loopback, bool ipv6);
+extern int _lwip_socket_udp_set_multicast_loopback (int fd, bool loopback, bool ipv6);
+extern int _lwip_socket_udp_get_multicast_ttl (int fd, uint8_t *ttl, bool ipv6);
+extern int _lwip_socket_udp_set_multicast_ttl (int fd, uint8_t ttl, bool ipv6);
 
 extern int _lwip_socket_init (lwip_socket_cb_t *cb);
 extern int _lwip_socket_deinit (void);
 
-extern int _lwip_socket_open_udp (int *fd, uint16_t local_port, bool ipv6, bool reuse_addr);
-extern int _lwip_socket_open_tcp_server (int *fd, uint16_t local_port, bool ipv6, bool reuse_addr);
+extern int _lwip_socket_open_udp (int *fd, uint16_t local_port, uint8_t multicast_ttl, bool ipv6);
+extern int _lwip_socket_open_tcp_server (int *fd, uint16_t local_port, bool ipv6);
 extern int _lwip_socket_open_tcp_client (int *fd, ip_addr_t *remote_addr, uint16_t remote_port,
-								int timeout_msec, bool ipv6, bool reuse_addr);
+											int timeout_msec, bool ipv6);
 extern int _lwip_socket_close (int fd);
 
 extern int _lwip_socket_get_peer (int fd, ip_addr_t *ipaddr, uint16_t *port);

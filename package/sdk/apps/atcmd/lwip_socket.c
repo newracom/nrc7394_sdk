@@ -332,7 +332,10 @@ int _lwip_socket_udp_get_broadcast (int fd, bool *enabled)
 
 	ret = getsockopt(fd, SOL_SOCKET, SO_BROADCAST, &broadcast, &len);
 	if (ret < 0)
+	{
+		*enabled = false;
 		return _lwip_socket_error(errno);
+	}
 
 	*enabled = !!broadcast;
 
@@ -352,6 +355,122 @@ int _lwip_socket_udp_set_broadcast (int fd, bool enable)
 		return _lwip_socket_error(errno);
 
 /*	_lwip_socket_log("SOCK_UDP_BROADCAST: set, fd=%d enable=%d", fd, enable); */
+
+	return 0;
+}
+
+int _lwip_socket_udp_add_multicast_group (int fd, ip_addr_t *addr, bool ipv6)
+{
+	struct ip_mreq mreq;
+	socklen_t len = sizeof(struct ip_mreq);
+	int ret;
+
+	if (ipv6)
+		return _lwip_socket_error(EOPNOTSUPP);
+
+	mreq.imr_multiaddr.s_addr = ip_addr_get_ip4_u32(addr);
+	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+
+	ret = setsockopt(fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, len);
+	if (ret < 0)
+		return _lwip_socket_error(errno);
+
+/*	_lwip_socket_log("SOCK_UDP_MULTICAST: add, fd=%d group=%s", fd, ipaddr_ntoa(addr)); */
+
+	return 0;
+}
+
+int _lwip_socket_udp_drop_multicast_group (int fd, ip_addr_t *addr, bool ipv6)
+{
+	struct ip_mreq mreq;
+	socklen_t len = sizeof(struct ip_mreq);
+	int ret;
+
+	if (ipv6)
+		return _lwip_socket_error(EOPNOTSUPP);
+
+	mreq.imr_multiaddr.s_addr = ip_addr_get_ip4_u32(addr);
+	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+
+	ret = setsockopt(fd, IPPROTO_IP, IP_DROP_MEMBERSHIP, &mreq, len);
+	if (ret < 0)
+		return _lwip_socket_error(errno);
+
+/*	_lwip_socket_log("SOCK_UDP_MULTICAST: drop, fd=%d group=%s", fd, ipaddr_ntoa(addr)); */
+
+	return 0;
+}
+
+int _lwip_socket_udp_get_multicast_loopback (int fd, bool *loopback, bool ipv6)
+{
+	socklen_t len = sizeof(bool);
+	int ret;
+
+	if (ipv6)
+		return _lwip_socket_error(EOPNOTSUPP);
+
+	ret = getsockopt(fd, IPPROTO_IP, IP_MULTICAST_LOOP, loopback, &len);
+	if (ret < 0)
+	{
+		*loopback = 0;
+		return _lwip_socket_error(errno);
+	}
+
+/*	_lwip_socket_log("SOCK_UDP_MULTICAST: get, fd=%d loopback=%d", fd, *loopback); */
+
+	return 0;
+}
+
+int _lwip_socket_udp_set_multicast_loopback (int fd, bool loopback, bool ipv6)
+{
+	socklen_t len = sizeof(bool);
+	int ret;
+
+	if (ipv6)
+		return _lwip_socket_error(EOPNOTSUPP);
+
+	ret = setsockopt(fd, IPPROTO_IP, IP_MULTICAST_LOOP, &loopback, len);
+	if (ret < 0)
+		return _lwip_socket_error(errno);
+
+/*	_lwip_socket_log("SOCK_UDP_MULTICAST: set, fd=%d loopback=%d", fd, loopback); */
+
+	return 0;
+}
+
+int _lwip_socket_udp_get_multicast_ttl (int fd, uint8_t *ttl, bool ipv6)
+{
+	socklen_t len = sizeof(uint8_t);
+	int ret;
+
+	if (ipv6)
+		return _lwip_socket_error(EOPNOTSUPP);
+
+	ret = getsockopt(fd, IPPROTO_IP, IP_MULTICAST_TTL, ttl, &len);
+	if (ret < 0)
+	{
+		*ttl = 0;
+		return _lwip_socket_error(errno);
+	}
+
+/*	_lwip_socket_log("SOCK_UDP_MULTICAST: get, fd=%d ttl=%d", fd, *ttl); */
+
+	return 0;
+}
+
+int _lwip_socket_udp_set_multicast_ttl (int fd, uint8_t ttl, bool ipv6)
+{
+	socklen_t len = sizeof(uint8_t);
+	int ret;
+
+	if (ipv6)
+		return _lwip_socket_error(EOPNOTSUPP);
+
+	ret = setsockopt(fd, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, len);
+	if (ret < 0)
+		return _lwip_socket_error(errno);
+
+/*	_lwip_socket_log("SOCK_UDP_MULTICAST: set, fd=%d ttl=%d", fd, ttl); */
 
 	return 0;
 }
@@ -816,10 +935,11 @@ int _lwip_socket_deinit (void)
 
 static int _lwip_socket_open (int type, int *fd,
 							ip_addr_t *remote_addr, uint16_t remote_port, uint16_t local_port,
-							int timeout_msec, bool ipv6, bool reuse_addr)
+							uint8_t multicast_ttl, int timeout_msec, bool ipv6)
 {
 	if (g_lwip_socket_info)
 	{
+		bool reuse_addr = true;
 		bool listen = false;
 		int ret;
 
@@ -850,13 +970,31 @@ static int _lwip_socket_open (int type, int *fd,
 					ret = _lwip_socket_udp_set_broadcast(*fd, true);
 					if (ret == 0)
 					{
+						if (multicast_ttl > 0)						
+							ret = _lwip_socket_udp_set_multicast_ttl(*fd, multicast_ttl, ipv6);
+					}
+
+					if (ret == 0)
+					{
 						bool broadcast;
 
 						ret = _lwip_socket_udp_get_broadcast(*fd, &broadcast);
 						if (ret == 0)
 						{
-							_lwip_socket_log("SOCK_OPEN: fd=%d, UDP Broadcasting %s",
-												*fd, broadcast ? "On" :"Off");
+							bool multicast_loopback;
+							uint8_t multicast_ttl;
+
+							if (broadcast)
+								_lwip_socket_log("SOCK_OPEN: UDP Broadcast, fd=%d", *fd);
+
+							ret = _lwip_socket_udp_get_multicast_loopback(*fd, &multicast_loopback, ipv6);
+							if (ret == 0)
+							{
+								_lwip_socket_udp_get_multicast_ttl(*fd, &multicast_ttl, ipv6);
+
+								_lwip_socket_log("SOCK_OPEN: UDP Multicast, fd=%d loopback=%d ttl=%u", 
+													*fd, multicast_loopback, multicast_ttl);
+							}
 						}
 					}
 				}
@@ -872,14 +1010,14 @@ static int _lwip_socket_open (int type, int *fd,
 
 				*fd = ret;
 
-				ret = _lwip_socket_set_reuse_addr(*fd, reuse_addr);
-				if (ret < 0)
-					return _lwip_socket_error(errno);
-
 				if (remote_addr)
 					ret = _lwip_socket_connect(*fd, remote_addr, remote_port, timeout_msec, ipv6);
 				else
 				{
+					ret = _lwip_socket_set_reuse_addr(*fd, reuse_addr);
+					if (ret < 0)
+						return _lwip_socket_error(errno);
+
 					ret = _lwip_socket_bind(*fd, local_port, ipv6);
 					if (ret	== 0)
 					{
@@ -912,20 +1050,20 @@ static int _lwip_socket_open (int type, int *fd,
 	return _lwip_socket_error(EPERM);
 }
 
-int _lwip_socket_open_udp (int *fd, uint16_t local_port, bool ipv6, bool reuse_addr)
+int _lwip_socket_open_udp (int *fd, uint16_t local_port, uint8_t multicast_ttl, bool ipv6) 
 {
-	return _lwip_socket_open(SOCK_DGRAM, fd, NULL, 0, local_port, 0, ipv6, reuse_addr);
+	return _lwip_socket_open(SOCK_DGRAM, fd, NULL, 0, local_port, multicast_ttl, 0, ipv6);
 }
 
-int _lwip_socket_open_tcp_server (int *fd, uint16_t local_port, bool ipv6, bool reuse_addr)
+int _lwip_socket_open_tcp_server (int *fd, uint16_t local_port, bool ipv6)
 {
-	return _lwip_socket_open(SOCK_STREAM, fd, NULL, 0, local_port, 0, ipv6, reuse_addr);
+	return _lwip_socket_open(SOCK_STREAM, fd, NULL, 0, local_port, 0, 0, ipv6);
 }
 
 int _lwip_socket_open_tcp_client (int *fd, ip_addr_t *remote_addr, uint16_t remote_port,
-								int timeout_msec, bool ipv6, bool reuse_addr)
+								int timeout_msec, bool ipv6)
 {
-	return _lwip_socket_open(SOCK_STREAM, fd, remote_addr, remote_port, 0, timeout_msec, ipv6, reuse_addr);
+	return _lwip_socket_open(SOCK_STREAM, fd, remote_addr, remote_port, 0, 0, timeout_msec, ipv6);
 }
 
 int _lwip_socket_get_peer (int fd, ip_addr_t *ipaddr, uint16_t *port)

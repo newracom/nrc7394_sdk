@@ -100,7 +100,9 @@ extern int ip4_input_nat(struct pbuf *p, struct netif *inp);
 #define LWIP_MULTICAST_TX_OPTIONS       1
 //#define LWIP_NOASSERT 1 // To suppress some errors for now (no debug output)
 
+#if defined(INCLUDE_TRACE_ALWAYS)
 #define LWIP_DEBUG
+#endif /* defined(INCLUDE_TRACE_ALWAYS) */
 #ifdef LWIP_DEBUG
 
 #define LWIP_DBG_MIN_LEVEL        LWIP_DBG_LEVEL_ALL // LWIP_DBG_LEVEL_SERIOUS
@@ -212,10 +214,10 @@ a lot of data that needs to be copied, this should be set high. */
 #else
 /* MEMP_NUM_UDP_PCB: the number of UDP protocol control blocks. One
    per active UDP "connection". */
-#define MEMP_NUM_UDP_PCB        20
+#define MEMP_NUM_UDP_PCB        10
 /* MEMP_NUM_TCP_PCB: the number of simulatenously active TCP
    connections. */
-#define MEMP_NUM_TCP_PCB        20
+#define MEMP_NUM_TCP_PCB        10
 /* MEMP_NUM_TCP_PCB_LISTEN: the number of listening TCP
    connections. */
 #define MEMP_NUM_TCP_PCB_LISTEN MEMP_NUM_TCP_PCB
@@ -264,7 +266,7 @@ a lot of data that needs to be copied, this should be set high. */
 #if defined(TS8266) || defined(TR6260) || defined(NRC7392)
 #define PBUF_POOL_SIZE          5
 #else
-#define PBUF_POOL_SIZE          12
+#define PBUF_POOL_SIZE          18
 #endif
 
 /* PBUF_POOL_BUFSIZE: the size of each pbuf in the pbuf pool. */
@@ -314,7 +316,7 @@ a lot of data that needs to be copied, this should be set high. */
 
 /* ---------- ARP options ---------- */
 #define LWIP_ARP		1
-#define ARP_TABLE_SIZE 10
+#define ARP_TABLE_SIZE 80
 #define ETHARP_TABLE_MATCH_NETIF        1
 #define ARP_QUEUEING                    1
 
@@ -344,11 +346,12 @@ a lot of data that needs to be copied, this should be set high. */
    interfaces. DHCP is not implemented in lwIP 0.5.1, however, so
    turning this on does currently not work. */
 #define LWIP_DHCP               1
+#if LWIP_DHCP
+#define LWIP_DHCP_EVENT         1
+#endif
 
-
-/* 1 if you want to do an ARP check on the offered address
-   (recommended). */
-#define DHCP_DOES_ARP_CHECK     ((LWIP_DHCP) && (LWIP_ARP))
+/* 1 if you want to do an ARP check on the offered address */
+#define DHCP_DOES_ARP_CHECK     0
 
 /* ---------- UDP options ---------- */
 #define LWIP_UDP                1
@@ -400,6 +403,9 @@ a lot of data that needs to be copied, this should be set high. */
 
 /* LWIP_BRIDGE==1: Enable bridge interface application */
 #define LWIP_BRIDGE            1
+
+/* STATIC_ARP_ENTRY_DHCP_SERVER==1: Enable static arp about DHCP server */
+#define STATIC_ARP_ENTRY_DHCP_SERVER            1
 
 /* define for sys_arch.c */
 #define LWIP_FREERTOS_THREAD_STACKSIZE_IS_STACKWORDS  1

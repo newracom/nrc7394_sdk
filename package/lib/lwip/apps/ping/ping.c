@@ -92,14 +92,14 @@ ping_statistics_report(void *arg)
 	ftoa(avg_delay,avg_delay_str, 2);
 
 	ping_mutex_lock();
-	LWIP_DEBUGF( PING_DEBUG, ("\n---------------------------- Ping Statistics --------------------------------\n"));
-	LWIP_DEBUGF( PING_DEBUG, (" Target Address : "));
+	LWIP_PLATFORM_DIAG(("\n---------------------------- Ping Statistics --------------------------------\n"));
+	LWIP_PLATFORM_DIAG((" Target Address : "));
 	ip_addr_debug_print(PING_DEBUG, &(ping_info->addr));
-	LWIP_DEBUGF( PING_DEBUG, ("\n"));
-	LWIP_DEBUGF( PING_DEBUG, (" %d packets transmitted, %d received, %d%% packet loss, %s ms average delay",\
+	LWIP_PLATFORM_DIAG(("\n"));
+	LWIP_PLATFORM_DIAG((" %d packets transmitted, %d received, %d%% packet loss, %s ms average delay",\
 		 (int)ping_info->count, (int)ping_info->success, (int)((ping_info->count-ping_info->success)*100/ping_info->count), \
 		((ping_info->success == 0) ?  "0":avg_delay_str)));
-	LWIP_DEBUGF( PING_DEBUG, ("\n-----------------------------------------------------------------------------\n"));
+	LWIP_PLATFORM_DIAG(("\n-----------------------------------------------------------------------------\n"));
 	ping_mutex_unlock();
 }
 
@@ -203,9 +203,9 @@ ping_recv(void *arg, int s)
 				ping_info->time_delay = (sys_now() - ping_info->time);
 				inet_ntop(AF_INET, &ping_info->addr, from_str, INET_ADDRSTRLEN);
 				ping_mutex_lock();
-				LWIP_DEBUGF( PING_DEBUG, ("ping: recv %s", from_str));
-				LWIP_DEBUGF( PING_DEBUG, (" [%d] ", ping_info->seq_num));
-				LWIP_DEBUGF( PING_DEBUG, (" %"U32_F" ms\n", ping_info->time_delay));
+				LWIP_PLATFORM_DIAG(("ping: recv %s", from_str));
+				LWIP_PLATFORM_DIAG((" [%d] ", ping_info->seq_num));
+				LWIP_PLATFORM_DIAG((" %"U32_F" ms\n", ping_info->time_delay));
 				ping_mutex_unlock();
 
 				/* do some ping result processing */
@@ -219,7 +219,7 @@ ping_recv(void *arg, int s)
 
 	if (len == 0) {
 		ping_mutex_lock();
-		LWIP_DEBUGF( PING_DEBUG, ("ping: recv - %"U32_F" ms - timeout\n", (sys_now()-ping_info->time)));
+		LWIP_PLATFORM_DIAG(("ping: recv - %"U32_F" ms - timeout\n", (sys_now()-ping_info->time)));
 		ping_mutex_unlock();
 	}
 
@@ -255,17 +255,17 @@ void ping_thread(void *arg)
 	while (1) {
 		if (ping_send(ping_info, s, &(ping_info->addr)) == ERR_OK) {
 			ping_mutex_lock();
-			LWIP_DEBUGF( PING_DEBUG, ("ping: send "));
+			LWIP_PLATFORM_DIAG(("ping: send "));
 			ip_addr_debug_print(PING_DEBUG, &(ping_info->addr));
-			LWIP_DEBUGF( PING_DEBUG, ("\n"));
+			LWIP_PLATFORM_DIAG(("\n"));
 			ping_mutex_unlock();
 			ping_info->time = sys_now();
 			ping_recv(ping_info, s);
 		} else {
 			ping_mutex_lock();
-			LWIP_DEBUGF( PING_DEBUG, ("ping: send "));
+			LWIP_PLATFORM_DIAG(("ping: send "));
 			ip_addr_debug_print(PING_DEBUG, &(ping_info->addr));
-			LWIP_DEBUGF( PING_DEBUG, (" - error\n"));
+			LWIP_PLATFORM_DIAG((" - error\n"));
 			ping_mutex_unlock();
 		}
 

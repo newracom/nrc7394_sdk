@@ -179,6 +179,285 @@ netconn_new_with_proto_and_callback(enum netconn_type t, u8_t proto, netconn_cal
   return conn;
 }
 
+#if defined(INCLUDE_LWIP_RECOVERY)
+/**
+ * Saves the state of a network connection to a socket container.
+ *
+ * @param sc A pointer to the socket container structure where the state will be saved.
+ * @param conn A pointer to the netconn structure containing the network connection states.
+ *
+ * @return ERR_OK on success, or an error code (ERR_ARG, ERR_MEM, ERR_VAL) on failure.
+ */
+err_t
+netconn_retent(struct socket_container *sc, struct netconn *conn)
+{
+  if (!conn || !sc) {
+    return ERR_ARG;
+  }
+
+  /* TCP/UDP PCB */
+  switch(conn->type) {
+    case NETCONN_TCP:
+    if (conn->pcb.tcp) {
+      if (conn->state == NETCONN_LISTEN) {
+        struct tcp_pcb_listen *tcp_pcb_listen = (struct tcp_pcb_listen *)conn->pcb.tcp;
+        struct tcp_pcb_listen_container *tcp_ret_listen = (struct tcp_pcb_listen_container *)&sc->pcb;
+        tcp_ret_listen->state = tcp_pcb_listen->state;
+        tcp_ret_listen->local_port = tcp_pcb_listen->local_port;
+        tcp_ret_listen->backlog = tcp_pcb_listen->backlog;
+        tcp_ret_listen->accepts_pending = tcp_pcb_listen->accepts_pending;
+      } else if (conn->state != NETCONN_CLOSE) {
+        struct tcp_pcb *tcp_pcb = (struct tcp_pcb *)conn->pcb.tcp;
+        struct tcp_pcb_container *tcp_ret = (struct tcp_pcb_container *)&sc->pcb;
+        tcp_ret->state = tcp_pcb->state;
+        tcp_ret->flags = tcp_pcb->flags;
+        tcp_ret->local_port = tcp_pcb->local_port;
+        tcp_ret->remote_port = tcp_pcb->remote_port;
+        tcp_ret->rcv_nxt = tcp_pcb->rcv_nxt;
+        tcp_ret->rcv_wnd = tcp_pcb->rcv_wnd;
+        tcp_ret->rcv_ann_wnd = tcp_pcb->rcv_ann_wnd;
+        tcp_ret->rcv_ann_right_edge = tcp_pcb->rcv_ann_right_edge;
+        tcp_ret->rtime = tcp_pcb->rtime;
+        tcp_ret->mss = tcp_pcb->mss;
+        tcp_ret->rttest = tcp_pcb->rttest;
+        tcp_ret->rtseq = tcp_pcb->rtseq;
+        tcp_ret->sa = tcp_pcb->sa;
+        tcp_ret->sv = tcp_pcb->sv;
+        tcp_ret->rto = tcp_pcb->rto;
+        tcp_ret->nrtx = tcp_pcb->nrtx;
+        tcp_ret->dupacks = tcp_pcb->dupacks;
+        tcp_ret->lastack = tcp_pcb->lastack;
+        tcp_ret->cwnd = tcp_pcb->cwnd;
+        tcp_ret->ssthresh = tcp_pcb->ssthresh;
+        tcp_ret->rto_end = tcp_pcb->rto_end;
+        tcp_ret->snd_nxt = tcp_pcb->snd_nxt;
+        tcp_ret->snd_wl1 = tcp_pcb->snd_wl1;
+        tcp_ret->snd_wl2 = tcp_pcb->snd_wl2;
+        tcp_ret->snd_lbb = tcp_pcb->snd_lbb;
+        tcp_ret->snd_wnd = tcp_pcb->snd_wnd;
+        tcp_ret->snd_wnd_max = tcp_pcb->snd_wnd_max;
+        tcp_ret->snd_buf = tcp_pcb->snd_buf;
+        tcp_ret->quickack = tcp_pcb->quickack;
+        tcp_ret->bytes_acked = tcp_pcb->bytes_acked;
+#if LWIP_CALLBACK_API
+        tcp_ret->connected = tcp_pcb->connected;
+#endif /* LWIP_CALLBACK_API */
+        tcp_ret->ts_lastacksent = tcp_pcb->ts_lastacksent;
+        tcp_ret->ts_recent = tcp_pcb->ts_recent;
+        tcp_ret->keep_idle = tcp_pcb->keep_idle;
+#if LWIP_TCP_KEEPALIVE
+        tcp_ret->keep_intvl = tcp_pcb->keep_intvl;
+        tcp_ret->keep_cnt = tcp_pcb->keep_cnt;
+#endif /* LWIP_TCP_KEEPALIVE */
+        tcp_ret->persist_cnt = tcp_pcb->persist_cnt;
+        tcp_ret->persist_backoff = tcp_pcb->persist_backoff;
+        tcp_ret->persist_probe = tcp_pcb->persist_probe;
+        tcp_ret->keep_cnt_sent = tcp_pcb->keep_cnt_sent;
+      } else {
+        return ERR_VAL;
+      }
+    } else {
+      return ERR_MEM;
+    }
+    break;
+    case NETCONN_UDP:
+    if (conn->pcb.udp) {
+      struct udp_pcb *udp_pcb = (struct udp_pcb *)conn->pcb.udp;
+      struct udp_pcb_container *udp_ret = (struct udp_pcb_container *)&sc->pcb;
+      udp_ret->flags = udp_pcb->flags;
+      udp_ret->local_port = udp_pcb->local_port;
+      udp_ret->remote_port = udp_pcb->remote_port;
+    } else {
+      return ERR_MEM;
+    }
+    break;
+    case NETCONN_RAW:
+#if 0 // SUPPORT RAW SOCKET RECOVERY?
+    if (conn->pcb.raw) {
+      struct raw_pcb *raw_pcb = (struct raw_pcb *)conn->pcb.raw;
+      struct udp_pcb_container *udp_ret = (struct udp_pcb_container *)&sc->pcb;
+      udp_ret->flags = raw_pcb->flags;
+      udp_ret->protocol = raw_pcb->protocol;
+    } else {
+      return ERR_MEM;
+    }
+#endif
+    break;
+    default:
+    return ERR_VAL;
+  }
+
+  /* IP PCB */
+  if (conn->pcb.ip) {
+    struct ip_pcb *ip_pcb = (struct ip_pcb *)conn->pcb.ip;
+    struct ip_pcb *ip_ret = (struct ip_pcb *)&sc->pcb;
+    ip_ret->local_ip.addr = ip_pcb->local_ip.addr;
+    ip_ret->remote_ip.addr = ip_pcb->remote_ip.addr;
+    ip_ret->netif_idx = ip_pcb->netif_idx;
+    ip_ret->so_options = ip_pcb->so_options;
+    ip_ret->ttl = ip_pcb->ttl;
+    ip_ret->tos = ip_pcb->tos;
+  } else {
+    return ERR_MEM;
+  }
+
+  /* netconn */
+  struct netconn_container *netconn = &sc->netconn;
+  netconn->type = conn->type;
+  netconn->state = conn->state;
+  if (netconn->state != NETCONN_LISTEN) {
+    netconn->state = NETCONN_NONE;
+  }
+#if LWIP_SO_SNDTIMEO
+  netconn->send_timeout = conn->send_timeout;
+#endif
+#if LWIP_SO_RCVTIMEO
+  netconn->recv_timeout = conn->recv_timeout;
+#endif
+#if LWIP_SO_RCVBUF
+  netconn->recv_bufsize = conn->recv_bufsize;
+#endif
+  netconn->flags = conn->flags;
+  netconn->callback = conn->callback;
+  netconn->socket = conn->socket;
+
+  return ERR_OK;
+}
+
+/**
+ * Restores the state of a netconn from a saved socket container.
+ *
+ * @param conn the netconn to restore
+ * @param sc the saved socket container
+ *
+ * @return ERR_OK on success, or an error code (ERR_ARG, ERR_MEM, ERR_VAL) on failure.
+ */
+err_t
+netconn_recover(struct netconn *conn, struct socket_container *sc)
+{
+  if (!conn || !sc) {
+    return ERR_ARG;
+  }
+
+  switch(sc->netconn.type) {
+    case NETCONN_TCP:
+    if (conn->pcb.tcp) {
+      if (sc->netconn.state == NETCONN_LISTEN) {
+        struct tcp_pcb_listen *tcp_pcb_listen = (struct tcp_pcb_listen *)conn->pcb.tcp;
+        struct tcp_pcb_listen_container *tcp_ret_listen = (struct tcp_pcb_listen_container *)&sc->pcb;
+        tcp_pcb_listen->state = tcp_ret_listen->state;
+        tcp_pcb_listen->local_port = tcp_ret_listen->local_port;
+        tcp_pcb_listen->backlog = tcp_ret_listen->backlog;
+        tcp_pcb_listen->accepts_pending = tcp_ret_listen->accepts_pending;
+      } else {
+        struct tcp_pcb *tcp_pcb = (struct tcp_pcb *)conn->pcb.tcp;
+        struct tcp_pcb_container *tcp_ret = (struct tcp_pcb_container *)&sc->pcb;
+        tcp_pcb->state = tcp_ret->state;
+        tcp_pcb->flags = tcp_ret->flags;
+        tcp_pcb->local_port = tcp_ret->local_port;
+        tcp_pcb->remote_port = tcp_ret->remote_port;
+        tcp_pcb->rcv_nxt = tcp_ret->rcv_nxt;
+        tcp_pcb->rcv_wnd = tcp_ret->rcv_wnd;
+        tcp_pcb->rcv_ann_wnd = tcp_ret->rcv_ann_wnd;
+        tcp_pcb->rcv_ann_right_edge = tcp_ret->rcv_ann_right_edge;
+        tcp_pcb->rtime = tcp_ret->rtime;
+        tcp_pcb->mss = tcp_ret->mss;
+        tcp_pcb->rttest = tcp_ret->rttest;
+        tcp_pcb->rtseq = tcp_ret->rtseq;
+        tcp_pcb->sa = tcp_ret->sa;
+        tcp_pcb->sv = tcp_ret->sv;
+        tcp_pcb->rto = tcp_ret->rto;
+        tcp_pcb->nrtx = tcp_ret->nrtx;
+        tcp_pcb->dupacks = tcp_ret->dupacks;
+        tcp_pcb->lastack = tcp_ret->lastack;
+        tcp_pcb->cwnd = tcp_ret->cwnd;
+        tcp_pcb->ssthresh = tcp_ret->ssthresh;
+        tcp_pcb->rto_end = tcp_ret->rto_end;
+        tcp_pcb->snd_nxt = tcp_ret->snd_nxt;
+        tcp_pcb->snd_wl1 = tcp_ret->snd_wl1;
+        tcp_pcb->snd_wl2 = tcp_ret->snd_wl2;
+        tcp_pcb->snd_lbb = tcp_ret->snd_lbb;
+        tcp_pcb->snd_wnd = tcp_ret->snd_wnd;
+        tcp_pcb->snd_wnd_max = tcp_ret->snd_wnd_max;
+        tcp_pcb->snd_buf = tcp_ret->snd_buf;
+        tcp_pcb->quickack = tcp_ret->quickack;
+        tcp_pcb->bytes_acked = tcp_ret->bytes_acked;
+#if LWIP_CALLBACK_API
+        tcp_pcb->connected = tcp_ret->connected;
+#endif /* LWIP_CALLBACK_API */
+        tcp_pcb->ts_lastacksent = tcp_ret->ts_lastacksent;
+        tcp_pcb->ts_recent = tcp_ret->ts_recent;
+        tcp_pcb->keep_idle = tcp_ret->keep_idle;
+#if LWIP_TCP_KEEPALIVE
+        tcp_pcb->keep_intvl = tcp_ret->keep_intvl;
+        tcp_pcb->keep_cnt = tcp_ret->keep_cnt;
+#endif /* LWIP_TCP_KEEPALIVE */
+        tcp_pcb->persist_cnt = tcp_ret->persist_cnt;
+        tcp_pcb->persist_backoff = tcp_ret->persist_backoff;
+        tcp_pcb->persist_probe = tcp_ret->persist_probe;
+        tcp_pcb->keep_cnt_sent = tcp_ret->keep_cnt_sent;
+      }
+    } else {
+      return ERR_MEM;
+    }
+    break;
+    case NETCONN_UDP:
+    if (conn->pcb.udp) {
+      struct udp_pcb *udp_pcb = (struct udp_pcb *)conn->pcb.udp;
+      struct udp_pcb_container *udp_ret = (struct udp_pcb_container *)&sc->pcb;
+      udp_pcb->flags = udp_ret->flags;
+      udp_pcb->local_port = udp_ret->local_port;
+      udp_pcb->remote_port = udp_ret->remote_port;
+    } else {
+      return ERR_MEM;
+    }
+    break;
+    case NETCONN_RAW:
+#if 0 // SUPPORT RAW SOCKET RECOVERY?
+    if (conn->pcb.raw) {
+      struct raw_pcb *raw_pcb = (struct raw_pcb *)conn->pcb.raw;
+      struct udp_pcb_container *udp_ret = (struct udp_pcb_container *)&sc->pcb;
+      raw_pcb->flags = raw_ret->flags;
+      raw_pcb->protocol = raw_ret->protocol;
+    } else {
+      return ERR_MEM;
+    }
+#endif
+    break;
+    default:
+    return ERR_VAL;
+  }
+
+  if (conn->pcb.ip) {
+    struct ip_pcb *ip_pcb = (struct ip_pcb *)conn->pcb.ip;
+    struct ip_pcb *ip_ret = (struct ip_pcb *)&sc->pcb;
+    ip_pcb->local_ip.addr = ip_ret->local_ip.addr;
+    ip_pcb->remote_ip.addr = ip_ret->remote_ip.addr;
+    ip_pcb->netif_idx = ip_ret->netif_idx;
+    ip_pcb->so_options = ip_ret->so_options;
+    ip_pcb->tos = ip_ret->tos;
+    ip_pcb->ttl = ip_ret->ttl;
+  } else {
+    return ERR_MEM;
+  }
+
+  conn->state = sc->netconn.state;
+#if LWIP_SO_SNDTIMEO
+  conn->send_timeout = sc->netconn.send_timeout;
+#endif
+#if LWIP_SO_RCVTIMEO
+  conn->recv_timeout = sc->netconn.recv_timeout;
+#endif
+#if LWIP_SO_RCVBUF
+  conn->recv_bufsize = sc->netconn.recv_bufsize;
+#endif
+  conn->flags = sc->netconn.flags;
+  conn->callback = sc->netconn.callback;
+
+  return ERR_OK;
+}
+#endif /* defined(INCLUDE_LWIP_RECOVERY) */
+
 /**
  * @ingroup netconn_common
  * Close a netconn 'connection' and free all its resources but not the netconn itself.

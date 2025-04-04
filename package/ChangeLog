@@ -4,6 +4,36 @@
 *
 *******************************************************************
 
+[2025-04-04]
+Change summary for version 1.3.3:
+
+Bugfix
+    * Invalid listen interval calculation value
+    * Incorrect S1G channel index for K2 2M channel
+    * Hidden SSID AP connection issue in the relay sample
+    * Issue where STA scan fails when the SoftAP uses a hidden SSID and the STA alawys uses NDP Probe request
+    * Issue where STA cleanup occurs later than the configured BSS Max Idle Time when there’s no keep-alive from STA in SoftAP mode
+    * Issue where beacons are occasionally missed during TIM mode deep sleep (non-periodic)
+    * Issue where connections between SoftAP and specific devices fail when multiple devices repeatedly attempt to connect to SoftAP (non-periodic)
+    * Issue where STA fails to parse the Auth Ctrl IE sent by the AP during DAC (Distributed Auth Control) (non-periodic).
+
+Changes
+    * Update SDK APIs
+      o Refer to UG-7394-005-Standalone SDK API document
+    * Update AT-CMD
+      o Refer to UG-7394-006-AT_Command document
+    * Add '+eeprom' build option for EEPROM
+    * STA PS support of SoftAP
+    * Upgrade to MbedTLS v3.6.2
+    * ECP calculation improvement
+    * Add sysconfig features
+      o Optional GP17 TX-ON monitoring
+      o GPIO band selection
+    * Disable an ARP check on the offered address
+    * Add NVS encryption support
+    * Increase PBUF_POOL_SIZE from 12 to 18
+    * Disabled short beacon by default on SoftAP
+
 [2024-12-27]
 Change summary for version 1.3.2:
 

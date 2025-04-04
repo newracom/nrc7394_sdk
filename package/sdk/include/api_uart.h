@@ -89,15 +89,18 @@ typedef enum  {
  * @brief UART configuration parameters
  ***********************************************/
 typedef struct {
-	int ch;								/**< channel number */
-	NRC_UART_DATA_BIT db;					/**< Data bit */
-	int br;								/**< Baud rate */
-	NRC_UART_STOP_BIT stop_bit;			/**< Stop bit */
-	NRC_UART_PARITY_BIT parity_bit;			/**< Parity bit */
-	NRC_UART_HW_FLOW_CTRL hw_flow_ctrl;	/**< HW flow control */
-	NRC_UART_FIFO fifo;					/**< FIFO */
+	int ch;                                /**< Channel number */
+	int tx;                                /**< TX GPIO pin number. If -1, uses default value in EVK */
+	int rx;                                /**< RX GPIO pin number. If -1, uses default value in EVK */
+	int rts;                               /**< RTS GPIO pin number. If -1, uses default value in EVK (only applicable if HW flow control is enabled) */
+	int cts;                               /**< CTS GPIO pin number. If -1, uses default value in EVK (only applicable if HW flow control is enabled) */
+	NRC_UART_DATA_BIT db;                  /**< Data bit */
+	int br;                                /**< Baud rate */
+	NRC_UART_STOP_BIT stop_bit;            /**< Stop bit */
+	NRC_UART_PARITY_BIT parity_bit;        /**< Parity bit */
+	NRC_UART_HW_FLOW_CTRL hw_flow_ctrl;    /**< HW flow control. If enabled, CTS and RTS GPIOs are used */
+	NRC_UART_FIFO fifo;                    /**< FIFO */
 } NRC_UART_CONFIG;
-
 
 /**********************************************
  * @fn nrc_err_t nrc_uart_set_config(NRC_UART_CONFIG *conf)

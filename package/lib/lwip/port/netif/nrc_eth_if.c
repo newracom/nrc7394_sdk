@@ -164,6 +164,8 @@ static void link_callback(struct netif *eth_if)
 				char mac_addr[20];
 				/* Retrieve all station currently associated */
 				if (nrc_wifi_softap_get_sta_list(0, &info, sizeof(STA_LIST)) == WIFI_SUCCESS) {
+					ctrl_iface_resp_t *resp;
+
 					for (int i = 0; i < info.total_num; i++) {
 						sprintf(mac_addr, "%02x:%02x:%02x:%02x:%02x:%02x",
 								info.sta[i].addr[0],
@@ -172,7 +174,10 @@ static void link_callback(struct netif *eth_if)
 								info.sta[i].addr[3],
 								info.sta[i].addr[4],
 								info.sta[i].addr[5]);
-						ctrl_iface_receive_response(0, "deauthenticate %s", mac_addr);
+						resp = ctrl_iface_receive_response(0, "deauthenticate %s", mac_addr);
+						if (!CTRL_IFACE_RESP_OK(resp)) {
+							E(TT_NET, "[%s] failed to deauthenticate %s\n", __func__, mac_addr);
+						}
 					}
 				}
 			}

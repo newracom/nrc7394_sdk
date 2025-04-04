@@ -29,26 +29,11 @@
 
 #include "lwip/sockets.h"
 
-//#define NVS_USE 1
 /* If the server echos back the data sent, enable HANDLE_SERVER_ECHO */
 #define HANDLE_SERVER_ECHO 1
 #define CLIENT_DATA_DEBUG 0
 
-#if defined(NVS_USE) && (NVS_USE == 1)
-#include "nrc_sdk.h"
-#include "nvs.h"
-#include "nvs_flash.h"
-nvs_handle_t nvs_handle;
-#endif
-
 #define MAX_RETRY 10
-
-/* TIM or NonTIM deep sleep (select one depending on services)*/
-#define TIM_DEEPSLEEP 0 //TIM (1) NonTIM(0)
-/* in ms. STA can enter deep sleep if there is no traffic during timeout */
-#define IDLE_TIMEOUT 100 // ms
-/* in ms. STA wakes up if sleep time is expired during deep sleep*/
-#define SLEEP_TIME_MS 60000 // ms
 
 /* tcp send operation */
 #define TCP_SEND 1 // Send TCP data : 1 or 0 (1:enable, 0:disable)
@@ -77,82 +62,6 @@ static bool _ready_ip_address(void)
 		return false;
 	}
 }
-
-#if defined(NVS_USE) && (NVS_USE == 1)
-#define NVS_PS_DEEPSLEEP_MODE "ps_mode"
-#define NVS_PS_IDLE_TIMEOUT "ps_idle"
-#define NVS_PS_SLEEP_TIME "ps_sleep"
-#define NVS_TCP_SEND "tcp_send"
-#define NVS_TCP_SEND_SIZE "tcp_send_size"
-
-int set_nvs_ps_setting(uint8_t ps_mode, uint32_t idle_time, uint32_t sleep_time,
-	uint8_t tcp_send, uint32_t tcp_send_size)
-{
-	int retry_cnt = 0;
-	while(1){
-		if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
-			break;
-		} else {
-			_delay_ms(1000);
-			if(retry_cnt == 10)
-				return -1;
-		}
-	}
-	nvs_set_u8(nvs_handle, NVS_PS_DEEPSLEEP_MODE, ps_mode);
-	nvs_set_u32(nvs_handle, NVS_PS_IDLE_TIMEOUT, idle_time);
-	nvs_set_u32(nvs_handle, NVS_PS_SLEEP_TIME, sleep_time);
-	nvs_set_u8(nvs_handle, NVS_TCP_SEND, tcp_send);
-	nvs_set_u32(nvs_handle, NVS_TCP_SEND_SIZE, tcp_send_size);
-	nvs_close(nvs_handle);
-
-	return 0;
-}
-
-int get_nvs_ps_setting(uint8_t *ps_mode, uint32_t *idle_time, uint32_t *sleep_time,
-	uint8_t * tcp_send, uint32_t * tcp_send_size)
-{
-	nvs_err_t err = NVS_OK;
-	int retry_cnt = 0;
-	while(1){
-		if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
-			break;
-		} else {
-			_delay_ms(1000);
-			if(retry_cnt == 10)
-				return -1;
-		}
-	}
-
-	err = nvs_get_u8(nvs_handle, NVS_PS_DEEPSLEEP_MODE, ps_mode);
-	if (NVS_ERR_NVS_NOT_FOUND == err) { /* no configuration set */
-		return -1;
-	}
-
-	err = nvs_get_u32(nvs_handle, NVS_PS_IDLE_TIMEOUT, idle_time);
-	if (NVS_ERR_NVS_NOT_FOUND == err) { /* no configuration set */
-		return -1;
-	}
-
-	err = nvs_get_u32(nvs_handle, NVS_PS_SLEEP_TIME, sleep_time);
-	if (NVS_ERR_NVS_NOT_FOUND == err) { /* no configuration set */
-		return -1;
-	}
-
-	err = nvs_get_u8(nvs_handle, NVS_TCP_SEND, tcp_send);
-	if (NVS_ERR_NVS_NOT_FOUND == err) { /* no configuration set */
-		return -1;
-	}
-
-	err = nvs_get_u32(nvs_handle, NVS_TCP_SEND_SIZE, tcp_send_size);
-	if (NVS_ERR_NVS_NOT_FOUND == err) { /* no configuration set */
-		return -1;
-	}
-
-	nvs_close(nvs_handle);
-
-	return 0;
-}
-#endif
 
 static int connect_to_server(WIFI_CONFIG *param)
 {
@@ -317,12 +226,14 @@ void enter_gpio_wakeup_mode(int wakeup_gpio)
 #ifdef NRC7292
 	/* Below configuration is for NRC7292 EVK Revision B board */
 	nrc_ps_set_gpio_direction(0x07FFFF7F);
+	nrc_ps_set_gpio_out(0x0);
+	nrc_ps_set_gpio_pullup(0x0);
 #elif defined(NRC7394)
 	/* Below configuration is for NRC7394 EVK Revision board */
 	nrc_ps_set_gpio_direction(0xFFF7FDC7);
-#endif
 	nrc_ps_set_gpio_out(0x0);
 	nrc_ps_set_gpio_pullup(0x0);
+#endif
 
 	nrc_ps_set_gpio_wakeup_pin(false, wakeup_gpio, true);
 	nrc_ps_set_wakeup_source(WAKEUP_SOURCE_GPIO);
@@ -343,20 +254,13 @@ nrc_err_t run_sample_wifi_power_save(WIFI_CONFIG *param)
 	char* ip_addr = NULL;
 	uint32_t wakeup_source = 0;
 
-	uint8_t ps_mode = TIM_DEEPSLEEP;
-	uint32_t ps_idle_timeout_ms = IDLE_TIMEOUT;
-	uint32_t ps_sleep_time_ms = SLEEP_TIME_MS;
+	uint8_t ps_mode = param->ps_mode;
+	uint32_t ps_idle_timeout_ms =   param->ps_idle;
+	uint32_t ps_sleep_time_ms =   param->ps_sleep;
 	uint8_t tcp_send = TCP_SEND;
 	uint32_t tcp_send_size = TCP_SEND_SIZE;
 
 	nrc_usr_print("[%s] Sample App for Wi-Fi  \n",__func__);
-
-#if defined(NVS_USE) && (NVS_USE == 1)
-	if(get_nvs_ps_setting(&ps_mode, &ps_idle_timeout_ms, &ps_sleep_time_ms, &tcp_send, &tcp_send_size) < 0){
-		set_nvs_ps_setting(TIM_DEEPSLEEP, IDLE_TIMEOUT,   SLEEP_TIME_MS, TCP_SEND, TCP_SEND_SIZE);
-	}
-#endif
-
 	nrc_usr_print("[%s] ps_mode(%s) idle_timeout(%d) sleep_time(%d)\n",
 		__func__, (ps_mode == 1) ? "TIM" : "NON-TIM", ps_idle_timeout_ms, ps_sleep_time_ms);
 
@@ -428,12 +332,14 @@ check_again:
 #ifdef NRC7292
 	/* Below configuration is for NRC7292 EVK Revision B board */
 	nrc_ps_set_gpio_direction(0x07FFFF7F);
+	nrc_ps_set_gpio_out(0x0);
+	nrc_ps_set_gpio_pullup(0x0);
 #elif defined(NRC7394)
 	/* Below configuration is for NRC7394 EVK Revision board */
 	nrc_ps_set_gpio_direction(0xFFF7FDC7);
-#endif
 	nrc_ps_set_gpio_out(0x0);
 	nrc_ps_set_gpio_pullup(0x0);
+#endif
 
 	while (1) {
 		if(ps_mode){

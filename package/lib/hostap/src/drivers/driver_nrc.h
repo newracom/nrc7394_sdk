@@ -110,16 +110,6 @@ enum {
 	VEVENT_VENDOR_IE_UTC = 0x1B,
 };
 
-struct nrc_wpa_key {
-	uint64_t tsc;	/* key transmit sequence counter */
-	uint16_t ix;	/* Key Index */
-	uint8_t cipher; /* WIM Cipher */
-	uint8_t addr[ETH_ALEN];
-	uint8_t key[NRC_WPA_MAX_KEY_LEN];
-	uint16_t key_len;
-	bool is_set[NRC_WPA_MAX_KEY_INDEX];
-};
-
 #define MAX_TID 8
 
 #if defined (INCLUDE_EARLY_FREE_SYSRXBUF) || defined (INCLUDE_AMPDU_REORDER )
@@ -192,6 +182,73 @@ struct sta_ampdu_mlme {
 #endif //defined (INCLUDE_EARLY_FREE_SYSRXBUF) || defined (INCLUDE_AMPDU_REORDER ) || defined (INCLUDE_AMPDU_AUTO_AGGR_TX)
 };
 
+#if defined(INCLUDE_SOFT_AP_PS_SUPPORT)
+struct nrc_wpa_key {
+	bool                    is_set[NRC_WPA_MAX_KEY_INDEX];
+	uint8_t                 reserved:2;
+	uint8_t                 cipher;        /* WIM Cipher */
+	uint8_t                 addr[ETH_ALEN];
+	uint8_t                 key[NRC_WPA_MAX_KEY_LEN];
+	uint16_t                ix;            /* Key Index */
+	uint16_t                key_len;
+	uint64_t                tsc;           /* key transmit sequence counter */
+} __attribute__ ((packed));
+
+struct nrc_wpa_route {
+	uint8_t                 addr[ETH_ALEN];
+	uint16_t                ts;
+	struct dl_list          list;
+} __attribute__ ((packed));
+
+struct nrc_max_idle {
+	uint8_t                 timeout_retry;
+	uint16_t                period;        // usf
+	uint32_t                timeout_time;  // sf second
+} __attribute__ ((packed));
+
+enum POWER_STATE {
+	POWER_STATE_AWAKE = 0,
+	POWER_STATE_SLEEP = 1
+};
+
+#define SET_BA_STATE(sta, tid, state) \
+	((sta)->block_ack = ((sta)->block_ack & ~((state) << ((tid) << 1))) | ((state) << ((tid) << 1)))
+#define CLEAR_BA_STATE(sta, tid, state) ((sta)->block_ack &= ~(state << ((tid) << 1)))
+#define GET_BA_STATE(sta, tid) (((sta)->block_ack >> ((tid) << 1)) & 3)
+
+struct nrc_wpa_sta {
+	bool                    qos;
+	bool                    use_4addr;
+	uint8_t                 state:3;
+	enum POWER_STATE        ps:1;
+	uint8_t                 reserved:2;
+	uint8_t                 addr[ETH_ALEN];
+	uint16_t                block_ack;
+	uint16_t                aid;
+#if defined (INCLUDE_SOFT_AP)
+	uint16_t                listen_interval;
+#endif
+	struct dl_list          route_list;	   /* only use softAP */
+#if defined(INCLUDE_SOFT_AP_PS_SUPPORT)
+	struct bu_queue         bq;
+#endif
+	struct nrc_max_idle     max_idle;
+	struct nrc_wpa_key      key;
+#if defined (INCLUDE_AMPDU_REORDER) || defined (INCLUDE_EARLY_FREE_SYSRXBUF) || defined (INCLUDE_AMPDU_AUTO_TX)
+	struct sta_ampdu_mlme   ampdu_mlme;
+#endif
+} __attribute__ ((packed));
+#else
+struct nrc_wpa_key {
+	uint64_t tsc;	/* key transmit sequence counter */
+	uint16_t ix;	/* Key Index */
+	uint8_t cipher; /* WIM Cipher */
+	uint8_t addr[ETH_ALEN];
+	uint8_t key[NRC_WPA_MAX_KEY_LEN];
+	uint16_t key_len;
+	bool is_set[NRC_WPA_MAX_KEY_INDEX];
+};
+
 struct nrc_wpa_route {
 	struct dl_list 			list;
 	bool 				used;
@@ -227,6 +284,7 @@ struct nrc_wpa_sta {
 	uint16_t				listen_interval;
 #endif
 };
+#endif
 
 struct nrc_wpa_signal_info {
 	bool 					enabled;
@@ -267,7 +325,7 @@ struct nrc_wpa_if {
 	int num_ap_sta;
 	uint32_t bss_max_idle;
 	uint8_t	num_route_list;
-	int key_mgmt ;
+	uint32_t key_mgmt;
 };
 
 struct nrc_wpa {
@@ -374,6 +432,9 @@ struct nrc_wpa_if *wpa_driver_get_interface(int vif);
 struct nrc_wpa_sta* nrc_wpa_find_sta(struct nrc_wpa_if *intf,
 						const uint8_t addr[ETH_ALEN],
 						bool enabled);
+int nrc_wpa_find_sta_idx(struct nrc_wpa_if *intf,
+						const uint8_t addr[ETH_ALEN],
+						bool enabled);
 struct nrc_wpa_key *nrc_wpa_get_key_by_key_idx(struct nrc_wpa_if *intf,
 						int key_idx);
 struct nrc_wpa_key *nrc_wpa_get_key_by_addr(struct nrc_wpa_if *intf,
@@ -381,17 +442,14 @@ struct nrc_wpa_key *nrc_wpa_get_key_by_addr(struct nrc_wpa_if *intf,
 void wpa_driver_sta_sta_add(struct nrc_wpa_if* intf);
 bool wpa_driver_get_associate_status(uint8_t vif);
 void wpa_driver_notify_event_to_app(int vif, int event_id, uint32_t data_len, uint8_t* data);
-void wpa_driver_notify_vevent_to_app(int event_id, uint32_t data_len, uint8_t* data);
+void wpa_driver_notify_vevent_to_app(int event_id, uint32_t data_len, uint8_t* data, uint8_t* bssid, int8_t rssi, char* ssid, uint8_t ssid_len);
 
 void wpa_driver_sta_sta_remove(struct nrc_wpa_if* intf);
 int wpas_l2_packet_filter(uint8_t *buffer, int len);
 void wpa_driver_clear_key_all(struct nrc_wpa_if *intf);
 void wpa_local_deauth_event(struct nrc_wpa_if *intf, const uint8_t *addr);
-int nrc_transmit(struct nrc_wpa_if* intf, uint8_t *frm, const uint16_t len);
-int nrc_transmit_pmf(struct nrc_wpa_if* intf, uint8_t *frm, const uint16_t len,
-		const uint16_t data_len, struct nrc_wpa_key *wpa_key);
-int nrc_raw_transmit(struct nrc_wpa_if* intf, uint8_t *frm, const uint16_t len,
-				const int ac);
+void wpa_driver_nrc_tx_status(struct nrc_wpa_if* intf, const u8* data,
+				size_t data_len, int ack);
 int nrc_send_deauthenticate(struct nrc_wpa_if *intf, const uint8_t *a1,
 				const uint8_t *a2, const uint8_t *a3, uint16_t reason_code);
 int nrc_get_sec_hdr_len(struct nrc_wpa_key *key);
@@ -423,6 +481,15 @@ static inline bool is_ccmp(uint8_t cipher)
 static inline bool is_key_ccmp(struct nrc_wpa_key *key)
 {
 	return (key && is_ccmp(key->cipher));
+}
+
+static inline bool is_pmf(struct nrc_wpa_if *intf, struct ieee80211_hdr *hdr)
+{
+	if ((WLAN_FC_GET_TYPE(hdr->frame_control) == WLAN_FC_TYPE_MGMT) &&
+		(intf->key_mgmt == WPA_KEY_MGMT_SAE || intf->key_mgmt == WPA_KEY_MGMT_OWE)) {
+		return true;
+	}
+	return false;
 }
 
 bool nrc_update_route(struct nrc_wpa_if* intf, struct nrc_wpa_sta* sta, uint8_t* addr);

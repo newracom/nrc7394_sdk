@@ -418,7 +418,16 @@ tWIFI_STATUS wifi_connect_with_vif(int vif, WIFI_CONFIG *param)
 		}
 	}
 
-	nrc_usr_print("[%s] bgsscan %s\n", __func__, param->bgscan_enable ? "Enable" : "Disable");
+	if (param->scan_period > 0) {
+		if(nrc_wifi_set_scan_dwell_time(vif, param->scan_period) != WIFI_SUCCESS) {
+			nrc_usr_print("[%s] Fail to set scan period %u ms\n", __func__, param->scan_period);
+			return WIFI_FAIL;
+		} else {
+			nrc_usr_print("[%s] Success to set scan period %u ms\n", __func__,param->scan_period);
+		}
+	}
+
+	nrc_usr_print("[%s] bgscan %s\n", __func__, param->bgscan_enable ? "Enable" : "Disable");
 	if (param->bgscan_enable == true) {
 		status = nrc_wifi_set_simple_bgscan(vif, param->bgscan_short, param->bgscan_thresh, param->bgscan_long);
 		nrc_usr_print("[%s] short %d, thres %d, long %d\n", __func__, param->bgscan_short, param->bgscan_thresh, param->bgscan_long);

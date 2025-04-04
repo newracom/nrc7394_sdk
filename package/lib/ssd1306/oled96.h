@@ -44,6 +44,7 @@ void oledShutdown(void);
 
 // Fills the display with the byte pattern
 int oledFill(unsigned char ucPattern);
+int oledPartFill(int pos);
 
 // Write a text string to the display at x (column 0-127) and y (row 0-7)
 // bLarge = 0 - 8x8 font, bLarge = 1 - 16x24 font

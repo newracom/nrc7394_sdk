@@ -11632,6 +11632,8 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 			wpas_request_connection(wpa_s);
 	} else if (os_strcmp(buf, "DISCONNECT") == 0) {
 		wpas_request_disconnection(wpa_s);
+	} else if (os_strncmp(buf, "STA_AUTOCONNECT ", 16) == 0) {
+		wpa_s->auto_reconnect_disabled = atoi(buf + 16) == 0;
 	} else if (os_strcmp(buf, "SCAN") == 0) {
 		wpas_ctrl_scan(wpa_s, NULL, reply, reply_size, &reply_len);
 	} else if (os_strncmp(buf, "SCAN ", 5) == 0) {

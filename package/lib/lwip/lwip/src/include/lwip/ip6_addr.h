@@ -310,9 +310,25 @@ typedef struct ip6_addr ip6_addr_t;
 #define ip6_addr_life_isinfinite(addr_life) ((addr_life) == IP6_ADDR_LIFE_INFINITE)
 #endif /* LWIP_IPV6_ADDRESS_LIFETIMES */
 
+#if defined(LWIP_DEBUG)
 #define ip6_addr_debug_print_parts(debug, a, b, c, d, e, f, g, h) \
   LWIP_DEBUGF(debug, ("%" X16_F ":%" X16_F ":%" X16_F ":%" X16_F ":%" X16_F ":%" X16_F ":%" X16_F ":%" X16_F, \
                       a, b, c, d, e, f, g, h))
+#else
+#define ip6_addr_debug_print_parts(debug, a, b, c, d, e, f, g, h) \
+  do { \
+    if ( \
+        ((debug) & LWIP_DBG_ON) && \
+        ((debug) & LWIP_DBG_TYPES_ON) && \
+        ((s16_t)((debug) & LWIP_DBG_MASK_LEVEL) >= LWIP_DBG_MIN_LEVEL)) { \
+        LWIP_PLATFORM_DIAG(("%" X16_F ":%" X16_F ":%" X16_F ":%" X16_F ":%" X16_F ":%" X16_F ":%" X16_F ":%" X16_F, \
+                            a, b, c, d, e, f, g, h)); \
+        if ((debug) & LWIP_DBG_HALT) { \
+          while(1); \
+        } \
+    } \
+  } while(0)
+#endif
 #define ip6_addr_debug_print(debug, ipaddr) \
   ip6_addr_debug_print_parts(debug, \
                       (u16_t)((ipaddr) != NULL ? IP6_ADDR_BLOCK1(ipaddr) : 0),    \

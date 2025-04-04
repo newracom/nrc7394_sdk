@@ -28,7 +28,7 @@
 #include "lwip/sockets.h"
 #include "lwip/netdb.h"
 #include "lwip/err.h"
-#include "mbedtls/net.h"
+#include "mbedtls/net_sockets.h"
 #include "nrc_http_client.h"
 #include "nrc_http_client_debug.h"
 
@@ -63,7 +63,7 @@ typedef struct {
 
 #if defined(SUPPORT_HTTPS_CLIENT)
 #include "mbedtls/ssl.h"
-#include "mbedtls/certs.h"
+//#include "mbedtls/certs.h"
 #include "mbedtls/entropy.h"
 #include "mbedtls/ctr_drbg.h"
 #include "mbedtls/debug.h"
@@ -359,7 +359,8 @@ static int httpc_ssl_conn(con_handle_t *handle, http_info_t *info, ssl_certs_t *
 	HTTPC_LOGD( "  . Loading the Client private key ..." );
 
 	ret = mbedtls_pk_parse_key( &http_ssl->pkey, (const unsigned char *) certs->client_pk,
-								certs->client_pk_length, NULL, 0 );
+								certs->client_pk_length, NULL, 0,
+								mbedtls_ctr_drbg_random, &http_ssl->ctr_drbg );
 	if( ret < 0 ) {
 		HTTPC_LOGE(" failed\n  !  mbedtls_pk_parse_key returned -0x%x while parsing private key\n\n", -ret);
 		goto exit;

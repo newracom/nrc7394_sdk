@@ -35,14 +35,17 @@
 
 /* Wifi pairwise master key calculated */
 /* (type string) */
+/* CLI : nvs set wifi_pmk <pmk> */
 #define NVS_WIFI_PMK "wifi_pmk"
 
 /* SSID used for calculating PMK */
 /* (type string) */
+/* CLI : nvs set wifi_pmk_ssid <wifi_pmk_ssid> */
 #define NVS_WIFI_PMK_SSID  "wifi_pmk_ssid"
 
 /* password used for calculating PMK */
 /* (type string) */
+/* CLI : nvs set wifi_pmk_pw <wifi_pmk_pw> */
 #define NVS_WIFI_PMK_PASSWORD "wifi_pmk_pw"
 
 /* Wifi Channel */
@@ -102,18 +105,22 @@
 
 /* bss max idle */
 /* (type i32) */
+/* CLI : nvs set_i32 bss_max_idle <bss_max_idle> */
 #define NVS_BSS_MAX_IDLE "bss_max_idle"
 
 /* bss retry count */
 /* (type i32) */
+/* CLI : nvs set_i32 bss_retry_cnt <bss_retry_cnt> */
 #define NVS_BSS_RETRY_CNT "bss_retry_cnt"
 
 /* Tx Power (dbm) */
 /* (type u8) */
+/* CLI : nvs set_u8 tx_power <tx_power> */
 #define NVS_WIFI_TX_POWER "tx_power"
 
 /* Tx Power type : Auto(0), Limit(1), Fixed(2) */
 /* (type u8) */
+/* CLI : nvs set_u8 tx_power_type <tx_power_type> */
 #define NVS_WIFI_TX_POWER_TYPE "tx_power_type"
 
 /* BSSID to be used */
@@ -123,14 +130,17 @@
 
 /*WIFI Connection timeout */
 /* (type i32) */
+/* CLI : nvs set_i32 conn_timeout <conn_timeout> */
 #define NVS_WIFI_CONN_TIMEOUT  "conn_timeout"
 
 /*WIFI Disonnection timeout */
 /* (type i32) */
+/* CLI : nvs set_i32 disconn_timeout <disconn_timeout> */
 #define NVS_WIFI_DISCONN_TIMEOUT  "disconn_timeout"
 
 /* DHCP timeout */
 /* (type i32) */
+/* CLI : nvs set_i32 dhcp_timeout <dhcp_timeout> */
 #define NVS_DHCP_TIMEOUT "dhcp_timeout"
 
 /*WIFI beacon interval */
@@ -235,9 +245,29 @@
 
 /* AUTH MODE */
 /* CLI : nvs set_u8 auth_ctrl [auth_mode] */
-/* [scan_mode] WIFI_DISABLE_AUTH_CONTROL = 0, WIFI_ENABLE_AUTH_CONTROL = 1 */
+/* [auth_mode] WIFI_DISABLE_AUTH_CONTROL = 0, WIFI_ENABLE_AUTH_CONTROL = 1 */
 /* (type u8) */
 #define NVS_WIFI_AUTH_CTRL "auth_ctrl"
+
+/* PS MODE */
+/* [ps_mode] TIM (1) NonTIM(0) */
+/* (type u8) */
+/* CLI : nvs set_u8 ps_mode [ps_mode] */
+#define NVS_PS_DEEPSLEEP_MODE "ps_mode"
+
+/* PS idle timeout */
+/* idle_timout_ms: wait time before entering the modem sleep. */
+/*                    The unit is ms.  (0 <= time < 10000ms) */
+/* (type u16) */
+/* CLI : nvs set_u32 ps_idle [idle_timout_ms] */
+#define NVS_PS_IDLE_TIMEOUT "ps_idle"
+
+/* PS sleep time */
+/* sleep_ms: duration for deep sleep. The unit is ms. (0(not use) or time >= 1000ms) */
+/*             Listen interval should be greater than sleep duration */
+/* (type u32) */
+/* CLI : nvs set_u32 ps_sleep [sleep_ms] */
+#define NVS_PS_SLEEP_TIME "ps_sleep"
 
 #ifdef INCLUDE_SCAN_BACKOFF
 

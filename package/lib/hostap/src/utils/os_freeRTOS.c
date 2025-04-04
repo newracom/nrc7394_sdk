@@ -39,8 +39,10 @@ void * os_memdup(const void *src, size_t len)
 {
 	void *r = NULL;
 	register size_t result = 0;
+#if defined(INCLUDE_BUF_TRACKER)
 #if (__arm__)
 	__asm volatile ("MOV %0, LR\n" : "=r" (result) );
+#endif
 #endif
 
 	r= pvPortMalloc2(len, result);
@@ -136,8 +138,10 @@ void * __attribute__ ((noinline)) os_zalloc(size_t size)
 {
 	void *ptr = NULL;
 	register size_t result = 0;
+#if defined(INCLUDE_BUF_TRACKER)
 #if (__arm__)
 	__asm volatile ("MOV %0, LR\n" : "=r" (result) );
+#endif
 #endif
 
 	ptr = pvPortMalloc2(size, result);
@@ -151,8 +155,10 @@ void * __attribute__ ((noinline)) os_malloc(size_t size)
 {
 	void* ptr = NULL;
 	register size_t result = 0;
+#if defined(INCLUDE_BUF_TRACKER)
 #if (__arm__)
 	__asm volatile ("MOV %0, LR\n" : "=r" (result) );
+#endif
 #endif
 
 	ptr = pvPortMalloc2(size, result);
@@ -164,8 +170,10 @@ void * os_realloc(void *ptr, size_t size)
 {
 	void *newPtr = NULL;
 	register size_t result = 0;
+#if defined(INCLUDE_BUF_TRACKER)
 #if (__arm__)
 	__asm volatile ("MOV %0, LR\n" : "=r" (result) );
+#endif
 #endif
 
 	if (size == 0) {
@@ -214,8 +222,10 @@ char * os_strdup(const char *s)
 	char *dup = NULL;
 	register size_t result = 0;
 	size_t len = strlen(s) + 1;
+#if defined(INCLUDE_BUF_TRACKER)
 #if (__arm__)
 	__asm volatile ("MOV %0, LR\n" : "=r" (result) );
+#endif
 #endif
 
 	dup= pvPortMalloc2(len, result);

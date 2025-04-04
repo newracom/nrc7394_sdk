@@ -41,7 +41,7 @@ void _lmac_check_rxgain_ctrl_idle();
 
 uint32_t lmac_bytes_to_bufend(struct _SYS_BUF* sys_buf, uint8_t *ptr);
 void    lmac_init_null_frame();
-void    lmac_send_callback(int vif_id, void *callback, const uint8_t *addr);
+bool    lmac_send_callback(int vif_id, void *callback, const uint8_t *addr);
 bool    lmac_send_null_frame(bool pm, void(*callback)());
 bool    lmac_send_qos_null_frame(bool pm, void(*callback)(), QoSField *qc);
 uint8_t* lmac_get_macaddr_magic_code(void);
@@ -106,6 +106,7 @@ void lmac_set_auth_control_scale(uint8_t scale);
 uint8_t lmac_get_auth_control_scale();
 bool lmac_set_auth_current_ti(void);
 bool lmac_get_auth_current_ti(int *ti);
+uint16_t lmac_get_auth_control_bo_cnt();
 bool lmac_set_auth_control_param(uint8_t slot, uint8_t ti_min, uint8_t ti_max);
 #endif /* defined(INCLUDE_AUTH_CONTROL) */
 

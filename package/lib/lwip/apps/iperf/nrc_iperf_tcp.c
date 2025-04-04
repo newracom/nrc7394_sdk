@@ -454,7 +454,7 @@ ATTR_NC __attribute__((optimize("O3"))) static void tcp_process_input(void *pvPa
 		iperf_get_time(&now);
 		option->server_info.stop_time = now;
 		if (option->server_info.send_time) {
-			if ((option->server_info.stop_time - option->server_info.start_time) >= option->server_info.send_time) {
+			if ((option->server_info.stop_time - option->server_info.start_time) >= option->server_info.send_time + 1) {
 				exit_flag = true;
 			}
 		}

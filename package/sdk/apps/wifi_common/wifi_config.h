@@ -459,6 +459,36 @@
 #endif /* NRC_WIFI_GUARD_INTERVAL_DEFAULT*/
 
 /**
+ * Wi-Fi Power Save Mode Type
+ * Defines the power save mode:
+ *   - Non-TIM (0): No Target Wake Time Indication
+ *   - TIM (1): Target Wake Time Indication (default)
+ */
+#ifndef NRC_WIFI_PS_MODE_DEFAULT
+#define NRC_WIFI_PS_MODE_DEFAULT 1
+#endif /* NRC_WIFI_PS_MODE_DEFAULT */
+
+/**
+ * Wi-Fi Power Save Idle Timeout
+ * Specifies the wait time before entering modem sleep mode.
+ *   - Unit: milliseconds (0 ≤ time < 10000 ms)
+ *   - The STA can enter deep sleep if there is no traffic during the timeout period.
+ */
+#ifndef NRC_WIFI_PS_IDLE_TIMEOUT_DEFAULT
+#define NRC_WIFI_PS_IDLE_TIMEOUT_DEFAULT 100
+#endif /* NRC_WIFI_PS_IDLE_TIMEOUT_DEFAULT */
+
+/**
+ * Wi-Fi Power Save Sleep Time
+ * Specifies the duration for deep sleep mode.
+ *   - - Unit: milliseconds (0 = not used, or time ≥ 1000 ms).
+ *   - - Note: The listen interval must be greater than the sleep duration.
+ */
+#ifndef NRC_WIFI_PS_SLEEP_TIME_DEFAULT
+#define NRC_WIFI_PS_SLEEP_TIME_DEFAULT 0
+#endif /* NRC_WIFI_PS_SLEEP_TIME_DEFAULT */
+
+/**
  * Wi-Fi ignore_broadcast_ssid - Hide SSID in AP mode
  *
  * This setting controls the behavior of the Access Point (AP) regarding SSID broadcast.
@@ -476,10 +506,14 @@
 #endif /* NRC_WIFI_IGNORE_BROADCAST_SSID_DEFAULT */
 
 /**
- * Maximum number of stations allowed in softAP (upto 75)
+ * Maximum number of stations allowed in softAP
  */
 #ifndef NRC_WIFI_SOFTAP_MAX_NUM_STA_DEFAULT
-#define NRC_WIFI_SOFTAP_MAX_NUM_STA_DEFAULT 75
+#ifdef NRC7394
+#define NRC_WIFI_SOFTAP_MAX_NUM_STA_DEFAULT 70
+#else
+#define NRC_WIFI_SOFTAP_MAX_NUM_STA_DEFAULT 10
+#endif
 #endif /* NRC_WIFI_SOFTAP_MAX_NUM_STA_DEFAULT */
 
 /**
@@ -491,7 +525,6 @@
 #ifndef NRC_WIFI_LISTEN_INTERVAL_DEFAULT
 #define NRC_WIFI_LISTEN_INTERVAL_DEFAULT 1000
 #endif /* NRC_WIFI_LISTEN_INTERVAL_DEFAULT*/
-
 
 /**
  * Background Scan Enable
@@ -534,6 +567,10 @@
 #define NRC_WIFI_BGSCAN_LONG_INTERVAL 300
 #endif /* NRC_WIFI_BGSCAN_LONG_INTERVAL */
 
+
+#ifndef NRC_WIFI_SCAN_PERIOD
+#define NRC_WIFI_SCAN_PERIOD 100
+#endif /* NRC_WIFI_SCAN_PERIOD */
 
 /**
  * EAP type settings for Wi-Fi networks can be specified only Station (STA) modes.

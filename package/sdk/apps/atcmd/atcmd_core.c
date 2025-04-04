@@ -29,12 +29,64 @@
 
 /**********************************************************************************************/
 
+static SemaphoreHandle_t g_atcmd_log_mutex = NULL;
+
+static int atcmd_log_mutex_create (void)
+{
+	g_atcmd_log_mutex = xSemaphoreCreateMutex();
+
+	return !g_atcmd_log_mutex ? -1 : 0;
+}
+
+static void atcmd_log_mutex_delete (void)
+{
+	if (g_atcmd_log_mutex)
+		vSemaphoreDelete(g_atcmd_log_mutex);
+}
+
+static bool atcmd_log_mutex_take (void)
+{
+	bool take = false;
+	int time_ms = 60000;
+
+	if (!g_atcmd_log_mutex)
+		atcmd_log_mutex_create();
+
+	take = !!xSemaphoreTake(g_atcmd_log_mutex, pdMS_TO_TICKS(time_ms));
+
+	if (!take)
+		_atcmd_error("timeout, %dms", time_ms);
+
+	return take;
+}
+#define ATCMD_LOG_LOCK()                ASSERT(atcmd_log_mutex_take())
+
+static bool atcmd_log_mutex_give (void)
+{
+	bool give = false;
+
+	if (g_atcmd_log_mutex)
+		give = !!xSemaphoreGive(g_atcmd_log_mutex);
+
+	if (!give)
+		_atcmd_error("fail");
+
+	return give;
+}
+#define ATCMD_LOG_UNLOCK()      ASSERT(atcmd_log_mutex_give())
+
 int atcmd_log (const char *fmt, ...)
 {
+#if ATCMD_MSG_LEN_MAX >= 256
+	char buf[ATCMD_MSG_LEN_MAX];
+#else	
 	char buf[256];
+#endif	
 	va_list ap;
 	int len;
 	int ret;
+
+	ATCMD_LOG_LOCK();
 
 	len = snprintf(buf, sizeof(buf), "[ATCMD] ");
 
@@ -42,23 +94,30 @@ int atcmd_log (const char *fmt, ...)
 	ret = vsnprintf(buf + len, sizeof(buf) - len, fmt, ap);
 	va_end(ap);
 
-	if (ret >= 0)
+	if (ret < 0)
+	{
+		_atcmd_printf("%s: %s\n", __func__, strerror(errno));
+		ret = -1;
+	}
+	else
 	{
 		len += ret;
 
 		if (len < sizeof(buf))
 		{
 			_atcmd_printf("%s\n", buf);
-
-			return 0;
+			ret = 0;
 		}
-
-		errno = ENOBUFS;
+		else
+		{
+			errno = ENOBUFS;
+			ret = -1;
+		}
 	}
-		
-	_atcmd_printf("%s: %s\n", __func__, strerror(errno));
 
-	return -1;
+	ATCMD_LOG_UNLOCK();
+
+	return ret;
 }
 
 /*******************************************************************************************/
@@ -401,217 +460,182 @@ static int atcmd_history_pop (char **cmd, int **cnt, int key) { return 0; }
 
 /*******************************************************************************************/
 
-#define _atcmd_data_mode_debug(fmt, ...)	/* _atcmd_info("data_mode: " fmt, ##__VA_ARGS__) */
+#define _atcmd_data_mode_info(fmt, ...)		_atcmd_info("data_mode: " fmt, ##__VA_ARGS__) 
+#define _atcmd_data_mode_debug(fmt, ...)	/*_atcmd_debug("data_mode: " fmt, ##__VA_ARGS__)*/
 
 typedef struct
 {
-	atcmd_socket_t *socket;
-	int32_t len;
-	uint32_t timeout;
-	char *exit_cmd;
-	bool done_event;
-	bool binary;
-#if defined(CONFIG_ATCMD_SFUSER)
-	uint32_t sf_user_offset;
-#endif	
-} atcmd_data_mode_params_t;
+	atcmd_data_mode_params_t params;
 
-typedef struct
-{
 	TaskHandle_t task;
 
 	bool enable;
 	bool idle;
-	bool passthrough;
-	bool done_event;
-	bool binary;
-	char *exit_cmd;
 
 	uint32_t cnt;
 	uint32_t send_len;
 	uint32_t send_done;
 	uint32_t send_drop;
-	atcmd_socket_t socket;
-
 	uint32_t send_timeout; // msec
 	uint32_t last_send_time; // msec
-	
-#if defined(CONFIG_ATCMD_SFUSER)
-	uint32_t sf_user_offset;
-#endif	
 } atcmd_data_mode_t;
 
 static atcmd_data_mode_t g_atcmd_data_mode =
 {
+	.params =
+	{
+		.data_type = ATCMD_DATA_NONE,
+		.id = -1,
+		.len = 0,
+		.timeout = 0,
+		.done_event = false,
+		.exit_cmd = NULL
+	},
+
 	.task = NULL,
 
 	.enable = false,
-	.idle = true,
-	.passthrough = false,
-	.done_event = false,
-	.binary = false,
-	.exit_cmd = NULL,
+	.idle = false,
 
 	.cnt = 0,
 	.send_len = 0,
 	.send_done = 0,
 	.send_drop = 0,
-
-	.socket =
-	{
-		.id = -1,
-	},
-
 	.send_timeout = 0,
-	.last_send_time = 0,
+	.last_send_time = 0
+};
 
+static const char *str_data_type[ATCMD_DATA_TYPE_MAX] = 
+{ 
+	[ATCMD_DATA_SSEND] = "SSEND", 
+#if defined(CONFIG_ATCMD_FWUPDATE)
+	[ATCMD_DATA_FWBINDL] = "FWBINDL",
+#endif	
 #if defined(CONFIG_ATCMD_SFUSER)
-	.sf_user_offset = 0,
+   	[ATCMD_DATA_SFUSER] = "SFUSER",
 #endif	
 };
 
-static bool atcmd_data_mode_is_enabled (void)
+void atcmd_data_mode_init_params (enum ATCMD_DATA_TYPE data_type, atcmd_data_mode_params_t *params)
 {
-	return g_atcmd_data_mode.enable;
+	_atcmd_data_mode_debug("%s init, params=%p", str_data_type[data_type], params);
+
+	if (params)
+	{
+		memset(params, 0, sizeof(atcmd_data_mode_params_t));
+
+		params->data_type = data_type;
+
+		params->id = -1;
+		params->len = 0;
+		params->timeout = 0;
+		params->done_event = false;
+		params->exit_cmd = NULL;
+
+		switch (data_type)
+		{
+			case ATCMD_DATA_SSEND:
+				params->ssend.passthrough = false;
+				break;
+
+#if defined(CONFIG_ATCMD_SFUSER)
+			case ATCMD_DATA_SFUSER:
+				params->sfuser.offset = 0;
+				break;
+#endif
+			default:
+				break;
+		}
+	}
 }
 
-static int _atcmd_data_mode_enable (atcmd_data_mode_params_t *params)
+int atcmd_data_mode_enable (atcmd_data_mode_params_t *params)
 {
-	atcmd_socket_t *socket = params->socket;
-	int32_t len = params->len;
-	uint32_t timeout = params->timeout;
-	char *exit_cmd = params->exit_cmd;
-	bool done_event = params->done_event;
-	bool binary = params->binary;
-#if defined(CONFIG_ATCMD_SFUSER)
-	uint32_t sf_user_offset = params->sf_user_offset;
-#endif
-
-	if (socket && socket->id < 0)
-		return -1;
-
-	if (timeout == 0)
-		return -1;
+	if (!params)
+	{
+		_atcmd_data_mode_info("no params");
+		return -EINVAL;
+	}
 
 	if (g_atcmd_data_mode.enable)
 	{
-		_atcmd_info("data_mode: already enabled");
-		return -1;
+		_atcmd_data_mode_info("already enabled");
+		return -EBUSY;
 	}
 
-	_atcmd_data_mode_debug("enable, id=%d len=%d timeout=%u exit_cmd=%s done_event=%d binary=%d\n",
-				socket ? socket->id : -1, len, timeout, exit_cmd ? exit_cmd : "", done_event, binary);
+	_atcmd_data_mode_debug("%s enable, id=%d len=%u timeout=%u done_event=%d exit_cmd=%s", 
+						str_data_type[params->data_type], 
+						params->id, params->len, params->timeout, params->done_event, 
+						params->exit_cmd ? params->exit_cmd : "");
+
+	switch (params->data_type)
+	{
+		case ATCMD_DATA_SSEND:
+			_atcmd_data_mode_debug(" - passthrough=%d", params->ssend.passthrough);
+			break;
+
+#if defined(CONFIG_ATCMD_FWUPDATE)
+		case ATCMD_DATA_FWBINDL:
+			break;
+#endif
+
+#if defined(CONFIG_ATCMD_SFUSER)
+		case ATCMD_DATA_SFUSER:
+			_atcmd_data_mode_debug(" - offset=%d", params->sf_user.offset);
+			break;
+#endif
+
+		default:
+			return -EINVAL;
+	}
+
+	memcpy(&g_atcmd_data_mode.params, params, sizeof(atcmd_data_mode_params_t));
 
 	g_atcmd_data_mode.enable = true;
 	g_atcmd_data_mode.idle = false;
-	g_atcmd_data_mode.passthrough = (len <= 0) ? true : false;
-	g_atcmd_data_mode.done_event = done_event;
-	g_atcmd_data_mode.binary = binary;
-	g_atcmd_data_mode.exit_cmd = exit_cmd ? exit_cmd : "AT\r\n";
 
 	g_atcmd_data_mode.cnt = 0;
-	g_atcmd_data_mode.send_len = abs(len);
+	g_atcmd_data_mode.send_len = params->len;
 	g_atcmd_data_mode.send_done = 0;
 	g_atcmd_data_mode.send_drop = 0;
 
-	if (socket)
-		memcpy(&g_atcmd_data_mode.socket, socket, sizeof(atcmd_socket_t));
-	else
-		atcmd_socket_reset(&g_atcmd_data_mode.socket);
-
-	g_atcmd_data_mode.send_timeout = timeout + 100;
+	g_atcmd_data_mode.send_timeout = params->timeout + 100;
 	g_atcmd_data_mode.last_send_time = 0;
-	
-#if defined(CONFIG_ATCMD_SFUSER)
-	g_atcmd_data_mode.sf_user_offset = sf_user_offset;
-#endif
 
 	return 0;
 }
 
-int atcmd_data_mode_enable (atcmd_socket_t *socket, int32_t len, bool done_event, uint32_t timeout, char *exit_cmd)
-{
-	atcmd_data_mode_params_t params;
-
-	params.socket = socket;
-	params.len = len;
-	params.timeout = timeout;
-	params.exit_cmd = exit_cmd;
-	params.done_event = done_event;
-	params.binary = false;	
-#if defined(CONFIG_ATCMD_SFUSER)
-	params.sf_user_offset = 0;	
-#endif
-
-	return _atcmd_data_mode_enable(&params);
-}
-
-int atcmd_firmware_download_enable (int32_t len, uint32_t timeout)
-{
-	atcmd_data_mode_params_t params;
-
-	params.socket = NULL;
-	params.len = len;
-	params.timeout = timeout;
-	params.exit_cmd = NULL;
-	params.done_event = false;
-	params.binary = true;	
-#if defined(CONFIG_ATCMD_SFUSER)
-	params.sf_user_offset = 0;	
-#endif
-
-	return _atcmd_data_mode_enable(&params);
-}
-
-#if defined(CONFIG_ATCMD_SFUSER)
-int atcmd_sf_user_mode_enable (int32_t offset, int32_t len, uint32_t timeout)
-{
-	atcmd_data_mode_params_t params;
-
-	params.socket = NULL;
-	params.len = len;
-	params.timeout = timeout;
-	params.exit_cmd = NULL;
-	params.done_event = false;
-	params.binary = false;
-	params.sf_user_offset = offset;	
-
-	return _atcmd_data_mode_enable(&params);
-}
-#endif
-
 static int atcmd_data_mode_disable (void)
 {
+	atcmd_data_mode_params_t *params = &g_atcmd_data_mode.params;
+
 	if (!g_atcmd_data_mode.enable)
 	{
-		_atcmd_info("already disabled");
+		_atcmd_data_mode_info("already disabled");
 		return -1;
 	}
 
-	_atcmd_data_mode_debug("disable, id=%d binary=%d\n", 
-			g_atcmd_data_mode.socket.id, g_atcmd_data_mode.binary);
+	_atcmd_data_mode_debug("%s disable", str_data_type[params->data_type]);
+
+	memset(params, 0, sizeof(atcmd_data_mode_params_t));
+
+	params->data_type = ATCMD_DATA_NONE;
+	params->id = -1;
+	params->len = 0;
+	params->timeout = 0;
+	params->done_event = false; 
+	params->exit_cmd = NULL;
 
 	g_atcmd_data_mode.enable = false;
-	g_atcmd_data_mode.idle = true;
-
-	g_atcmd_data_mode.passthrough = false;
-	g_atcmd_data_mode.done_event = false;
-	g_atcmd_data_mode.binary = false;
-	g_atcmd_data_mode.exit_cmd = NULL;
+	g_atcmd_data_mode.idle = false;
 
 	g_atcmd_data_mode.cnt = 0;
 	g_atcmd_data_mode.send_len = 0;
 	g_atcmd_data_mode.send_done = 0;
 	g_atcmd_data_mode.send_drop = 0;
 
-	atcmd_socket_reset(&g_atcmd_data_mode.socket);
-
 /*	g_atcmd_data_mode.send_timeout = 0;
 	g_atcmd_data_mode.last_send_time = 0; */
-
-#if defined(CONFIG_ATCMD_SFUSER)
-	g_atcmd_data_mode.sf_user_offset = 0;
-#endif
 
 	return 0;
 }
@@ -623,7 +647,7 @@ static void atcmd_data_mode_task_suspend (uint32_t time)
 		TickType_t ticks = (time == 0) ? portMAX_DELAY : pdMS_TO_TICKS(time);
 		uint32_t _time;
 
-		_atcmd_data_mode_debug("suspend %u\n", time);
+		_atcmd_data_mode_debug("suspend %u", time); 
 
 		_time = atcmd_sys_now();
 
@@ -635,22 +659,60 @@ static void atcmd_data_mode_task_resume (void)
 {
 	if (g_atcmd_data_mode.task)
 	{
-		_atcmd_data_mode_debug("resume\n");
+		_atcmd_data_mode_debug("resume"); 
 
 		xTaskNotifyGive(g_atcmd_data_mode.task);
 	}
 }
 
-static void atcmd_data_mode_sending (void)
+static void atcmd_data_mode_continue (void)
 {
-	_atcmd_data_mode_debug("sending\n");
-
 	if (g_atcmd_data_mode.enable)
 	{
+		_atcmd_data_mode_debug("continue");
+
 		g_atcmd_data_mode.idle = false;
 		g_atcmd_data_mode.last_send_time = atcmd_sys_now();
 
 		atcmd_data_mode_task_resume();
+	}
+}
+
+static void atcmd_data_mode_timeout (uint32_t time)
+{
+	atcmd_data_mode_params_t *data_mode_params = &g_atcmd_data_mode.params;
+	int data_type = data_mode_params->data_type;
+	int id = data_mode_params->id;
+	uint32_t cnt = g_atcmd_data_mode.cnt;
+	uint32_t send_len = g_atcmd_data_mode.send_len;
+	uint32_t send_done = g_atcmd_data_mode.send_done;
+	uint32_t send_drop = g_atcmd_data_mode.send_drop;
+
+	_atcmd_data_mode_debug("%s timeout, id=%d cnt=%u len=%u done=%u drop=%u time=%u", 
+							str_data_type[data_type],
+							id, cnt, send_len, send_done, send_drop, time); 
+
+	switch (data_type)
+	{
+		case ATCMD_DATA_SSEND:
+			atcmd_socket_event_send_idle(id, send_done, send_drop, cnt, time - 100);
+			break;
+
+#if defined(CONFIG_ATCMD_FWUPDATE)
+		case ATCMD_DATA_FWBINDL:
+			atcmd_firmware_download_event_idle(send_len, cnt);
+			break;
+#endif
+
+#if defined(CONFIG_ATCMD_SFUSER)
+		case ATCMD_DATA_SFUSER:
+		{
+			uint32_t offset = data_mode_params->sfuser.offset;
+
+			atcmd_sf_user_write_event_idle(offset, send_len, cnt);
+			break;
+		}
+#endif
 	}
 }
 
@@ -664,7 +726,7 @@ static void atcmd_data_mode_task (void *pvParameters)
 
 	while (1)
 	{
-		if (atcmd_data_mode_is_enabled())
+		if (g_atcmd_data_mode.enable)
 		{
 			send_time = g_atcmd_data_mode.last_send_time;
 			send_timeout = g_atcmd_data_mode.send_timeout;
@@ -691,32 +753,13 @@ static void atcmd_data_mode_task (void *pvParameters)
 					continue;
 				}
 
-				_atcmd_data_mode_debug("timeout, %ums\n", elapsed_time);
+/*				_atcmd_data_mode_debug("timeout, %ums\n", elapsed_time); */
 
 				if (!g_atcmd_data_mode.idle)
 				{
 					if (g_atcmd_data_mode.enable && send_timeout > 0)
 					{
-/*						_atcmd_data_mode_debug("%d %u %u %u %u\n", g_atcmd_data_mode.socket.id,
-												g_atcmd_data_mode.send_done,
-												g_atcmd_data_mode.send_drop,
-												g_atcmd_data_mode.cnt,
-												elapsed_time); */
-
-						if (g_atcmd_data_mode.binary)
-							atcmd_firmware_download_timeout(g_atcmd_data_mode.send_len, g_atcmd_data_mode.cnt);
-						else if (g_atcmd_data_mode.socket.id >= 0)
-						{
-							atcmd_socket_send_timeout(g_atcmd_data_mode.socket.id,
-														g_atcmd_data_mode.send_done,
-														g_atcmd_data_mode.send_drop,
-														g_atcmd_data_mode.cnt);
-						}
-#if defined(CONFIG_ATCMD_SFUSER)
-						else
-							atcmd_sf_user_write_timeout(g_atcmd_data_mode.sf_user_offset, 
-									g_atcmd_data_mode.send_len, g_atcmd_data_mode.cnt);
-#endif
+						atcmd_data_mode_timeout(elapsed_time);
 						g_atcmd_data_mode.idle = true;
 					}
 				}
@@ -810,13 +853,13 @@ int atcmd_msg_print (int type, const char *fmt, ...)
 
 /**********************************************************************************************/
 
-static void atcmd_list_init (atcmd_list_t *list)
+void atcmd_list_init (atcmd_list_t *list)
 {
 	list->next = NULL;
 	list->prev = NULL;
 }
 
-static void atcmd_list_add (atcmd_list_t *head, atcmd_list_t *list)
+void atcmd_list_add (atcmd_list_t *head, atcmd_list_t *list)
 {
 	list->next = head;
 	list->prev = head->prev;
@@ -825,7 +868,7 @@ static void atcmd_list_add (atcmd_list_t *head, atcmd_list_t *list)
 	head->prev = list;
 }
 
-static void atcmd_list_del (atcmd_list_t *list)
+void atcmd_list_del (atcmd_list_t *list)
 {
 	list->next->prev = list->prev;
 	list->prev->next = list->next;
@@ -979,6 +1022,7 @@ void atcmd_info_unregister (enum ATCMD_GROUP_ID gid, enum ATCMD_ID id)
 
 /*******************************************************************************************/
 
+#if 0
 static void atcmd_parse_print (enum ATCMD_TYPE type, int argc, char **argv)
 {
 	char *str_type[ATCMD_TYPE_NUM] = { "RUN", "GET", "GET_PARAM", "SET", "SET_HELP" };
@@ -990,25 +1034,31 @@ static void atcmd_parse_print (enum ATCMD_TYPE type, int argc, char **argv)
 	_atcmd_info("%s_%s: %d", argv[0], str_type[type], argc);
 
 	for (i = 1 ; i < argc ; i++)
-		_atcmd_info(" - opt%d : %s", i - 1, argv[i]);
+		_atcmd_info(" - arg%d : %s", i - 1, argv[i]);
 }
+#else
+#define atcmd_parse_print(type, argc, argv)
+#endif
 
 static enum ATCMD_HANDLER atcmd_parse (char *cmd, int *argc, char **argv)
 {
 	enum ATCMD_TYPE type = ATCMD_TYPE_NONE;
 	int max_argc = ATCMD_MSG_PARAM_MAX + 1;
 	bool set_help = false;
+	char *c = cmd;
 	int i;
+
+/*	_atcmd_debug("%s: %s", __func__, cmd); */
 
 	for (i = 0 ; i < max_argc ; i++)
 	{
-		argv[i] = cmd;
+		argv[i] = c;
 
 		do
 		{
-/*			_atcmd_debug("%d.%d: %c", i, cmd - argv[0], *cmd); */
+/*			_atcmd_debug("%s: %d.%d: %c", __func__, i, c - argv[0], *c); */
 
-			switch (*cmd)
+			switch (*c)
 			{
 				case '=':
 					if (i == 0 && type == ATCMD_TYPE_NONE)
@@ -1018,14 +1068,9 @@ static enum ATCMD_HANDLER atcmd_parse (char *cmd, int *argc, char **argv)
 						i = 0;
 						type = ATCMD_TYPE_GET_PARAM;
 					}
-					else
-						return ATCMD_HANDLER_NONE;
 
-					*cmd = '\0';
-					break;
-
-				case ',':
-					*cmd = '\0';
+					if (i == 0 && (type == ATCMD_TYPE_SET || ATCMD_TYPE_GET_PARAM))
+						*c = '\0';
 					break;
 
 				case '?':
@@ -1036,15 +1081,21 @@ static enum ATCMD_HANDLER atcmd_parse (char *cmd, int *argc, char **argv)
 						i = 0;
 						type = ATCMD_TYPE_SET_HELP;
 					}
-					else
-						return ATCMD_HANDLER_NONE;
 
-					*cmd = '\0';
+					if (i == 0 && (type == ATCMD_TYPE_GET || ATCMD_TYPE_SET_HELP))
+						*c = '\0';
 					break;
 
-				case '\r':
+				case ',':
+					if (type == ATCMD_TYPE_SET)
+						*c = '\0';
+					break;
+
 				case '\n':
-					*cmd = '\0';
+					if (*(c - 1) == '\r')
+						*(--c) = '\0';
+					else
+						*c = '\0';
 
 					*argc = 1;
 
@@ -1061,7 +1112,7 @@ static enum ATCMD_HANDLER atcmd_parse (char *cmd, int *argc, char **argv)
 
 					strupr(argv[0]);
 
-/*					atcmd_parse_print(type, *argc, argv); */
+					atcmd_parse_print(type, *argc, argv); 
 
 					switch (type)
 					{
@@ -1089,7 +1140,7 @@ static enum ATCMD_HANDLER atcmd_parse (char *cmd, int *argc, char **argv)
 					return ATCMD_HANDLER_NONE;
 			}
 
-		} while (*cmd++ != '\0');
+		} while (*c++ != '\0');
 	}
 
 	return ATCMD_HANDLER_NONE;
@@ -1156,8 +1207,8 @@ static int atcmd_handler (char *cmd)
 					}
 				}
 
-				if (group->cmd_prefix_size > 0)
-					break;
+//				if (group->cmd_prefix_size > 0)
+//					break;
 			}
 
 			list = &group->list;
@@ -1535,65 +1586,184 @@ int atcmd_receive_command (char *buf, int len)
 	return i;
 }
 
-#if defined(CONFIG_ATCMD_SFUSER)
-static int _atcmd_receive_sf_user_data (uint32_t offset, char *buf, int len)
+static int _atcmd_receive_data (enum ATCMD_DATA_TYPE data_type, int id, char *buf, int len)
 {
-	atcmd_sf_user_write(offset, len, buf);
-
-	return len;
-}
-#endif
-
-static int _atcmd_receive_binary (char *buf, int len)
-{
-	atcmd_firmware_write(buf, len);
-
-	return len;
-}
-
-static int _atcmd_receive_data (char *buf, int len, bool done_event)
-{
-	int ret = 0;
-
 	if (buf && len > 0)
 	{
-		ret = atcmd_socket_send_data(&g_atcmd_data_mode.socket, buf, len, done_event);
-		g_atcmd_data_mode.send_drop += len - ret;
+		atcmd_data_mode_params_t *data_mode_params = &g_atcmd_data_mode.params;
+
+		switch (data_type)
+		{
+			case ATCMD_DATA_SSEND:
+				return atcmd_socket_send_data(id, buf, len);
+
+#if defined(CONFIG_ATCMD_FWUPDATE)
+			case ATCMD_DATA_FWBINDL:
+				return atcmd_firmware_download(buf, len);
+#endif
+
+#if defined(CONFIG_ATCMD_SFUSER)
+			case ATCMD_DATA_SFUSER:
+			{
+				uint32_t offset = data_mode_params->sfuser.offset;
+
+				return atcmd_sf_user_write(offset, len, buf);
+			}
+#endif
+
+			default:
+				break;
+		}
 	}
 
-	return ret;
+	return 0;
+}
+
+static void _atcmd_receive_data_done (enum ATCMD_DATA_TYPE data_type, int id, uint32_t done)
+{
+	atcmd_data_mode_params_t *data_mode_params = &g_atcmd_data_mode.params;
+
+	switch (data_type)
+	{
+		case ATCMD_DATA_SSEND:
+			atcmd_socket_event_send_done(id, done);
+			break;
+
+#if defined(CONFIG_ATCMD_FWUPDATE)
+		case ATCMD_DATA_FWBINDL:
+			atcmd_firmware_download_event_done(done);
+			break;
+#endif
+
+#if defined(CONFIG_ATCMD_SFUSER)
+		case ATCMD_DATA_SFUSER:
+		{
+			uint32_t offset = data_mode_params->sfuser.offset;
+
+			atcmd_sf_user_write_event_done(offset, done);
+			break;
+		}
+#endif
+
+		default:
+			break;
+	}
+}
+
+static void _atcmd_receive_data_drop (enum ATCMD_DATA_TYPE data_type, int id, uint32_t drop)
+{
+	atcmd_data_mode_params_t *data_mode_params = &g_atcmd_data_mode.params;
+
+	switch (data_type)
+	{
+		case ATCMD_DATA_SSEND:
+			atcmd_socket_event_send_drop(id, drop);
+			break;
+
+#if defined(CONFIG_ATCMD_FWUPDATE)
+		case ATCMD_DATA_FWBINDL:
+			atcmd_firmware_download_event_drop(drop);
+			break;
+#endif
+
+#if defined(CONFIG_ATCMD_SFUSER)
+		case ATCMD_DATA_SFUSER:
+		{
+			uint32_t offset = data_mode_params->sfuser.offset;
+
+			atcmd_sf_user_write_event_drop(offset, drop);
+			break;
+		}
+#endif
+
+		default:
+			break;
+	}
+}
+
+static void _atcmd_receive_data_exit (enum ATCMD_DATA_TYPE data_type, 
+								int id, uint32_t len, uint32_t done, uint32_t drop)
+{
+	atcmd_data_mode_params_t *data_mode_params = &g_atcmd_data_mode.params;
+
+	switch (data_type)
+	{
+		case ATCMD_DATA_SSEND:
+			atcmd_socket_event_send_exit(id, done, drop);
+			break;
+
+#if defined(CONFIG_ATCMD_FWUPDATE)
+		case ATCMD_DATA_FWBINDL:
+			atcmd_firmware_download_event_fail(len);
+			break;
+#endif
+
+#if defined(CONFIG_ATCMD_SFUSER)
+		case ATCMD_DATA_SFUSER:
+		{
+			uint32_t offset = data_mode_params->sfuser.offset;
+
+			atcmd_sf_user_write_event_fail(offset, len);
+			break;
+		}
+#endif
+
+		default:
+			break;
+	}
 }
 
 static int atcmd_receive_data (char *buf, int len)
 {
+	atcmd_data_mode_t *data_mode = &g_atcmd_data_mode;
+	atcmd_data_mode_params_t *data_mode_params = &g_atcmd_data_mode.params;
 	static char _buf[ATCMD_DATA_LEN_MAX];
-	int send_len = 0;
-	int send_done = 0;
+	int data_type;
+	int id;
+	bool done_event;
+	const char *exit_cmd;
+	bool passthrough;
+	uint32_t send_len;
+	uint32_t send_done;
+	uint32_t send_drop;
+	int ret;
 
-	if (!g_atcmd_data_mode.enable || !len)
+	if (!data_mode->enable || !len)
 	   return 0;
 
-	if (g_atcmd_data_mode.idle)
+	data_type = data_mode_params->data_type;
+	id = data_mode_params->id;
+	done_event = data_mode_params->done_event;
+	exit_cmd = data_mode_params->exit_cmd;
+
+	passthrough = (data_type == ATCMD_DATA_SSEND) ? data_mode->params.ssend.passthrough : false;
+	send_len = data_mode->send_len;
+	send_done = data_mode->send_done;
+	send_drop = data_mode->send_drop;
+
+	_atcmd_data_mode_debug("%s receive, id=%d done_event=%d exit_cmd=%s passthrough=%d"
+	                       " send_len=%u send_done=%u send_drop=%u"
+						   " idle=%d cnt=%u len=%d", 
+						   str_data_type[data_type],
+						   id, done_event, exit_cmd, passthrough,
+						   send_len, send_done, send_drop, 
+						   data_mode->idle, data_mode->cnt, len);
+
+	if (data_mode->idle)
 	{
 		static int cnt_exit_cmd = 0;
-		char *str_exit_cmd = NULL;
 		int len_exit_cmd = 0;
+
 		int i;
 
-		if (g_atcmd_data_mode.exit_cmd)
-			str_exit_cmd = g_atcmd_data_mode.exit_cmd;
-		else
-		{
-			_atcmd_error("no exit_cmd");
+		if (!exit_cmd)
+			exit_cmd = "AT\r\n";
 
-			str_exit_cmd = "AT\r\n";
-		}
-
-		len_exit_cmd = strlen(str_exit_cmd);
+		len_exit_cmd = strlen(exit_cmd);
 
 		for (i = 0 ; i < len ; i++)
 		{
-			if (buf[i] != str_exit_cmd[cnt_exit_cmd])
+			if (buf[i] != exit_cmd[cnt_exit_cmd])
 			{
 				cnt_exit_cmd = 0;
 				break;
@@ -1601,54 +1771,31 @@ static int atcmd_receive_data (char *buf, int len)
 
 			if (++cnt_exit_cmd == len_exit_cmd)
 			{
-				ATCMD_MSG_RETURN(NULL, ATCMD_SUCCESS);
-
-				if (g_atcmd_data_mode.send_len > 0)
-				{
-					if (g_atcmd_data_mode.cnt > 0)
-					{
-						if (g_atcmd_data_mode.binary)
-							_atcmd_info("BINDL: timeout, %d", g_atcmd_data_mode.cnt);
-						else if (g_atcmd_data_mode.socket.id >= 0)
-						{
-							_atcmd_info("SEND: timeout, %d", g_atcmd_data_mode.cnt);
-
-							g_atcmd_data_mode.send_done += _atcmd_receive_data(_buf, 
-									g_atcmd_data_mode.cnt, g_atcmd_data_mode.done_event);
-						}
-						else
-							_atcmd_info("SFUSER: timeout, %d", g_atcmd_data_mode.cnt);
-					}
-				}
-
 				cnt_exit_cmd = 0;
 
-				if (g_atcmd_data_mode.binary)
-				{
-					uint32_t send_len = g_atcmd_data_mode.send_len;
+				ATCMD_MSG_RETURN(NULL, ATCMD_SUCCESS);
 
-					atcmd_data_mode_disable();
-					atcmd_firmware_download_drop(send_len);
-				}
-				else if (g_atcmd_data_mode.socket.id >= 0)
+				if (i >= len_exit_cmd)
 				{
-					int id = g_atcmd_data_mode.socket.id;
-					uint32_t send_done = g_atcmd_data_mode.send_done;
-					uint32_t send_drop = g_atcmd_data_mode.send_drop;
+					int _len = (i + 1) - len_exit_cmd;
 
-					atcmd_data_mode_disable();
-					atcmd_socket_send_exit(id, send_done, send_drop);
+					memcpy(_buf + data_mode->cnt, buf, _len);
+					data_mode->cnt += _len;
 				}
-#if defined(CONFIG_ATCMD_SFUSER)
-				else
+
+				if (passthrough && data_mode->cnt > 0)		
 				{
-					uint32_t offset = g_atcmd_data_mode.sf_user_offset;
-					uint32_t length = g_atcmd_data_mode.send_len;
+					ret = _atcmd_receive_data(data_type, id, _buf, data_mode->cnt);
 
-					atcmd_data_mode_disable();
-					atcmd_sf_user_write_drop(offset, length);
+					send_done += ret;
+					send_drop += data_mode->cnt - ret;
 				}
-#endif
+
+				_atcmd_data_mode_debug("%s exit, cnt=%d", str_data_type[data_type], data_mode->cnt);
+
+				_atcmd_receive_data_exit(data_type, id, send_len, send_done, send_drop);
+				atcmd_data_mode_disable();
+
 				return i;
 			}
 		}
@@ -1656,53 +1803,69 @@ static int atcmd_receive_data (char *buf, int len)
 		if (i == len)
 			return len;
 
-		_atcmd_info("SEND: continue");
+		_atcmd_data_mode_info("%s continue", str_data_type[data_type]);
 	}
 
-	if (g_atcmd_data_mode.send_len > 0)
+	if (passthrough && send_len == 0)
+		send_len = len;		
+	else
 	{
-		send_len = g_atcmd_data_mode.send_len;
-
-		if ((g_atcmd_data_mode.cnt + len) > send_len)
-			len = send_len - g_atcmd_data_mode.cnt;
-		else if ((g_atcmd_data_mode.cnt + len) < send_len)
+		if ((data_mode->cnt + len) > send_len)
+			len = send_len - data_mode->cnt;
+		else if ((data_mode->cnt + len) < send_len)
 		{
-			memcpy(_buf + g_atcmd_data_mode.cnt, buf, len);
-			g_atcmd_data_mode.cnt += len;
+			memcpy(_buf + data_mode->cnt, buf, len);
+			data_mode->cnt += len;
 
-			_atcmd_data_mode_debug("data: %d/%d\n", g_atcmd_data_mode.cnt, send_len);
+			_atcmd_data_mode_debug("%s buffering, %d/%d", 
+					str_data_type[data_type], data_mode->cnt, send_len);
 
-			goto recv_data_done;
+			atcmd_data_mode_continue();
+
+			return len;
 		}
 
-		if (g_atcmd_data_mode.cnt > 0)
+		if (data_mode->cnt > 0)
 		{
-			memcpy(_buf + g_atcmd_data_mode.cnt, buf, len);
+			memcpy(_buf + data_mode->cnt, buf, len);
+			data_mode->cnt += len;
 			buf = _buf;
 		}
 	}
-	else if (g_atcmd_data_mode.passthrough)
-		send_len = len;
 
-	if (g_atcmd_data_mode.binary)
-		send_done = _atcmd_receive_binary(buf, send_len);
-	else if (g_atcmd_data_mode.socket.id >= 0)
-		send_done = _atcmd_receive_data(buf, send_len, g_atcmd_data_mode.done_event);
-#if defined(CONFIG_ATCMD_SFUSER)
-	else
-		send_done = _atcmd_receive_sf_user_data(g_atcmd_data_mode.sf_user_offset, buf, send_len);
-#endif
+	_atcmd_data_mode_debug("%s data, passthrough=%d event=%d len=%d/%d done=%d drop=%d", 
+				str_data_type[data_type], passthrough, done_event,
+				data_mode->cnt, send_len, send_done, send_drop);
 
-	g_atcmd_data_mode.send_done += send_done;
+	ret = _atcmd_receive_data(data_type, id, buf, send_len);
+					
+	send_done += ret;
+	send_drop += send_len - ret;
 
-	if (g_atcmd_data_mode.passthrough)
+	if (passthrough)
+	{
 		g_atcmd_data_mode.cnt = 0;
+		g_atcmd_data_mode.send_done = send_done;
+		g_atcmd_data_mode.send_drop = send_drop;
+
+		send_done = ret;
+		send_drop = send_len - ret;
+	}
+		
+	_atcmd_data_mode_debug("%s data, done=%d drop=%d", 				
+				str_data_type[data_type], passthrough, done_event, 
+				send_done, send_drop);
+
+	if (send_drop > 0)
+		_atcmd_receive_data_drop(data_type, id, send_drop);
+
+	if (done_event)
+		_atcmd_receive_data_done(data_type, id, send_done);
+
+	if (passthrough)
+		atcmd_data_mode_continue();
 	else
 		atcmd_data_mode_disable();
-
-recv_data_done:
-
-	atcmd_data_mode_sending();
 
 	return len;
 }
@@ -1717,7 +1880,7 @@ void atcmd_receive (char *buf, int len)
 
 	for (i = 0 ; i < len ; i += ret)
 	{
-		if (atcmd_data_mode_is_enabled())
+		if (g_atcmd_data_mode.enable)
 			ret = atcmd_receive_data(buf + i, len - i);
 		else
 			ret = atcmd_receive_command(buf + i, len - i);
@@ -1780,8 +1943,7 @@ int atcmd_transmit_return (char *cmd, int ret)
 	{
 		len = atcmd_transmit("OK\r\n", 2 + 2);
 
-		if (atcmd_data_mode_is_enabled())
-			atcmd_data_mode_sending();
+		atcmd_data_mode_continue();
 	}
 	else
 	{

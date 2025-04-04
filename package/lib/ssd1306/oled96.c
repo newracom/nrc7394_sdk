@@ -323,6 +323,45 @@ int oledFill(unsigned char ucData)
 	return 0;
 } /* oledFill() */
 
+int oledPartFill(int pos)
+{
+	int x;
+	int y;
+	int i;
+	unsigned char temp[128];
+	int iLines, iCols;
+
+    switch (pos) {
+        case 0:
+            x=0;
+            y=0;
+            break;
+        case 1:
+            x=0;
+            y=3;
+            break;
+        case 2:
+            x=112;
+            y=0;
+            break;
+        default:
+            x=0;
+            y=0;
+            break;
+    }
+
+	if (ssd1360_i2c == 0) return -1; // not initialized
+
+	iLines = (oled_type == OLED_128x32 || oled_type == OLED_64x32) ? 4:8;
+	iCols = (oled_type == OLED_64x32) ? 4:8;
+
+	memset(temp, 0xFF, 128);
+	oledSetPosition(x,y); // set to (0,Y)
+	oledSetPosition(x,y+1); // set to (0,Y)
+    oledWriteDataBlock(temp, 16); // fill with data byte
+	return 0;
+} /* oledFill() */
+
 //
 // Write a block of flash memory to the display
 //
