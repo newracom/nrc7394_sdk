@@ -29,6 +29,10 @@
 #define DHCPS_DEBUG_DATA	0
 #define STATIC_ARP_ENTRY_ENABLE
 
+#if !defined(NRC_DHCP_SERVER_UNICAST_RESPONSE)
+#define NRC_DHCP_SERVER_UNICAST_RESPONSE 1
+#endif
+
 extern struct netif* nrc_netif[MAX_IF];    /* global variable containing MAC Config*/
 
 static const u32_t magic_cookie   = 0x63538263;
@@ -42,7 +46,9 @@ static struct dhcps_lease dhcps_lease;
 static list_node* plist = NULL;
 static u8_t offer = 0xFF;
 static bool renew = false;
+#ifndef DHCPS_LEASE_TIME_DEF
 #define DHCPS_LEASE_TIME_DEF	(120)
+#endif
 u32_t dhcps_lease_time = DHCPS_LEASE_TIME_DEF;  //minute
 
 static struct netif *softap_if = NULL; // SOFTAP_IF network interface
@@ -299,7 +305,11 @@ static void create_msg(struct dhcps_msg* m)
 	m->hlen = 6;
 	m->hops = 0;
 	m->secs = 0;
+#if defined(NRC_DHCP_SERVER_UNICAST_RESPONSE) && (NRC_DHCP_SERVER_UNICAST_RESPONSE == 1) && (LWIP_IPV6 == 0)
+	m->flags = (m->unicast == 1) ? htons(BOOTP_UNICAST) : htons(BOOTP_BROADCAST);
+#else
 	m->flags = htons(BOOTP_BROADCAST);
+#endif
 
 	memcpy((char*) m->yiaddr, (char*) &client.addr, sizeof(m->yiaddr));
 
@@ -329,6 +339,7 @@ static void send_offer(struct dhcps_msg* m)
 	u16_t cnt = 0;
 	u16_t i;
 	err_t SendOffer_err_t;
+	ip_addr_t dest_addr = broadcast_dhcps;
 
 	create_msg(m);
 
@@ -362,12 +373,26 @@ static void send_offer(struct dhcps_msg* m)
 
 			q = q->next;
 		}
+#if defined(NRC_DHCP_SERVER_UNICAST_RESPONSE) && (NRC_DHCP_SERVER_UNICAST_RESPONSE == 1) && (LWIP_IPV6 == 0)
+		const ip4_addr_t *unused_ipaddr;
+		struct eth_addr *unused_ethaddr;
+
+		if (m->unicast) {
+			dest_addr = m->dest_ip;
+			if (!etharp_find_addr(softap_if, &dest_addr, &unused_ethaddr, &unused_ipaddr)) {
+				struct eth_addr eth_addr;
+				LWIP_DEBUGF(DHCPS_DEBUG, ("dhcps: ARP entry not found, adding static entry\n"));
+				memcpy(eth_addr.addr, m->dest_mac, sizeof(eth_addr.addr));
+				etharp_add_static_entry(&dest_addr, &eth_addr);
+			}
+		}
+#endif
 	} else {
 		LWIP_DEBUGF(DHCPS_DEBUG | LWIP_DBG_TRACE, ("dhcps: send_offer>>pbuf_alloc failed\n"));
 		return;
 	}
 
-	SendOffer_err_t = udp_sendto_if(pcb_dhcps, p, &broadcast_dhcps, DHCPS_CLIENT_PORT, softap_if);
+	SendOffer_err_t = udp_sendto_if(pcb_dhcps, p, &dest_addr, DHCPS_CLIENT_PORT, softap_if);
 	LWIP_DEBUGF(DHCPS_DEBUG | LWIP_DBG_TRACE, ("dhcps: send_offer>>udp_sendto_if result %x\n", SendOffer_err_t));
 
 	if (p->ref != 0) {
@@ -390,6 +415,7 @@ static void send_nak(struct dhcps_msg* m)
 	u16_t cnt = 0;
 	u16_t i;
 	err_t SendNak_err_t;
+	ip_addr_t dest_addr = broadcast_dhcps;
 
 	create_msg(m);
 
@@ -419,12 +445,17 @@ static void send_nak(struct dhcps_msg* m)
 			}
 			q = q->next;
 		}
+#if defined(NRC_DHCP_SERVER_UNICAST_RESPONSE) && (NRC_DHCP_SERVER_UNICAST_RESPONSE == 1) && (LWIP_IPV6 == 0)
+		if (m->unicast) {
+			dest_addr = m->dest_ip;
+		}
+#endif
 	} else {
 		LWIP_DEBUGF(DHCPS_DEBUG | LWIP_DBG_TRACE, ("dhcps: send_nak>>pbuf_alloc failed\n"));
 		return;
 	}
 
-	SendNak_err_t = udp_sendto_if(pcb_dhcps, p, &broadcast_dhcps, DHCPS_CLIENT_PORT, softap_if);
+	SendNak_err_t = udp_sendto_if(pcb_dhcps, p, &dest_addr, DHCPS_CLIENT_PORT, softap_if);
 	LWIP_DEBUGF(DHCPS_DEBUG | LWIP_DBG_TRACE, ("dhcps: send_nak>>udp_sendto_if result %x\n", SendNak_err_t));
 
 	if (p->ref != 0) {
@@ -447,6 +478,8 @@ static void send_ack(struct dhcps_msg* m)
 	u16_t cnt = 0;
 	u16_t i;
 	err_t SendAck_err_t;
+	ip_addr_t dest_addr = broadcast_dhcps;
+
 	create_msg(m);
 
 	end = add_msg_type(&m->options[4], DHCPACK);
@@ -477,12 +510,17 @@ static void send_ack(struct dhcps_msg* m)
 			}
 			q = q->next;
 		}
+#if defined(NRC_DHCP_SERVER_UNICAST_RESPONSE) && (NRC_DHCP_SERVER_UNICAST_RESPONSE == 1) && (LWIP_IPV6 == 0)
+		if (m->unicast) {
+			dest_addr = m->dest_ip;
+		}
+#endif
 	} else {
 		LWIP_DEBUGF(DHCPS_DEBUG | LWIP_DBG_TRACE, ("dhcps: send_ack>>pbuf_alloc failed\n"));
 		return;
 	}
 
-	SendAck_err_t = udp_sendto_if(pcb_dhcps, p, &broadcast_dhcps, DHCPS_CLIENT_PORT, softap_if);
+	SendAck_err_t = udp_sendto_if(pcb_dhcps, p, &dest_addr, DHCPS_CLIENT_PORT, softap_if);
 	LWIP_DEBUGF(DHCPS_DEBUG | LWIP_DBG_TRACE, ("dhcps: send_ack>>udp_sendto_if result %x\n", SendAck_err_t));
 
 	if (p->ref != 0) {
@@ -690,6 +728,14 @@ static s16_t parse_msg(struct dhcps_msg* m, u16_t len)
 		if (ret == DHCPS_STATE_RELEASE) {
 			memset(&client_address, 0x0, sizeof(client_address));
 		}
+#if defined(NRC_DHCP_SERVER_UNICAST_RESPONSE) && (NRC_DHCP_SERVER_UNICAST_RESPONSE == 1) && (LWIP_IPV6 == 0)
+		ip_addr_copy(m->dest_ip, client_address);
+		memcpy(m->dest_mac, m->chaddr, 6);
+		LWIP_DEBUGF(DHCPS_DEBUG | LWIP_DBG_TRACE, ("dhcps: dest_ip: %s, dest_mac: ", ipaddr_ntoa(&m->dest_ip)));
+		LWIP_DEBUGF(DHCPS_DEBUG | LWIP_DBG_TRACE, ("%02x:%02x:%02x:%02x:%02x:%02x\n",
+			m->dest_mac[0], m->dest_mac[1], m->dest_mac[2],
+			m->dest_mac[3], m->dest_mac[4], m->dest_mac[5]));
+#endif
 #if 0
 		if (wifi_softap_set_station_info(m->chaddr, &client_address) == false) {
 			return 0;
@@ -774,6 +820,9 @@ static void handle_dhcp(void* arg,
 		}
 	}
 	LWIP_DEBUGF(DHCPS_DEBUG | LWIP_DBG_TRACE, ("dhcps: handle_dhcp-> parse_msg(p)\n"));
+#if defined(NRC_DHCP_SERVER_UNICAST_RESPONSE) && (NRC_DHCP_SERVER_UNICAST_RESPONSE == 1) && (LWIP_IPV6 == 0)
+	pmsg_dhcps->unicast = ((pmsg_dhcps->flags & PP_HTONS(0x8000)) == 0);
+#endif
 
 	switch (parse_msg(pmsg_dhcps, tlen - 240)) {
 

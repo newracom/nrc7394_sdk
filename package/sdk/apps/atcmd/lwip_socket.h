@@ -133,14 +133,16 @@ extern int _lwip_socket_tcp_set_keepalive (int fd, int keepalive, int keepidle, 
 
 extern int _lwip_socket_tcp_get_nodelay (int fd, bool *enabled);
 extern int _lwip_socket_tcp_set_nodelay (int fd, bool enable);
+
 extern int _lwip_socket_udp_get_broadcast (int fd, bool *enabled);
 extern int _lwip_socket_udp_set_broadcast (int fd, bool enable);
-extern int _lwip_socket_udp_add_multicast_group (int fd, ip_addr_t *addr, bool ipv6);
-extern int _lwip_socket_udp_drop_multicast_group (int fd, ip_addr_t *addr, bool ipv6);
-extern int _lwip_socket_udp_get_multicast_loopback (int fd, bool *loopback, bool ipv6);
-extern int _lwip_socket_udp_set_multicast_loopback (int fd, bool loopback, bool ipv6);
-extern int _lwip_socket_udp_get_multicast_ttl (int fd, uint8_t *ttl, bool ipv6);
-extern int _lwip_socket_udp_set_multicast_ttl (int fd, uint8_t ttl, bool ipv6);
+
+extern int _lwip_socket_udp_add_multicast_group (int fd, ip_addr_t *addr);
+extern int _lwip_socket_udp_drop_multicast_group (int fd, ip_addr_t *addr);
+extern int _lwip_socket_udp_get_multicast_loopback (int fd, bool *loopback);
+extern int _lwip_socket_udp_set_multicast_loopback (int fd, bool loopback);
+extern int _lwip_socket_udp_get_multicast_ttl (int fd, uint8_t *ttl);
+extern int _lwip_socket_udp_set_multicast_ttl (int fd, uint8_t ttl);
 
 extern int _lwip_socket_init (lwip_socket_cb_t *cb);
 extern int _lwip_socket_deinit (void);

@@ -158,6 +158,7 @@ bool 		system_sflash_update_slot(uint32_t address, uint8_t *data, size_t size);
 #define EN25S32A_JEDEC_ID (0x1C3816)
 #define EN25SE32A_JEDEC_ID (0x1C4816)
 #define XT25Q32F_JEDEC_ID (0x0B6016)
+#define XT25F32F_JEDEC_ID (0x0B4016)
 #define P25Q32U_JEDEC_ID (0x856016)
 #define P25Q16U_JEDEC_ID (0x856015)
 #define UC25WQ08_JEDEC_ID (0xB36014)

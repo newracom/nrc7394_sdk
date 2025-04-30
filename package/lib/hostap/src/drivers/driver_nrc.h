@@ -492,10 +492,13 @@ static inline bool is_pmf(struct nrc_wpa_if *intf, struct ieee80211_hdr *hdr)
 	return false;
 }
 
+bool nrc_cleanup_old_route(struct nrc_wpa_if* intf, uint8_t* addr);
 bool nrc_update_route(struct nrc_wpa_if* intf, struct nrc_wpa_sta* sta, uint8_t* addr);
 uint8_t* nrc_sta_find_route(struct nrc_wpa_sta* sta, const uint8_t addr[ETH_ALEN]);
 void nrc_set_use_4address(bool value);
 bool nrc_get_use_4address(void);
+void nrc_set_4address_bcmc_as_uni(bool value);
+bool nrc_get_4address_bcmc_as_uni(void);
 void nrc_set_scan_max_interval(uint32_t interval);
 uint32_t nrc_get_scan_max_interval();
 void nrc_set_backoff_start_count(uint32_t count);

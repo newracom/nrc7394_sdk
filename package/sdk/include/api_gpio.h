@@ -203,6 +203,28 @@ nrc_err_t nrc_gpio_input(uint32_t *word);
  ***********************************************/
 nrc_err_t nrc_gpio_inputb(int pin, int *level);
 
+/**********************************************
+ * @fn nrc_err_t nrc_gpio_get_direction(uint32_t *word)
+ *
+ * @brief get gpio direction settings
+ *
+ * @param word: direction setting for gpio pins, 1: output, 0: input.
+ *
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
+ ***********************************************/
+nrc_err_t nrc_gpio_get_direction(uint32_t *word);
+
+/**********************************************
+ * @fn nrc_err_t nrc_gpio_get_pullup_setting(uint32 *word)
+ *
+ * @brief get gpio pullup settings
+ *
+ * @param word : pullup settings for pio pins, 1: pullup, 0; float.
+ *
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
+ ***********************************************/
+nrc_err_t nrc_gpio_get_pullup_setting(uint32_t *word);
+
 #if defined(NRC7394)
 /**********************************************
  * @fn nrc_err_t nrc_gpio_trigger_config(int vector, nrc_gpio_trigger_t trigger, nrc_gpio_trigger_level_t level)

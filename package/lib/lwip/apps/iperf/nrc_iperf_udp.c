@@ -141,6 +141,9 @@ static void iperf_udp_client_report (iperf_opt_t * option)
 			} else if (nrc_wifi_softap_get_sta_by_addr(1, mac_addr->addr, &info) == WIFI_SUCCESS) {
 				snr = info.snr;
 				rssi = info.rssi;
+			} else {
+				nrc_wifi_get_snr(1, &snr);
+				nrc_wifi_get_rssi(1, &rssi);
 			}
 #endif
 		} else {
@@ -527,6 +530,9 @@ static void iperf_udp_server_report (struct udp_client_data *client)
 			} else if (nrc_wifi_softap_get_sta_by_addr(1, mac_addr->addr, &info) == WIFI_SUCCESS) {
 				snr = info.snr;
 				rssi = info.rssi;
+			} else {
+				nrc_wifi_get_snr(1, &snr);
+				nrc_wifi_get_rssi(1, &rssi);
 			}
 #endif
 		} else {
@@ -761,6 +767,20 @@ ATTR_NC __attribute__((optimize("O3"))) static void iperf_udp_server_recv (iperf
 	}
 }
 
+ATTR_NC __attribute__((optimize("O3"))) static void udp_free_all_clients(void)
+{
+       struct udp_client_data *client = udp_client_list;
+       struct udp_client_data *next;
+
+       while(client) {
+               next = client->next;
+               udp_free_client(client);
+               client = next;
+       }
+
+       udp_client_list = NULL;
+}
+
 uint32_t g_delay = 0;
 
 ATTR_NC __attribute__((optimize("O3"))) void iperf_udp_server(void *pvParameters)
@@ -848,7 +868,7 @@ ATTR_NC __attribute__((optimize("O3"))) void iperf_udp_server(void *pvParameters
 		int client_done = 0;
 		while (!client_done) {
 			if(option->mForceStop){
-				option->server_info.done = 1;
+				client_done = 1;
 				continue;
 			}
 
@@ -899,6 +919,13 @@ ATTR_NC __attribute__((optimize("O3"))) void iperf_udp_server(void *pvParameters
 		}
 	}
 
+	nrc_iperf_spin_lock();
+	CPA("\n%s %s %s : Stopped!\n", __func__,(option->mUDP) ? "udp":"tcp",
+		(option->mThreadMode == kMode_Server)?"server":"client" );
+	nrc_iperf_spin_unlock();
+
+	udp_free_all_clients();
+
 exit:
 	nrc_iperf_task_list_del(option);
 	if(buf) mem_free(buf);
@@ -909,11 +936,6 @@ exit:
 
 task_exit:
 	iperf_option_free(option);
-#if DEBUG_IPERF_TASK_HANDLE
-	nrc_iperf_spin_lock();
-	CPA("%s END [handle:%d]\n", __func__, task_handle);
-	nrc_iperf_spin_unlock();
-#endif
 	vTaskDelete(NULL);
 }
 #endif /* LWIP_IPERF */

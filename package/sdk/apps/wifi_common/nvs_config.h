@@ -204,6 +204,16 @@
 /* (type u16) */
 #define NVS_WIFI_LISTEN_INTERVAL "listen_interval"
 
+/* Wi-Fi DTIM period */
+/* CLI : nvs set_u8 dtim_period */
+/* (type u8) */
+#define NVS_WIFI_DTIM_PERIOD "dtim_period"
+
+/* Wi-Fi short beacon enable */
+/* CLI : nvs set_u8 short_beacon */
+/* (type u8) */
+#define NVS_WIFI_SHORT_BEACON "short_beacon"
+
 /* SCAN MODE */
 /* CLI : nvs set_u8 scan_mode [scan_mode] */
 /* [scan_mode] WIFI_SCAN_NORMAL = 0, WIFI_SCAN_PASSIVE = 1 */

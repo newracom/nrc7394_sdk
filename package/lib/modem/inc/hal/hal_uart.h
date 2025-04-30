@@ -70,6 +70,8 @@ void nrc_hsuart_interrupt(int ch, bool tx_en, bool rx_en);
 void nrc_hsuart_int_clr(int ch, bool tx_int, bool rx_int, bool to_int);
 void nrc_hsuart_fifo_level(int ch, uint32_t tx_level, uint32_t rx_level);
 void nrc_hsuart_set_alt_uart_to_gpio(int ch);
+void hal_uart_disable_irq(void);
+void hal_uart_enable_irq(void);
 
 #ifdef RELEASE
 	#define system_printf

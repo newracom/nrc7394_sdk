@@ -132,6 +132,11 @@
   handler;} } while(0)
 #endif
 
+/* Request to broadcast response */
+#ifndef NRC_DHCP_SET_BROADCAST_FLAG
+#define NRC_DHCP_SET_BROADCAST_FLAG 0
+#endif
+
 /** Option handling: options are parsed in dhcp_parse_reply
  * and saved in an array where other functions can load them from.
  * This might be moved into the struct dhcp (not necessarily since
@@ -227,27 +232,33 @@ static u16_t dhcp_option_hostname(u16_t options_out_len, u8_t *options, struct n
 static void dhcp_option_trailer(u16_t options_out_len, u8_t *options, struct pbuf *p_out);
 
 
-#if LWIP_DHCP_EVENT
-static dhcp_event_handler_t dhcp_event_handler = NULL;
-
+#if defined(LWIP_DHCP_EVENT) && (LWIP_DHCP_EVENT == 1)
 err_t
 dhcp_event_enable (struct netif *netif, dhcp_event_handler_t handler)
 {
-  LWIP_ERROR("dhcp_event_enable: handler != NULL",
-		  (handler != NULL), return ERR_ARG;);
-  LWIP_ERROR("dhcp_event_enable: dhcp_event_handler == NULL",
-		  (dhcp_event_handler == NULL), return ERR_USE;);
+	struct dhcp *dhcp = netif_dhcp_data(netif);
 
-  LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("dhcp_event_enable()\n"));
-  dhcp_event_handler = handler;
-  return ERR_OK;
+	LWIP_ERROR("dhcp_event_enable: dhcp != NULL", (dhcp != NULL), return ERR_ARG;);
+	LWIP_ERROR("dhcp_event_enable: handler != NULL", (handler != NULL), return ERR_ARG;);
+	LWIP_ERROR("dhcp_event_enable: dhcp->event_handler == NULL", (dhcp->event_handler == NULL), return ERR_USE;);
+
+	LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("dhcp_event_enable()\n"));
+
+	dhcp->event_handler = handler;
+
+	return ERR_OK;
 }
 
 void
 dhcp_event_disable (struct netif *netif)
 {
-  LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("dhcp_event_disable()\n"));
-  dhcp_event_handler = NULL;
+	struct dhcp *dhcp = netif_dhcp_data(netif);
+
+	LWIP_ERROR("dhcp_event_disable: dhcp != NULL", (dhcp != NULL), return;);
+
+	LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("dhcp_event_disable()\n"));
+
+	dhcp->event_handler = NULL;
 }
 
 static void dhcp_event_send (struct netif *netif, dhcp_event_t event)
@@ -257,10 +268,16 @@ static void dhcp_event_send (struct netif *netif, dhcp_event_t event)
 		case DHCP_EVENT_RENEWING:
 		case DHCP_EVENT_RELEASED:
 		case DHCP_EVENT_BOUND:
-			if (dhcp_event_handler)
-				dhcp_event_handler(netif, event);
+		{
+  			struct dhcp *dhcp = netif_dhcp_data(netif);
+
+		  	LWIP_ERROR("dhcp_event_send: dhcp != NULL", (dhcp != NULL), return;);
+
+			if (dhcp->event_handler)
+				dhcp->event_handler(netif, event);
 			else
 				LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("dhcp_event_send(): no handler\n"));
+		}
 	}
 }
 #else
@@ -268,10 +285,10 @@ static void dhcp_event_send (struct netif *netif, dhcp_event_t event)
 {
    return;
 }
-#endif /* #if LWIP_DHCP_EVENT */
+#endif /* #if defined(LWIP_DHCP_EVENT) && (LWIP_DHCP_EVENT == 1) */
 
 /** Ensure DHCP PCB is allocated and bound */
-static err_t
+err_t
 dhcp_inc_pcb_refcount(void)
 {
   if (dhcp_pcb_refcount == 0) {
@@ -465,7 +482,11 @@ dhcp_select(struct netif *netif)
   if (dhcp->tries < 255) {
     dhcp->tries++;
   }
+#if defined(LWIP_DHCP_REQUEST_TIMEOUT_SECONDS) && (LWIP_DHCP_REQUEST_TIMEOUT_SECONDS > 0)
+  msecs = (u16_t)(LWIP_DHCP_REQUEST_TIMEOUT_SECONDS * 1000);
+#else
   msecs = (u16_t)((dhcp->tries < 6 ? 1 << dhcp->tries : 60) * 1000);
+#endif
   dhcp->request_timeout = (u16_t)((msecs + DHCP_FINE_TIMER_MSECS - 1) / DHCP_FINE_TIMER_MSECS);
   LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_STATE, ("dhcp_select(): set request timeout %"U16_F" msecs\n", msecs));
   return result;
@@ -1073,7 +1094,11 @@ dhcp_discover(struct netif *netif)
     autoip_start(netif);
   }
 #endif /* LWIP_DHCP_AUTOIP_COOP */
+#if defined(LWIP_DHCP_REQUEST_TIMEOUT_SECONDS) && (LWIP_DHCP_REQUEST_TIMEOUT_SECONDS > 0)
+  msecs = (u16_t)(LWIP_DHCP_REQUEST_TIMEOUT_SECONDS * 1000);
+#else
   msecs = (u16_t)((dhcp->tries < 6 ? 1 << dhcp->tries : 60) * 1000);
+#endif
   dhcp->request_timeout = (u16_t)((msecs + DHCP_FINE_TIMER_MSECS - 1) / DHCP_FINE_TIMER_MSECS);
   LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE | LWIP_DBG_STATE, ("dhcp_discover(): set request timeout %"U16_F" msecs\n", msecs));
   return result;
@@ -2017,7 +2042,7 @@ dhcp_create_msg(struct netif *netif, struct dhcp *dhcp, u8_t message_type, u16_t
   msg_out->hlen = netif->hwaddr_len;
   msg_out->xid = lwip_htonl(dhcp->xid);
 
-#ifdef NRC_DHCP_SET_BROADCAST_FLAG
+#if defined(NRC_DHCP_SET_BROADCAST_FLAG) && (NRC_DHCP_SET_BROADCAST_FLAG == 1)
 // Set the broadcast bit in flags.
   msg_out->flags = htons(0x8000);  // Set the broadcast flag
 #endif
@@ -2079,6 +2104,70 @@ dhcp_supplied_address(const struct netif *netif)
            (dhcp->state == DHCP_STATE_REBINDING);
   }
   return 0;
+}
+
+void print_dhcp_info(struct dhcp *dhcp)
+{
+	LWIP_DEBUGF(DHCP_DEBUG, ("DHCP Info:\n"));
+	LWIP_DEBUGF(DHCP_DEBUG, ("  xid: 0x%08X\n", dhcp->xid));
+	LWIP_DEBUGF(DHCP_DEBUG, ("  pcb_allocated: %u\n", dhcp->pcb_allocated));
+	LWIP_DEBUGF(DHCP_DEBUG, ("  state: %u\n", dhcp->state));
+	LWIP_DEBUGF(DHCP_DEBUG, ("  tries: %u\n", dhcp->tries));
+#if LWIP_DHCP_AUTOIP_COOP
+	LWIP_DEBUGF(DHCP_DEBUG, ("  autoip_coop_state: %u\n", dhcp->autoip_coop_state));
+#endif
+	LWIP_DEBUGF(DHCP_DEBUG, ("  subnet_mask_given: %u\n", dhcp->subnet_mask_given));
+	LWIP_DEBUGF(DHCP_DEBUG, ("  request_timeout: %u\n", dhcp->request_timeout));
+	LWIP_DEBUGF(DHCP_DEBUG, ("  t1_timeout: %u\n", dhcp->t1_timeout));
+	LWIP_DEBUGF(DHCP_DEBUG, ("  t2_timeout: %u\n", dhcp->t2_timeout));
+	LWIP_DEBUGF(DHCP_DEBUG, ("  t1_renew_time: %u\n", dhcp->t1_renew_time));
+	LWIP_DEBUGF(DHCP_DEBUG, ("  t2_rebind_time: %u\n", dhcp->t2_rebind_time));
+	LWIP_DEBUGF(DHCP_DEBUG, ("  lease_used: %u\n", dhcp->lease_used));
+	LWIP_DEBUGF(DHCP_DEBUG, ("  t0_timeout: %u\n", dhcp->t0_timeout));
+
+	LWIP_DEBUGF(DHCP_DEBUG, ("  server_ip_addr: %s\n", ipaddr_ntoa(&dhcp->server_ip_addr)));
+	LWIP_DEBUGF(DHCP_DEBUG, ("  offered_ip_addr: %s\n", ip4addr_ntoa(&dhcp->offered_ip_addr)));
+	LWIP_DEBUGF(DHCP_DEBUG, ("  offered_sn_mask: %s\n", ip4addr_ntoa(&dhcp->offered_sn_mask)));
+	LWIP_DEBUGF(DHCP_DEBUG, ("  offered_gw_addr: %s\n", ip4addr_ntoa(&dhcp->offered_gw_addr)));
+
+	LWIP_DEBUGF(DHCP_DEBUG, ("  offered_t0_lease: %u\n", dhcp->offered_t0_lease));
+	LWIP_DEBUGF(DHCP_DEBUG, ("  offered_t1_renew: %u\n", dhcp->offered_t1_renew));
+	LWIP_DEBUGF(DHCP_DEBUG, ("  offered_t2_rebind: %u\n", dhcp->offered_t2_rebind));
+
+#if LWIP_DHCP_BOOTP_FILE
+	LWIP_DEBUGF(DHCP_DEBUG, ("  offered_si_addr: %s\n", ip4addr_ntoa(&dhcp->offered_si_addr)));
+	LWIP_DEBUGF(DHCP_DEBUG, ("  boot_file_name: %s\n", dhcp->boot_file_name));
+#endif
+
+#if defined(LWIP_DHCP_EVENT) && (LWIP_DHCP_EVENT == 1)
+	LWIP_DEBUGF(DHCP_DEBUG, ("  event_handler: %p\n", (void*)dhcp->event_handler));
+#endif
+}
+
+dhcp_renew_status_t wait_for_dhcp_renewing_done(struct netif *netif, int max_wait_ms)
+{
+	if ((netif == NULL) || (netif_dhcp_data(netif) == NULL)) {
+		return DHCP_RENEWAL_FAILED;
+	}
+
+	struct dhcp *dhcp = netif_dhcp_data(netif);
+	const int check_interval_ms = 10;
+	int elapsed_ms = 0;
+
+	if (dhcp->state != DHCP_STATE_RENEWING) {
+		return DHCP_NOT_RENEWING;
+	}
+
+	while (dhcp->state == DHCP_STATE_RENEWING && elapsed_ms < max_wait_ms) {
+		vTaskDelay(pdMS_TO_TICKS(check_interval_ms));
+		elapsed_ms += check_interval_ms;
+	}
+
+	if (dhcp->state == DHCP_STATE_RENEWING) {
+		return DHCP_RENEWING;
+	} else {
+		return DHCP_RENEWAL_DONE;
+	}
 }
 
 #endif /* LWIP_IPV4 && LWIP_DHCP */

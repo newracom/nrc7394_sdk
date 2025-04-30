@@ -330,6 +330,9 @@ bool system_modem_api_get_listen_interval(int vif_id, uint16_t *interval, uint32
 bool system_modem_api_ps_set_user_data(void* data, uint16_t size);
 bool system_modem_api_ps_get_user_data(void* data, uint16_t size);
 uint16_t system_modem_api_ps_get_user_data_size(void);
+#if!defined(NRC7292)
+uint64_t system_modem_api_ps_get_sleep_duration(void);
+#endif
 
 #if defined(INCLUDE_TWT_SUPPORT)
 void system_modem_api_set_tx_suppress_start(uint32_t setting, uint32_t value);

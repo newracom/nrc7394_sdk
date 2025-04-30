@@ -67,6 +67,8 @@ static WIFI_CONFIG* g_wifi_config;
 	wifi_config->nons1g_freq = STAGetNonS1GFreq(wifi_config->channel);
 	wifi_config->bw = NRC_AP_SET_CHANNEL_BW;
 	wifi_config->bcn_interval =  NRC_WIFI_BCN_INTERVAL;
+	wifi_config->dtim_period = NRC_WIFI_DTIM_PERIOD_DEFAULT;
+	wifi_config->short_beacon = NRC_WIFI_SHORT_BEACON_DEFAULT;
 	wifi_config->ip_mode = NRC_WIFI_IP_MODE;
 	memcpy(wifi_config->static_ip,  NRC_STATIC_IP, sizeof(NRC_STATIC_IP));
 	memcpy(wifi_config->netmask,  NRC_NETMASK, sizeof(NRC_NETMASK));
@@ -165,6 +167,8 @@ nrc_err_t nrc_save_wifi_config(WIFI_CONFIG* wifi_config, int rewrite)
 	nvs_set_u16(nvs_handle, NVS_WIFI_CHANNEL, (uint16_t)wifi_config->channel);
 	nvs_set_u8(nvs_handle, NVS_WIFI_CHANNEL_BW, (uint8_t)wifi_config->bw);
 	nvs_set_u16(nvs_handle, NVS_WIFI_BCN_INTERVAL, (uint16_t)wifi_config->bcn_interval);
+	nvs_set_u8(nvs_handle, NVS_WIFI_DTIM_PERIOD, (uint8_t)wifi_config->dtim_period);
+	nvs_set_u8(nvs_handle, NVS_WIFI_SHORT_BEACON, (uint8_t)wifi_config->short_beacon);
 	nvs_set_u8(nvs_handle, NVS_IP_MODE, (uint8_t)wifi_config->ip_mode);
 	nvs_set_str(nvs_handle, NVS_STATIC_IP, (char*)wifi_config->static_ip);
 	nvs_set_str(nvs_handle, NVS_NETMASK, (char*)wifi_config->netmask);
@@ -282,6 +286,9 @@ void print_settings(WIFI_CONFIG* wifi_config)
 	nrc_usr_print("bw %d\n", wifi_config->bw);
 	nrc_usr_print("bcn interval %d\n", wifi_config->bcn_interval);
 	nrc_usr_print("short bcn interval %d\n", wifi_config->bcn_interval);
+	nrc_usr_print("DTIM period %d\n", wifi_config->dtim_period);
+	nrc_usr_print("short beacon %d [%s]\n", wifi_config->short_beacon,
+		( wifi_config->short_beacon == 0) ? "DISABLE" : "ENABLE");
 	nrc_usr_print("ip_mode %d [%s]\n", wifi_config->ip_mode,
 		( wifi_config->ip_mode == 0) ? "Static IP" : "Dynamic IP");
 	nrc_usr_print("static ip %s\n", wifi_config->static_ip);
@@ -523,6 +530,8 @@ static nrc_err_t load_wifi_config_from_nvs(WIFI_CONFIG *wifi_config)
 	nvs_get_u16(nvs_handle,NVS_WIFI_CHANNEL, (uint16_t*)&wifi_config->channel);
 	nvs_get_u8(nvs_handle, NVS_WIFI_CHANNEL_BW, (uint8_t*)&wifi_config->bw);
 	nvs_get_u16(nvs_handle, NVS_WIFI_BCN_INTERVAL, (uint16_t*)&wifi_config->bcn_interval);
+	nvs_get_u8(nvs_handle, NVS_WIFI_DTIM_PERIOD, (uint8_t*)&wifi_config->dtim_period);
+	nvs_get_u8(nvs_handle, NVS_WIFI_SHORT_BEACON, (uint8_t*)&wifi_config->short_beacon);
 	nvs_get_u8(nvs_handle, NVS_IP_MODE, (uint8_t*)&wifi_config->ip_mode);
 
 	length = sizeof(wifi_config->netmask);
@@ -724,6 +733,8 @@ nrc_err_t nrc_erase_all_wifi_nvs(void)
 	nvs_erase_key(nvs_handle, NVS_WIFI_DISCONN_TIMEOUT);
 	nvs_erase_key(nvs_handle, NVS_DHCP_TIMEOUT);
 	nvs_erase_key(nvs_handle, NVS_WIFI_BCN_INTERVAL);
+	nvs_erase_key(nvs_handle, NVS_WIFI_DTIM_PERIOD);
+	nvs_erase_key(nvs_handle, NVS_WIFI_SHORT_BEACON);
 	nvs_erase_key(nvs_handle, NVS_DEVICE_MODE);
 	nvs_erase_key(nvs_handle, NVS_NETWORK_MODE);
 	nvs_erase_key(nvs_handle, NVS_WIFI_RATE_CONTROL);

@@ -156,4 +156,8 @@ v6.4.0 / v7.4.0 (01/21/2025)
 
 v6.5.0 (02/19/2025)
 - Enabled NRC7292 flash identification and memory map update feature.
-- Increaed the timeout for the memomry map update BP packet response from 2 to 5 seconds.
+- Increased the timeout for the memomry map update BP packet response from 2 to 5 seconds.
+
+v6.5.0 (04/23/2025)
+- Updated bootloader/firmware.
+- Support XT25F32F

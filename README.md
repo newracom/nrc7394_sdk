@@ -10,6 +10,7 @@
 > If users plan to use this software package with other devices that incorporate the NRC7394 chip, they should utilize the board data file supplied by the device's vendor.
 
 ### Release roadmap
+- v1.3.4 (2025.04.30) (hotfix)
 - v1.3.3 (2025.04.04)
 - v1.3.2 (2024.12.27) (hotfix)
 - v1.3.1 (2024.12.13) (hotfix)
@@ -21,7 +22,7 @@
 - v1.0 (2023.08.07)
 
 ### Latest release
-- [NRC7394_Standalone_SDK_v1.3.3](https://github.com/newracom/nrc7394_sdk/releases/tag/v1.3.3)
+- [NRC7394_Standalone_SDK_v1.3.4](https://github.com/newracom/nrc7394_sdk/releases/tag/v1.3.4)
   - WPA3-SAE H2E is enabled by default.
   - Please refer to the [UG-7394-008-Memory_Map.pdf](https://github.com/newracom/nrc7394_sdk/blob/master/package/doc/UG-7394-008-Memory_Map.pdf) for the latest memory map updates.
   - The default build configuration is designed for 4MB flash memory. If you are using a 2MB flash memory module, please include the ALIAS "+2m" option. 

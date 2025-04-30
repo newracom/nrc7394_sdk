@@ -222,11 +222,9 @@ typedef err_t (*netif_igmp_mac_filter_fn)(struct netif *netif,
 typedef err_t (*netif_mld_mac_filter_fn)(struct netif *netif,
        const ip6_addr_t *group, enum netif_mac_filter_action action);
 #endif /* LWIP_IPV6 && LWIP_IPV6_MLD */
-#ifdef NRC_LWIP
 #if LWIP_DHCP
 typedef void (*dhcp_event_fn)(void);
 #endif /* LWIP_DHCP */
-#endif /* NRC_LWIP */
 
 #if LWIP_DHCP || LWIP_AUTOIP || LWIP_IGMP || LWIP_IPV6_MLD || LWIP_IPV6_DHCP6 || (LWIP_NUM_NETIF_CLIENT_DATA > 0)
 #if LWIP_NUM_NETIF_CLIENT_DATA > 0
@@ -326,7 +324,6 @@ struct netif {
   /** This field can be set by the device driver and could point
    *  to state information for the device. */
   void *state;
-#ifdef NRC_LWIP
 #if LWIP_DHCP
   /** the DHCP client state information for this netif */
   struct dhcp *dhcp;
@@ -335,7 +332,6 @@ struct netif {
 #if LWIP_DHCPS
   struct udp_pcb *dhcps_pcb;	//dhcps
 #endif /* LWIP_DHCPS */
-#endif /* NRC_LWIP */
 #ifdef netif_get_client_data
   void* client_data[LWIP_NETIF_CLIENT_DATA_INDEX_MAX + LWIP_NUM_NETIF_CLIENT_DATA];
 #endif

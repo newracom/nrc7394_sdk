@@ -170,12 +170,24 @@ struct ret_tidinfo {
 } __attribute__ ((packed));
 #define RET_TIDNFO_SIZE sizeof(struct ret_tidinfo)
 
-//12B
+#define MAX_RETAINED_ARP_ENTRIES 3
+
+//12B + (52B + 4B) -> 68B : ret_ipinfo common
 struct ret_ipinfo {
 	uint32_t	ip_addr;
 	uint32_t	net_mask:31;
 	uint32_t	ip_mode:1;
 	uint32_t	gw_addr;
+#if !defined(NRC7292)
+	uint8_t 	dhcp_setting[52 + 4]; /* sizeof(struct dhcp) + sizeof(dhcp_event_handler_t) */
+	struct {
+		uint32_t	ipaddr;
+		uint8_t		mac[6];
+		uint8_t		_pad[2];
+	} arp[MAX_RETAINED_ARP_ENTRIES];
+	uint8_t		arp_count;
+	uint8_t		dhcp_renew:1;
+#endif
 } __attribute__ ((packed));
 #define RET_IPINFO_SIZE sizeof(struct ret_ipinfo)
 
@@ -302,7 +314,7 @@ struct ret_dutyinfo {
 } __attribute__ ((packed));
 #define RET_DUTY_INFO_SIZE sizeof(struct ret_dutyinfo)
 
-// 5B
+// 6B
 struct ret_rcinfo {
 		uint16_t maxtp:4;		/* 4bits for 0 ~ 15 */
 		uint16_t tp2:4;
@@ -314,6 +326,9 @@ struct ret_rcinfo {
 //#if defined(INCLUDE_DUTYCYCLE)
 		uint8_t org_intval:3;		/* original statistics update interval : 1~7 => 100ms 200ms...700ms */
 		uint8_t org_probe_intval:5;	/* original probe inerval			  : 1~31 => 10ms 20ms ... 310ms  */
+//#endif
+//#if defined(RC_USE_CAP_BASE_RETRY0_RANGE_N)
+		uint8_t probe_range_n:3; /*random probe range 0 ~ 7*/
 //#endif
 } __attribute__ ((packed));
 #define RET_RC_INFO_SIZE sizeof(struct ret_rcinfo)
@@ -499,7 +514,7 @@ struct retention_info {
 	struct ret_wakeupinfo	wakeup_info;		//wakeup source (3B)
 	struct ret_acinfo		ac_info;		//info per AC (40B)
 	struct ret_tidinfo		tid_info;		//info per TID ( 76B)
-	struct ret_ipinfo		ip_info;		//ip info (12B)
+	struct ret_ipinfo		ip_info;		//ip info (12B or 68B)
 	struct ret_lbtinfo		lbt_info;		//lbt info (10B)
 	struct ret_rfinfo		rf_info;		//rf info (375B)
 	struct ret_ucodeinfo	ucode_info;		//ucode info (58B)
@@ -555,6 +570,9 @@ struct retention_info {
 	uint8_t				ps_mode;		//Power saving mode (1B) (none/modem/tim/nontim)
 	uint64_t			ps_duration;		//Power save duration (8B) (in ms unit)
 	uint64_t			usr_timeout;		//TIM-mode user timer (8B) (in ms unit)
+#if !defined(NRC7292)
+	uint64_t			sleep_at;		//RTC save when going to sleep (8B) (in ms unit)
+#endif
 	uint32_t			wdt_flag:8;		//WDT Reset Flag (1B)
 	uint32_t			wdt_cnt: 24;		//WDT Reset Count (3B)
 	uint8_t				fota_in_progress:1;	//fota in progress flag(1bit) (1: in progress, 0: not in progress)
@@ -757,5 +775,7 @@ bool nrc_ps_check_fast_connect(void);
 bool nrc_ps_set_user_data(void* data, uint16_t size);
 bool nrc_ps_get_user_data(void* data, uint16_t size);
 uint16_t nrc_ps_get_user_data_size(void);
+bool nrc_ps_set_dhcp_renew(bool eanble);
+bool nrc_ps_get_dhcp_renew(void);
 
 #endif /*__NRC_PS_API_H__*/

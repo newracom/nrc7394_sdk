@@ -10,6 +10,7 @@ extern "C" {
 #include "lwip/netif.h"
 #include "lwip/ip_addr.h"
 #include "lwip/dhcp.h"
+#include "lwip/etharp.h"
 
 typedef enum {
 	WIFI_NULL_MODE = 0,      /**< null mode */

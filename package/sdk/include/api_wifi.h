@@ -1087,6 +1087,34 @@ tWIFI_STATUS nrc_wifi_softap_set_beacon_interval(int vif_id, uint16_t beacon_int
 
 
 /**********************************************
+ * @fn     tWIFI_STATUS nrc_wifi_softap_set_dtim_period(int vif_id, uint16_t period)
+ *
+ * @brief Configure the DTIM period for the SoftAP interface.
+ *
+ * @param vif_id: Network interface index
+ *
+ * @param period: DTIM(Delivery Traffic Indication Message) period in beacon intervals (default: 2)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_softap_set_dtim_period(int vif_id, uint8_t period);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_softap_set_short_beacon (int vif_id, bool enable)
+ *
+ * @brief Configure the short beacon option
+ *
+ * @param vif_id: Network interface index
+ *
+ * @param enable: 1(enable) or 0(disable)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_softap_set_short_beacon(int vif_id, bool enable);
+
+
+/**********************************************
  * @fn tWIFI_STATUS nrc_wifi_register_event_handler (int vif_id, event_callback_fn fn)
  *
  * @brief Register event handler for connection

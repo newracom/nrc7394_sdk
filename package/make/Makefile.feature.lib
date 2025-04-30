@@ -273,6 +273,16 @@ endif
 #// WEBSOCKET_CLIENT
 #// --------------------------------------------------
 ifeq ($(CONFIG_WEBSOCKET_CLIENT), y)
-       WEBSOCKET_CLIENT_BASE = $(LIB_PATH)/websocket_client
-       include $(WEBSOCKET_CLIENT_BASE)/module.mk
+	WEBSOCKET_CLIENT_BASE = $(LIB_PATH)/websocket_client
+	include $(WEBSOCKET_CLIENT_BASE)/module.mk
+endif
+
+#// --------------------------------------------------
+#// TCP CLI library
+#// --------------------------------------------------
+TCP_CLI_ROOT    = $(LIB_PATH)/tcp_cli
+
+ifeq ($(CONFIG_TCP_CLI), y)
+	DEFINE	+= -DSUPPORT_TCP_CLI
+	include $(TCP_CLI_ROOT)/module.mk
 endif

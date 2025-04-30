@@ -7,8 +7,11 @@ CSRCS += \
 	web_service.c \
 	wifi_service.c \
 	lzo_decompress.c \
+	button_action.c
 
 DEFINE += -DSUPPORT_ETHERNET_ACCESSPOINT
 DEFINE += -DENABLE_ETHERNET_INTERRUPT
-DEFINE += -DNRC_DHCP_SET_BROADCAST_FLAG
+DEFINE += -DNRC_DHCP_SET_BROADCAST_FLAG=1
+DEFINE += -DENABLE_RESET_BUTTON=0
+
 include $(SDK_WIFI_COMMON)/module.mk

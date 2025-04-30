@@ -42,18 +42,18 @@ typedef struct {
 typedef struct {
 	union {
 		struct {
-			uint32_t txpwr_boosting_valid       :  1;
-			uint32_t fem_polarity_valid         :  1;
-			uint32_t external_pa_exists         :  1;
-			uint32_t max_txgain_valid           :  1;
-			uint32_t max_txpwr_valid            :  1;
-			uint32_t auxadc_temp_override_valid :  1;
-			uint32_t unused                     :  1;
-			uint32_t rx_cal_default_override    :  1;
-			uint32_t gp17_tx_on_monitoring      :  1;
-			uint32_t reserved1                  :  7;
-			uint32_t sxtal_32k_flag             :  2; //0: Unknown, 1: okay, 2: not okay
-			uint32_t reserved2                  : 14;
+			uint32_t txpwr_boosting_valid       :  1; //[0]
+			uint32_t fem_polarity_valid         :  1; //[1]
+			uint32_t external_pa_exists         :  1; //[2]
+			uint32_t max_txgain_valid           :  1; //[3]
+			uint32_t max_txpwr_valid            :  1; //[4]
+			uint32_t auxadc_temp_override_valid :  1; //[5]
+			uint32_t unused                     :  1; //[6]
+			uint32_t rx_cal_default_override    :  1; //[7]
+			uint32_t gp17_tx_on_monitoring      :  1; //[8]
+			uint32_t reserved1                  :  7; //[9]
+			uint32_t sxtal_32k_flag             :  2; //[16] //0: Unknown, 1: okay, 2: not okay
+			uint32_t reserved2                  : 14; //[18]
 		};
 		uint32_t word;
 	};

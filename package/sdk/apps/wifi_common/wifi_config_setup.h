@@ -50,6 +50,8 @@ typedef struct  {
 	uint16_t nons1g_freq;
 	uint8_t bw;
 	uint16_t bcn_interval;
+	uint8_t dtim_period;
+	uint8_t short_beacon;
 	uint8_t ip_mode;
 	char static_ip[MAX_STATIC_IP_LENGTH+1];
 	char netmask[MAX_STATIC_IP_LENGTH+1];

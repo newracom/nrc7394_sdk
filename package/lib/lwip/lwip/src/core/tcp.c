@@ -126,6 +126,10 @@
 #define TCP_ENSURE_LOCAL_PORT_RANGE(port) ((u16_t)(((port) & (u16_t)~TCP_LOCAL_PORT_RANGE_START) + TCP_LOCAL_PORT_RANGE_START))
 #endif
 
+#ifndef TCP_INITIAL_RTO_MS
+#define TCP_INITIAL_RTO_MS          3000
+#endif
+
 #if LWIP_TCP_KEEPALIVE
 #define TCP_KEEP_DUR(pcb)   ((pcb)->keep_cnt * (pcb)->keep_intvl)
 #define TCP_KEEP_INTVL(pcb) ((pcb)->keep_intvl)
@@ -1915,7 +1919,7 @@ tcp_alloc(u8_t prio)
     /* As initial send MSS, we use TCP_MSS but limit it to 536.
        The send MSS is updated when an MSS option is received. */
     pcb->mss = INITIAL_MSS;
-    pcb->rto = 3000 / TCP_SLOW_INTERVAL;
+    pcb->rto = TCP_INITIAL_RTO_MS / TCP_SLOW_INTERVAL;
     pcb->sv = 3000 / TCP_SLOW_INTERVAL;
     pcb->rtime = -1;
     pcb->cwnd = 1;

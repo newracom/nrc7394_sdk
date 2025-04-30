@@ -359,14 +359,11 @@ int _lwip_socket_udp_set_broadcast (int fd, bool enable)
 	return 0;
 }
 
-int _lwip_socket_udp_add_multicast_group (int fd, ip_addr_t *addr, bool ipv6)
+int _lwip_socket_udp_add_multicast_group (int fd, ip_addr_t *addr)
 {
 	struct ip_mreq mreq;
 	socklen_t len = sizeof(struct ip_mreq);
 	int ret;
-
-	if (ipv6)
-		return _lwip_socket_error(EOPNOTSUPP);
 
 	mreq.imr_multiaddr.s_addr = ip_addr_get_ip4_u32(addr);
 	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
@@ -380,14 +377,11 @@ int _lwip_socket_udp_add_multicast_group (int fd, ip_addr_t *addr, bool ipv6)
 	return 0;
 }
 
-int _lwip_socket_udp_drop_multicast_group (int fd, ip_addr_t *addr, bool ipv6)
+int _lwip_socket_udp_drop_multicast_group (int fd, ip_addr_t *addr)
 {
 	struct ip_mreq mreq;
 	socklen_t len = sizeof(struct ip_mreq);
 	int ret;
-
-	if (ipv6)
-		return _lwip_socket_error(EOPNOTSUPP);
 
 	mreq.imr_multiaddr.s_addr = ip_addr_get_ip4_u32(addr);
 	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
@@ -401,13 +395,10 @@ int _lwip_socket_udp_drop_multicast_group (int fd, ip_addr_t *addr, bool ipv6)
 	return 0;
 }
 
-int _lwip_socket_udp_get_multicast_loopback (int fd, bool *loopback, bool ipv6)
+int _lwip_socket_udp_get_multicast_loopback (int fd, bool *loopback)
 {
 	socklen_t len = sizeof(bool);
 	int ret;
-
-	if (ipv6)
-		return _lwip_socket_error(EOPNOTSUPP);
 
 	ret = getsockopt(fd, IPPROTO_IP, IP_MULTICAST_LOOP, loopback, &len);
 	if (ret < 0)
@@ -421,13 +412,10 @@ int _lwip_socket_udp_get_multicast_loopback (int fd, bool *loopback, bool ipv6)
 	return 0;
 }
 
-int _lwip_socket_udp_set_multicast_loopback (int fd, bool loopback, bool ipv6)
+int _lwip_socket_udp_set_multicast_loopback (int fd, bool loopback)
 {
 	socklen_t len = sizeof(bool);
 	int ret;
-
-	if (ipv6)
-		return _lwip_socket_error(EOPNOTSUPP);
 
 	ret = setsockopt(fd, IPPROTO_IP, IP_MULTICAST_LOOP, &loopback, len);
 	if (ret < 0)
@@ -438,13 +426,10 @@ int _lwip_socket_udp_set_multicast_loopback (int fd, bool loopback, bool ipv6)
 	return 0;
 }
 
-int _lwip_socket_udp_get_multicast_ttl (int fd, uint8_t *ttl, bool ipv6)
+int _lwip_socket_udp_get_multicast_ttl (int fd, uint8_t *ttl)
 {
 	socklen_t len = sizeof(uint8_t);
 	int ret;
-
-	if (ipv6)
-		return _lwip_socket_error(EOPNOTSUPP);
 
 	ret = getsockopt(fd, IPPROTO_IP, IP_MULTICAST_TTL, ttl, &len);
 	if (ret < 0)
@@ -458,13 +443,10 @@ int _lwip_socket_udp_get_multicast_ttl (int fd, uint8_t *ttl, bool ipv6)
 	return 0;
 }
 
-int _lwip_socket_udp_set_multicast_ttl (int fd, uint8_t ttl, bool ipv6)
+int _lwip_socket_udp_set_multicast_ttl (int fd, uint8_t ttl)
 {
 	socklen_t len = sizeof(uint8_t);
 	int ret;
-
-	if (ipv6)
-		return _lwip_socket_error(EOPNOTSUPP);
 
 	ret = setsockopt(fd, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, len);
 	if (ret < 0)
@@ -971,7 +953,7 @@ static int _lwip_socket_open (int type, int *fd,
 					if (ret == 0)
 					{
 						if (multicast_ttl > 0)						
-							ret = _lwip_socket_udp_set_multicast_ttl(*fd, multicast_ttl, ipv6);
+							ret = _lwip_socket_udp_set_multicast_ttl(*fd, multicast_ttl);
 					}
 
 					if (ret == 0)
@@ -987,10 +969,10 @@ static int _lwip_socket_open (int type, int *fd,
 							if (broadcast)
 								_lwip_socket_log("SOCK_OPEN: UDP Broadcast, fd=%d", *fd);
 
-							ret = _lwip_socket_udp_get_multicast_loopback(*fd, &multicast_loopback, ipv6);
+							ret = _lwip_socket_udp_get_multicast_loopback(*fd, &multicast_loopback);
 							if (ret == 0)
 							{
-								_lwip_socket_udp_get_multicast_ttl(*fd, &multicast_ttl, ipv6);
+								_lwip_socket_udp_get_multicast_ttl(*fd, &multicast_ttl);
 
 								_lwip_socket_log("SOCK_OPEN: UDP Multicast, fd=%d loopback=%d ttl=%u", 
 													*fd, multicast_loopback, multicast_ttl);

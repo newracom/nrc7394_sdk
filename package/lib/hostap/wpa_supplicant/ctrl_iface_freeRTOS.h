@@ -20,6 +20,11 @@ typedef struct
 	uint32_t net_mask:31;
 	uint32_t ip_mode:1;
 	uint32_t gw_addr;
+#if !defined(NRC7292)
+	uint8_t  dhcp_setting[52 + 4]; /* sizeof(struct dhcp) + sizeof(dhcp_event_handler_t) */
+	uint32_t dhcp_renew:1;
+	uint32_t reserved0:31;
+#endif
 	const char *country;
 	const char *ssid;
 	const char *bssid;

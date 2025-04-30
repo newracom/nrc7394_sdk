@@ -192,7 +192,7 @@ static int _wifi_dhcpc_start(int vif, dhcp_event_handler_t event_handler)
 
 	result = dhcp_start(target_if);
 
-#if LWIP_DHCP_EVENT
+#if defined(LWIP_DHCP_EVENT) && (LWIP_DHCP_EVENT == 1)
 	if (result == ERR_OK && event_handler)
 		dhcp_event_enable(target_if, event_handler);
 #endif
@@ -249,7 +249,7 @@ int wifi_dhcpc_stop(int vif)
 			return -EINVAL;
 	}
 
-#if LWIP_DHCP_EVENT
+#if defined(LWIP_DHCP_EVENT) && (LWIP_DHCP_EVENT == 1)
 	dhcp_event_disable(target_if);
 #endif
 	dhcp_stop(target_if);

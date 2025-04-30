@@ -37,6 +37,10 @@
 #include "nvs.h"
 #include "cJSON.h"
 
+#if ENABLE_RESET_BUTTON
+#include "button_action.h"
+#endif
+
 #define WIRELESS_BRIDGE_FW_VERSION "1.0.0"
 #define WEB_SERVER_DEFAULT_IP "192.168.50.1"
 #define DHCP_LEASE_TIME 12*60 // min
@@ -270,7 +274,9 @@ void user_init(void)
 	char** argv;
 
 	nrc_uart_console_enable(true);
-
+#if ENABLE_RESET_BUTTON
+	init_reset_button();
+#endif
 #ifdef NRC7394
 	gpio_int_pin = GPIO_30;
 	w5500_spi.pin_miso = 29;

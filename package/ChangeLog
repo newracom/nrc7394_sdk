@@ -4,6 +4,26 @@
 *
 *******************************************************************
 
+[2025-04-30]
+Change summary for version 1.3.4:
+
+Bugfix
+    * Device occasionally enters deep sleep after a SW reset and FOTA update completion
+    * Fragmented DHCP frames occasionally fail to be received properly
+    * RELAY STA disconnects after receiving a deauthentication frame from an AP outside its own BSS
+    * Device wakes up using Long GI after deep sleep, despite Short GI being set
+    * Assert or operation failure during passive scan in connected state
+    * 'show optimal_channel' displays result over 100%
+
+Changes
+    * Update SDK APIs
+      o Refer to UG-7394-005-Standalone SDK API document
+    * DHCP server enhancement: add unicast response support for DHCP_OFFER and DHCP_ACK
+    * Power management improvements
+      o Restore DHCP structure, ARP table, and DHCP renewal operation after waking from deep sleep
+    * Improved temperature estimation 
+    * Add support for XT25F32F flash
+
 [2025-04-04]
 Change summary for version 1.3.3:
 

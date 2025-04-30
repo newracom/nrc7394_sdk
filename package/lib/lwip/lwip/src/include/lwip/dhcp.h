@@ -64,6 +64,19 @@ typedef enum {
   DHCP_AUTOIP_COOP_STATE_ON   = 1
 } dhcp_autoip_coop_state_enum_t;
 
+#if defined(LWIP_DHCP_EVENT) && (LWIP_DHCP_EVENT == 1)
+typedef enum {
+	DHCP_EVENT_RENEWING,
+	DHCP_EVENT_RELEASED,
+	DHCP_EVENT_BOUND,
+} dhcp_event_t;
+
+typedef void (*dhcp_event_handler_t) (struct netif *netif, int event);
+
+err_t dhcp_event_enable (struct netif *netif, dhcp_event_handler_t handler);
+void dhcp_event_disable (struct netif *netif);
+#endif
+
 struct dhcp
 {
   /** transaction identifier of last sent request */
@@ -98,9 +111,20 @@ struct dhcp
   ip4_addr_t offered_si_addr;
   char boot_file_name[DHCP_BOOT_FILE_LEN];
 #endif /* LWIP_DHCP_BOOTPFILE */
+
+#if defined(LWIP_DHCP_EVENT) && (LWIP_DHCP_EVENT == 1)
+  dhcp_event_handler_t event_handler;
+#endif
 };
 
+typedef enum {
+  DHCP_RENEWAL_DONE = 0,
+  DHCP_RENEWAL_FAILED,
+  DHCP_RENEWING,
+  DHCP_NOT_RENEWING
+} dhcp_renew_status_t;
 
+err_t dhcp_inc_pcb_refcount();
 void dhcp_set_struct(struct netif *netif, struct dhcp *dhcp);
 /** Remove a struct dhcp previously set to the netif using dhcp_set_struct() */
 #define dhcp_remove_struct(netif) netif_set_client_data(netif, LWIP_NETIF_CLIENT_DATA_INDEX_DHCP, NULL)
@@ -123,6 +147,8 @@ void dhcp_fine_tmr(void);
 #if STATIC_ARP_ENTRY_DHCP_SERVER
 int dhcp_get_state(struct netif *netif);
 #endif /* STATIC_ARP_ENTRY_DHCP_SERVER */
+void print_dhcp_info(struct dhcp *dhcp);
+dhcp_renew_status_t wait_for_dhcp_renewing_done(struct netif *netif, int max_wait_ms);
 
 #if LWIP_DHCP_GET_NTP_SRV
 /** This function must exist, in other to add offered NTP servers to
@@ -130,19 +156,6 @@ int dhcp_get_state(struct netif *netif);
  * See LWIP_DHCP_MAX_NTP_SERVERS */
 extern void dhcp_set_ntp_servers(u8_t num_ntp_servers, const ip4_addr_t* ntp_server_addrs);
 #endif /* LWIP_DHCP_GET_NTP_SRV */
-
-#if LWIP_DHCP_EVENT
-typedef enum {
-	DHCP_EVENT_RENEWING,
-	DHCP_EVENT_RELEASED,
-	DHCP_EVENT_BOUND,
-} dhcp_event_t;
-
-typedef void (*dhcp_event_handler_t) (struct netif *netif, int event);
-
-err_t dhcp_event_enable (struct netif *netif, dhcp_event_handler_t handler);
-void dhcp_event_disable (struct netif *netif);
-#endif
 
 #define netif_dhcp_data(netif) ((struct dhcp*)netif_get_client_data(netif, LWIP_NETIF_CLIENT_DATA_INDEX_DHCP))
 

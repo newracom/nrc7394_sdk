@@ -1251,4 +1251,43 @@ etharp_request(struct netif *netif, const ip4_addr_t *ipaddr)
   return etharp_request_dst(netif, ipaddr, &ethbroadcast);
 }
 
+#if !defined(NRC7292)
+#include "nrc_ps_api.h"
+
+void etharp_store_to_ret_ipinfo(void)
+{
+	struct retention_info *ret_info = nrc_ps_get_retention_info();
+	ret_info->ip_info.arp_count = 0;
+
+	for (int i = 0; i < ARP_TABLE_SIZE && ret_info->ip_info.arp_count < MAX_RETAINED_ARP_ENTRIES; i++) {
+		if (arp_table[i].state == ETHARP_STATE_STABLE || arp_table[i].state == ETHARP_STATE_STATIC) {
+			ret_info->ip_info.arp[ret_info->ip_info.arp_count].ipaddr = arp_table[i].ipaddr.addr;
+			memcpy(ret_info->ip_info.arp[ret_info->ip_info.arp_count].mac, arp_table[i].ethaddr.addr, 6);
+			ret_info->ip_info.arp_count++;
+		}
+	}
+}
+
+void etharp_restore_from_ret_ipinfo(void)
+{
+	struct retention_info *ret_info = nrc_ps_get_retention_info();
+
+	for (int i = 0; i < ret_info->ip_info.arp_count && i < ARP_TABLE_SIZE; i++) {
+		ip4_addr_t ip;
+		struct eth_addr mac;
+
+		ip.addr = ret_info->ip_info.arp[i].ipaddr;
+		memcpy(mac.addr, ret_info->ip_info.arp[i].mac, ETH_HWADDR_LEN);
+
+		LWIP_DEBUGF(ETHARP_DEBUG | LWIP_DBG_TRACE,
+		("  Restoring entry %d: %u.%u.%u.%u -> %02X:%02X:%02X:%02X:%02X:%02X\n", i + 1,
+			(ip.addr & 0xFF), (ip.addr >> 8) & 0xFF,
+			(ip.addr >> 16) & 0xFF, (ip.addr >> 24) & 0xFF,
+			mac.addr[0], mac.addr[1], mac.addr[2],
+			mac.addr[3], mac.addr[4], mac.addr[5]));
+
+		etharp_add_static_entry(&ip, &mac);
+	}
+}
+#endif /* !defined(NRC7292) */
 #endif /* LWIP_IPV4 && LWIP_ARP */

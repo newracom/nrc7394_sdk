@@ -144,6 +144,16 @@ int nrc_uart_dma_read (char *buf, int len);
  ***********************************************/
 int nrc_uart_write (char *buf, int len);
 
+/**********************************************
+ * @fn nrc_uart_write_done (void)
+ *
+ * @brief Check if the UART write operation has been completed.
+ *
+ * @return bool : `true` if the UART write operation is complete,
+ *                `false` if the write operation is still ongoing.
+ ***********************************************/
+bool nrc_uart_write_done (void);
+
 /****************************************************************************/
 #endif /* #ifndef __API_UART_DMA_H__ */
 

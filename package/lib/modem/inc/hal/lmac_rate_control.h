@@ -54,9 +54,22 @@ enum {
 //#undef RC_USE_RAND_PROBE_RSSI_CAP    /* use random probe using rssi cap */
 
 #if defined (RC_USE_RAND_PROBE_RSSI_CAP)
-#define RC_USE_UPPER_CAP_PROBE_WEAK_RF_F_ONLY    /* use upper cap in case of weak rf field only */ 
-#undef RC_USE_LOWER_CAP_PROBE    				/* use downward cap when getting random probing rate index */
-#endif
+
+/*
+	Use Random probing using min & max cap with a range N:
+	(Current retry[0] rate index - N) ~ (Current retry[0] rate index + N)
+*/
+#define RC_USE_CAP_BASE_RETRY0_RANGE_N
+
+ #if defined (RC_USE_CAP_BASE_RETRY0_RANGE_N)
+   #undef RC_USE_UPPER_CAP_PROBE_WEAK_RF_F_ONLY	 /* use upper cap in case of weak rf field only */ 
+   #define RC_USE_LOWER_CAP_PROBE				  /* use downward cap when getting random probing rate index */
+ #else
+  #define RC_USE_UPPER_CAP_PROBE_WEAK_RF_F_ONLY    /* use upper cap in case of weak rf field only */ 
+  #undef RC_USE_LOWER_CAP_PROBE    				/* use downward cap when getting random probing rate index */
+ #endif
+
+#endif // RC_USE_RAND_PROBE_RSSI_CAP
 
 /* MEM Tuning
  * MEM9: remove total_success, total_attempt from PER_RATE							==> remain for debug purpose
@@ -140,6 +153,10 @@ typedef struct _RC_INFO {
     double ewma;
     uint16_t update_interval_ms; // time
     uint16_t probe_interval_ms;  // per packet
+#if defined(RC_USE_CAP_BASE_RETRY0_RANGE_N)
+	uint8_t probe_range_n; /* random probe range */
+#endif
+    
 } RC_INFO;
 
 struct track_index {
@@ -202,9 +219,11 @@ void lmac_rc_show_by_aid (uint8_t vif_id, uint16_t aid);
 void lmac_rc_show();
 uint8_t lmac_rc_get_retry_order(uint8_t vif, uint8_t * retry_chain, uint16_t aid);
 
-
-
+#if defined(RC_USE_CAP_BASE_RETRY0_RANGE_N)
+void lmac_rc_set_param(uint8_t ewma, uint8_t uinterval, uint8_t pinterval, uint8_t probe_range_n);
+#else
 void lmac_rc_set_param(uint8_t ewma, uint8_t uinterval, uint8_t pinterval);
+#endif
 void lmac_rc_set_update_interval(uint8_t uinterval);
 #if defined(INCLUDE_DUTYCYCLE)
 void lmac_rc_save_org_param(void);

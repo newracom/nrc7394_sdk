@@ -1355,7 +1355,7 @@ static int __atcmd_socket_list_get (enum ATCMD_SOCKET_PROTO proto)
 		{
 			uint8_t ttl;
 
-			if (_lwip_socket_udp_get_multicast_ttl(socket->id, &ttl, false) == 0)
+			if (_lwip_socket_udp_get_multicast_ttl(socket->id, &ttl) == 0)
 			{
 				if (ttl != socket->multicast.ttl)
 				{
@@ -2370,7 +2370,7 @@ static int _atcmd_socket_udp_multicast_add_group_addr (atcmd_socket_t *socket, i
 		{
 			_atcmd_info("udp_multicast_add: %s", ipaddr_ntoa(group_addr)); 
 
-			if (_lwip_socket_udp_add_multicast_group(socket->id, group_addr, false) != 0)
+			if (_lwip_socket_udp_add_multicast_group(socket->id, group_addr) != 0)
 				return ATCMD_ERROR_FAIL;
 
 			ip_addr_set(&socket->multicast.group_addr[i], group_addr);
@@ -2394,7 +2394,7 @@ static int _atcmd_socket_udp_multicast_drop_group_addr (atcmd_socket_t *socket, 
 		for (i = 0 ; i < ATCMD_SOCKET_MULTICAST_GROUP_MAX ; i++)
 		{
 			if (!ip_addr_isany_val(socket->multicast.group_addr[i]))
-				_lwip_socket_udp_drop_multicast_group(socket->id, &socket->multicast.group_addr[i], false);
+				_lwip_socket_udp_drop_multicast_group(socket->id, &socket->multicast.group_addr[i]);
 
 			ip_addr_set_zero(&socket->multicast.group_addr[i]);
 		}
@@ -2417,7 +2417,7 @@ static int _atcmd_socket_udp_multicast_drop_group_addr (atcmd_socket_t *socket, 
 		{
 			_atcmd_info("udp_multicast_drop: %s", ipaddr_ntoa(group_addr)); 
 
-			if (_lwip_socket_udp_drop_multicast_group(socket->id, group_addr, false) != 0)
+			if (_lwip_socket_udp_drop_multicast_group(socket->id, group_addr) != 0)
 				return ATCMD_ERROR_FAIL;
 
 			ip_addr_set_zero(&socket->multicast.group_addr[i]);

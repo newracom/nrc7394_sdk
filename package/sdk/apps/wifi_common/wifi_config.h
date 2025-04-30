@@ -517,7 +517,7 @@
 #endif /* NRC_WIFI_SOFTAP_MAX_NUM_STA_DEFAULT */
 
 /**
- * Wi-Fi isten Interval
+ * Wi-Fi listen Interval
  * Listen Interval Time (us) = listen_interval * beacon_interval * 1TU (1024 us)
  * This value should be configured when enabling the power-saving operation
  * and listen interval time must be larger than sleep duratioon
@@ -525,6 +525,28 @@
 #ifndef NRC_WIFI_LISTEN_INTERVAL_DEFAULT
 #define NRC_WIFI_LISTEN_INTERVAL_DEFAULT 1000
 #endif /* NRC_WIFI_LISTEN_INTERVAL_DEFAULT*/
+
+/**
+ * Wi-Fi DTIM(Delivery Traffic Indication Message) period
+ *
+ * The DTIM period defines how often the AP includes a DTIM beacon that signals
+ * buffered multicast/broadcast data availability. This value is relevant when
+ * power-saving is enabled on the client side
+ *
+ */
+#ifndef NRC_WIFI_DTIM_PERIOD_DEFAULT
+#define NRC_WIFI_DTIM_PERIOD_DEFAULT 2
+#endif /* NRC_WIFI_DTIM_PERIOD_DEFAULT*/
+
+/**
+ * Wi-Fi Short Beacon
+ *
+ * Enables or disables the use of short beacons in Wi-Fi operation.
+ * Set to 1 to enable, 0 to disable.
+ */
+#ifndef NRC_WIFI_SHORT_BEACON_DEFAULT
+#define NRC_WIFI_SHORT_BEACON_DEFAULT 0
+#endif /* NRC_WIFI_SHORT_BEACON_DEFAULT*/
 
 /**
  * Background Scan Enable

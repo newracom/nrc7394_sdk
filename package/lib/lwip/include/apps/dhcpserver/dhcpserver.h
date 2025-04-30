@@ -31,6 +31,9 @@ typedef struct dhcps_msg {
 	u8_t sname[64];
 	u8_t file[128];
 	u8_t options[312];
+	ip_addr_t dest_ip;
+	u8_t dest_mac[6];
+	bool unicast;
 } dhcps_msg;
 
 #ifndef LWIP_OPEN_SRC
@@ -66,6 +69,7 @@ extern u32_t dhcps_lease_time;
 #define DHCPS_LEASE_TIMER  dhcps_lease_time  //0x05A0
 #define DHCPS_MAX_LEASE 0x64
 #define BOOTP_BROADCAST 0x8000
+#define BOOTP_UNICAST 0x0000
 
 #define DHCP_REPLY          2
 #define DHCP_HTYPE_ETHERNET 1

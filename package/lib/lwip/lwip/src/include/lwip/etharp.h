@@ -96,6 +96,11 @@ err_t etharp_add_static_entry(const ip4_addr_t *ipaddr, struct eth_addr *ethaddr
 err_t etharp_remove_static_entry(const ip4_addr_t *ipaddr);
 #endif /* ETHARP_SUPPORT_STATIC_ENTRIES */
 
+#if !defined(NRC7292)
+void etharp_store_to_ret_ipinfo(void);
+void etharp_restore_from_ret_ipinfo(void);
+#endif /* !defined(NRC7292) */
+
 void etharp_input(struct pbuf *p, struct netif *netif);
 
 #ifdef __cplusplus

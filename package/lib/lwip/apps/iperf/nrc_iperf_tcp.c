@@ -42,10 +42,13 @@ extern struct netif br_netif;
 struct client_data {
 	iperf_opt_t *option;
 	TaskHandle_t task_handle;
+	struct client_data *next;
 };
 
 #define TCP_SND_RECV_TIMEOUT 15 /* in sec */
 #define TCP_SND_RECV_RETRY_MAX 4 /* Timeout retry max */
+
+static struct client_data *client_list = NULL;
 
 #if !defined(DISABLE_IPERF_APP)
 #if defined(LWIP_IPERF) && (LWIP_IPERF == 1)
@@ -94,6 +97,9 @@ static void iperf_tcp_client_report (iperf_opt_t * option )
 			} else if (nrc_wifi_softap_get_sta_by_addr(1, mac_addr->addr, &info) == WIFI_SUCCESS) {
 				snr = info.snr;
 				rssi = info.rssi;
+			} else {
+				nrc_wifi_get_snr(1, &snr);
+				nrc_wifi_get_rssi(1, &rssi);
 			}
 #endif
 		} else {
@@ -375,6 +381,9 @@ static void iperf_tcp_server_report (struct client_data *client)
 			} else if (nrc_wifi_softap_get_sta_by_addr(1, mac_addr->addr, &info) == WIFI_SUCCESS) {
 				snr = info.snr;
 				rssi = info.rssi;
+			} else {
+				nrc_wifi_get_snr(1, &snr);
+				nrc_wifi_get_rssi(1, &rssi);
 			}
 #endif
 		} else {
@@ -393,6 +402,36 @@ static void iperf_tcp_server_report (struct client_data *client)
 					start_time, stop_time,
 					byte_to_string(byte), bps_to_string(bps));
 	nrc_iperf_spin_unlock();
+}
+
+ATTR_NC __attribute__((optimize("O3"))) static void tcp_free_client(struct client_data *client)
+{
+	struct client_data *tmp;
+	TaskHandle_t task_handle = client->task_handle;
+
+	if(!client) {
+		return;
+	}
+
+	if(client == client_list) {
+		client_list = client_list->next;
+	} else {
+		for (tmp = client_list; (tmp->next != client) && tmp; tmp = tmp->next);
+		if (tmp) tmp->next = client->next;
+	}
+
+	close(client->option->server_info.client_sock);
+
+	if(client->option->server_info.periodic_report_task) {
+		sys_arch_msleep(100);
+		xTaskNotifyGive(client->option->server_info.periodic_report_task);
+		ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+	}
+
+	iperf_tcp_server_report(client);
+	mem_free(client->option);
+	mem_free(client);
+	vTaskDelete(task_handle);
 }
 
 ATTR_NC __attribute__((optimize("O3"))) static void tcp_process_input(void *pvParameters)
@@ -468,24 +507,8 @@ ATTR_NC __attribute__((optimize("O3"))) static void tcp_process_input(void *pvPa
 		if(exit_flag)
 			break;
 	}
-	close(option->server_info.client_sock);
 
-	if(option->server_info.periodic_report_task) {
-		sys_arch_msleep(100);
-		xTaskNotifyGive(option->server_info.periodic_report_task);
-		ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-	}
-	iperf_tcp_server_report(client);
-
-	mem_free(client->option);
-	mem_free(client);
-#if DEBUG_IPERF_TASK_HANDLE
-	nrc_iperf_spin_lock();
-	CPA("%s END [handle:%d]\n", __func__, task_handle);
-	nrc_iperf_spin_unlock();
-#endif
-	vTaskDelete(NULL);
-
+	tcp_free_client(client);
 }
 
 ATTR_NC __attribute__((optimize("O3"))) static struct client_data *tcp_new_client(iperf_opt_t *option)
@@ -531,6 +554,9 @@ ATTR_NC __attribute__((optimize("O3"))) static struct client_data *tcp_new_clien
 	}
 	memcpy(c_data->option, option, sizeof(iperf_opt_t));
 
+	c_data->next = client_list;
+	client_list = c_data;
+
 	nrc_iperf_spin_lock();
 	CPA("\n[%3d] local %s port %d connected with %s port %d\n",
 	  c_data->option->server_info.client_sock,
@@ -547,17 +573,35 @@ ATTR_NC __attribute__((optimize("O3"))) static struct client_data *tcp_new_clien
 	return c_data;
 }
 
+ATTR_NC __attribute__((optimize("O3"))) static void tcp_free_all_clients(void)
+{
+	struct client_data *client = client_list;
+	struct client_data *tmp;
+
+	while(client) {
+		tmp = client->next;
+		tcp_free_client(client);
+		client = tmp;
+	}
+
+	client_list = NULL;
+}
+
 ATTR_NC __attribute__((optimize("O3"))) static void tcp_server_loop(iperf_opt_t *option)
 {
 	fd_set input_set;
 	struct client_data *client;
+	struct timeval timeout;
+	timeout.tv_sec = 1;
+	timeout.tv_usec = 0;
 
 	while (!option->mForceStop) {
 		FD_ZERO(&input_set);
 		FD_SET(option->mSock, &input_set);
 
-		if (select(option->mSock + 1, &input_set, NULL, NULL, NULL) < 0) {
-			return;
+		if (select(option->mSock + 1, &input_set, NULL, NULL, &timeout) < 0) {
+			CPA("select error: %s\n", strerror(errno));
+			break;
 		}
 
 		if (FD_ISSET(option->mSock, &input_set)) {
@@ -571,6 +615,11 @@ ATTR_NC __attribute__((optimize("O3"))) static void tcp_server_loop(iperf_opt_t 
 			}
 		}
 	}
+
+	nrc_iperf_spin_lock();
+	CPA("\n%s %s %s : Stopped!\n", __func__,(option->mUDP) ? "udp":"tcp",
+		(option->mThreadMode == kMode_Server)?"server":"client" );
+	nrc_iperf_spin_unlock();
 }
 
 static int tcp_init_server(unsigned short port)
@@ -589,13 +638,17 @@ static int tcp_init_server(unsigned short port)
 	server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
 	if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(int)) < 0) {
+		close(sock);
 		return -1;
 	}
+
 	if (bind(sock, (struct sockaddr *) &server_addr, sizeof(struct sockaddr_in)) < 0) {
+		close(sock);
 		return -1;
 	}
 
 	if (listen(sock, 3) < 0) {
+		close(sock);
 		return -1;
 	}
 
@@ -639,7 +692,12 @@ void iperf_tcp_server(void *pvParameters)
 	}
 #endif /* LWIP_IPV4 */
 
+	tcp_free_all_clients();
+
 	nrc_iperf_task_list_del(option);
+	shutdown(option->mSock, SHUT_RDWR);
+	close(option->mSock);
+	option->mSock = -1;
 
 task_exit:
 #if DEBUG_IPERF_TASK_HANDLE

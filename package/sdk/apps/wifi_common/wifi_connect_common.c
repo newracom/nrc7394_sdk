@@ -500,8 +500,18 @@ tWIFI_STATUS wifi_start_softap_with_vif(int vif, WIFI_CONFIG *param)
 		return WIFI_FAIL;
 	}
 
-	if(nrc_wifi_softap_set_beacon_interval(vif,  param->bcn_interval) != WIFI_SUCCESS) {
+	if(nrc_wifi_softap_set_beacon_interval(vif, param->bcn_interval) != WIFI_SUCCESS) {
 		nrc_usr_print("[%s] Fail to set bcn_interval %d\n", __func__, param->bcn_interval);
+		return WIFI_FAIL;
+	}
+
+	if(nrc_wifi_softap_set_dtim_period(vif, param->dtim_period) != WIFI_SUCCESS) {
+		nrc_usr_print("[%s] Fail to set dtim_period %d\n", __func__, param->dtim_period);
+		return WIFI_FAIL;
+	}
+
+	if(nrc_wifi_softap_set_short_beacon(vif, param->short_beacon) != WIFI_SUCCESS) {
+		nrc_usr_print("[%s] Fail to set short_beacon_enable %d\n", __func__, param->short_beacon);
 		return WIFI_FAIL;
 	}
 

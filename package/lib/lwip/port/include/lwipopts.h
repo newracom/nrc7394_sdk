@@ -313,10 +313,15 @@ a lot of data that needs to be copied, this should be set high. */
 /* TCP_WND_UPDATE_THRESHOLD: difference in window to trigger anexplicit window update and defined as LWIP_MIN((TCP_WND / 4), (TCP_MSS * 4)) in opt.h */
 #define TCP_WND_UPDATE_THRESHOLD        (TCP_WND/2)
 
+/* TCP retransmission timeout(RTO) in milliseconds */
+#define TCP_INITIAL_RTO_MS 3000 /* Initial RTO in milliseconds, before scaling by TCP_SLOW_INTERVAL */
+
+/* Timeout for keeping out-of-order segments in the reassembly queue before discarding */
+#define TCP_OOSEQ_TIMEOUT        6U /* x RTO */
 
 /* ---------- ARP options ---------- */
 #define LWIP_ARP		1
-#define ARP_TABLE_SIZE 80
+#define ARP_TABLE_SIZE 100
 #define ETHARP_TABLE_MATCH_NETIF        1
 #define ARP_QUEUEING                    1
 

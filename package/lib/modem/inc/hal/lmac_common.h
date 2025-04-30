@@ -343,4 +343,7 @@ void lmac_set_ack_configure(uint8_t type);
 void lmac_set_sw_reset();
 void udelay(uint32_t delay);
 void mdelay(uint32_t delay);
+#if defined (INCLUDE_COMPENSATE_TXPWR_W_TEMP)
+bool lmac_get_txpwr_compensate_debug();
+#endif
 #endif /* HAL_LMAC_COMMON_H */

@@ -249,7 +249,6 @@ void lwif_input(struct nrc_wpa_if* intf, void *buffer, int data_len)
 	}
 	else
 	{
-		E(TT_NET, "[%s] pbuf_alloc failed\n", __func__);
 		LINK_STATS_INC(link.memerr);
 		LINK_STATS_INC(link.drop);
 		return;
