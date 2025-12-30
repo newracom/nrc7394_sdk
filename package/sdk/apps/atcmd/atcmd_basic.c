@@ -94,7 +94,7 @@ static void _atcmd_gpio_get_config (NRC_GPIO_CONFIG *config)
 
 		_atcmd_info("GPIO_GET: ALT bit%d is 1", config->gpio_pin);
 
-		config->gpio_alt = GPIO_NORMAL_OP;
+		config->gpio_alt = GPIO_ALT_FUNC;
 
 		for (i = 0 ; i <= 15 ; i++)
 		{
@@ -150,7 +150,7 @@ static void _atcmd_gpio_get_config (NRC_GPIO_CONFIG *config)
 		int i;
 
 		_atcmd_info("GPIO_GET: ALT0 bit%d is 1", config->gpio_pin);
-		config->gpio_alt = GPIO_NORMAL_OP;
+		config->gpio_alt = GPIO_ALT_FUNC;
 
 		for (i = 0 ; i <= 15 ; i++)
 		{
@@ -169,7 +169,7 @@ static void _atcmd_gpio_get_config (NRC_GPIO_CONFIG *config)
 	if (reg.word & (1 << config->gpio_pin))
 	{
 		_atcmd_info("GPIO_GET: ALT1 bit%d is 1", config->gpio_pin);
-		config->gpio_alt = GPIO_NORMAL_OP;
+		config->gpio_alt = GPIO_ALT_FUNC;
 	}
 
 	nrc_gpio_get_alt2(&reg);
@@ -177,7 +177,7 @@ static void _atcmd_gpio_get_config (NRC_GPIO_CONFIG *config)
 	if (reg.word & (1 << config->gpio_pin))
 	{
 		_atcmd_info("GPIO_GET: ALT2 bit%d is 1", config->gpio_pin);
-		config->gpio_alt = GPIO_NORMAL_OP;
+		config->gpio_alt = GPIO_ALT_FUNC;
 	}
 
 	nrc_gpio_get_alt3(&reg);
@@ -185,7 +185,7 @@ static void _atcmd_gpio_get_config (NRC_GPIO_CONFIG *config)
 	if (reg.word & (1 << config->gpio_pin))
 	{
 		_atcmd_info("GPIO_GET: ALT3 bit%d is 1", config->gpio_pin);
-		config->gpio_alt = GPIO_NORMAL_OP;
+		config->gpio_alt = GPIO_ALT_FUNC;
 	}
 
 	nrc_gpio_get_alt4(&reg);
@@ -193,7 +193,7 @@ static void _atcmd_gpio_get_config (NRC_GPIO_CONFIG *config)
 	if (reg.word & (1 << config->gpio_pin))
 	{
 		_atcmd_info("GPIO_GET: ALT4 bit%d is 1", config->gpio_pin);
-		config->gpio_alt = GPIO_NORMAL_OP;
+		config->gpio_alt = GPIO_ALT_FUNC;
 	}
 
 	/* Direction */
@@ -247,56 +247,27 @@ static void _atcmd_gpio_init (NRC_GPIO_DIR dir, NRC_GPIO_MODE mode)
 
 /**********************************************************************************************/
 
-static bool g_atcmd_adc_enable = false;
+#if !defined(NRC7292)
 
-static void _atcmd_adc_init (void)
+#define ATCMD_ADC_CH0_GPIO	CONFIG_ADC_CH0_GPIO
+#define ATCMD_ADC_CH1_GPIO	CONFIG_ADC_CH1_GPIO
+
+static struct 
 {
-	 nrc_adc_init(false);
-
-	 g_atcmd_adc_enable = false;
-}
-
-static void _atcmd_adc_deinit (void)
+	bool enable;
+	int gpio;
+} g_atcmd_adc[2] = 
 {
-	 nrc_adc_deinit();
-
-	 g_atcmd_adc_enable = false;
-}
-
-static void _atcmd_adc_enable (void)
-{
-	if (!g_atcmd_adc_enable)
-	{
-		_atcmd_info("ADC: enable");
-
-		g_atcmd_adc_enable = true;
-		nrc_adc_enable();
-	}
-}
-
-static void _atcmd_adc_disable (void)
-{
-	if (g_atcmd_adc_enable)
-	{
-		_atcmd_info("ADC: disable");
-
-		g_atcmd_adc_enable = false;
-		nrc_adc_disable();
-	}
-}
+	[0] = { false, -1 },
+	[1] = { false, -1 },
+};
 
 static bool _atcmd_adc_channel_valid (int channel)
 {
-	switch (channel)
+	switch (ADC0 + channel)
 	{
-#if defined(NRC7292)
-		case ADC1:
-		case ADC2:
-		case ADC3:
-#else
 		case ADC0:
 		case ADC1:
-#endif
 			return true;
 
 		default:
@@ -304,10 +275,92 @@ static bool _atcmd_adc_channel_valid (int channel)
 	}
 }
 
+static bool _atcmd_adc_gpio_valid (int gpio)
+{
+	switch (gpio)
+	{
+		case ATCMD_ADC_CH0_GPIO:
+		case ATCMD_ADC_CH1_GPIO:
+			return true;
+
+		default:
+			return _atcmd_gpio_pin_valid(gpio);
+	}
+}
+
+static void _atcmd_adc_init (void)
+{
+	g_atcmd_adc[0].enable = false;
+	g_atcmd_adc[0].gpio = ATCMD_ADC_CH0_GPIO;
+	nrc_adc_disable(ADC0);
+
+	g_atcmd_adc[1].enable = false;
+	g_atcmd_adc[1].gpio = ATCMD_ADC_CH1_GPIO;
+	nrc_adc_disable(ADC1);
+}
+
+static void _atcmd_adc_deinit (void)
+{
+	g_atcmd_adc[0].enable = false;
+	g_atcmd_adc[0].gpio = -1;
+	nrc_adc_disable(ADC0);
+
+	g_atcmd_adc[1].enable = false;
+	g_atcmd_adc[1].gpio = -1;
+	nrc_adc_disable(ADC1);
+}
+
+static void _atcmd_adc_enable (int channel, int gpio)
+{
+	int start = 0;
+	int end = 1;
+
+	if (channel >= 0)
+	{
+		start = end = channel;
+
+		if (gpio >= 0)
+			g_atcmd_adc[channel].gpio = gpio;
+	}
+
+	for (channel = start ; channel <= end ; channel++)
+	{
+		ASSERT(_atcmd_adc_channel_valid(channel));
+
+		gpio = g_atcmd_adc[channel].gpio;
+		ASSERT(_atcmd_adc_gpio_valid(gpio));
+
+		_atcmd_info("ADC: enable, channel=%d, gpio=%d", channel, gpio);
+		g_atcmd_adc[channel].enable = true;
+		nrc_adc_set_gpio(ADC0 + channel, gpio);
+		nrc_adc_enable(ADC0 + channel);		
+	}
+}
+
+static void _atcmd_adc_disable (int channel)
+{
+	int start = 0;
+	int end = 1;
+
+	if (channel >= 0)
+		start = end = channel;
+
+	for (channel = start ; channel <= end ; channel++)
+	{
+		ASSERT(_atcmd_adc_channel_valid(channel));
+
+		_atcmd_info("ADC: disable, channel=%d gpio=%d", channel, g_atcmd_adc[channel].gpio);
+		g_atcmd_adc[channel].enable = false;
+		nrc_adc_disable(ADC0 + channel);
+	}
+}
+
 static uint16_t _atcmd_adc_get_value (int channel)
 {
 	return nrc_adc_get_data(channel);
 }
+
+#endif /* #if defined(NRC7292) */
 
 /**********************************************************************************************/
 
@@ -399,7 +452,7 @@ static int _atcmd_firmware_download (char *buf, int len)
 
 		if (i == 0)
 		{
-			_atcmd_debug("fw_download: erase and rewrite"); 
+			_atcmd_debug("fw_download: erase and rewrite");
 
 			ret = util_fota_erase(offset, len);
 		   	if (ret != 0)
@@ -411,9 +464,9 @@ static int _atcmd_firmware_download (char *buf, int len)
 	}
 
 	if (ret != 0)
-		len = 0;	
-		
-	g_firmware_update.download += len;		
+		len = 0;
+
+	g_firmware_update.download += len;
 
 	return len;
 }
@@ -479,21 +532,21 @@ static bool _atcmd_sf_user_valid_params (int mode, uint32_t offset, uint32_t len
 
 	if (offset >= sf_user_area_size)
 	{
-		_atcmd_info("sf_user: invalid param, offset=%u size=%d", 
+		_atcmd_info("sf_user: invalid param, offset=%u size=%d",
 						offset, sf_user_area_size);
 		return false;
 	}
 
 	if (length == 0 || length > length_max)
 	{
-		_atcmd_info("sf_user: invalid param, length=%u/%d size=%d", 
+		_atcmd_info("sf_user: invalid param, length=%u/%d size=%d",
 						length, length_max, sf_user_area_size);
 		return false;
 	}
 
 	if ((offset + length) > sf_user_area_size)
 	{
-		_atcmd_info("sf_user: invalid param, offset=%u length=%u size=%d", 
+		_atcmd_info("sf_user: invalid param, offset=%u length=%u size=%d",
 						offset, length, sf_user_area_size);
 		return false;
 	}
@@ -637,15 +690,15 @@ static int _atcmd_basic_version_get (int argc, char *argv[])
 
 			/* SDK Package */
 #if !defined(SDK_VER_DESCRIPTION)
-			len = snprintf(buf, sizeof(buf), "\"%u.%u.%u\"", 
+			len = snprintf(buf, sizeof(buf), "\"%u.%u.%u\"",
 					SDK_VER_MAJOR, SDK_VER_MINOR, SDK_VER_REVISION);
-#else			
-			len = snprintf(buf, sizeof(buf), "\"%u.%u.%u-%s\"", 
+#else
+			len = snprintf(buf, sizeof(buf), "\"%u.%u.%u-%s\"",
 					SDK_VER_MAJOR, SDK_VER_MINOR, SDK_VER_REVISION, SDK_VER_DESCRIPTION);
-#endif			
+#endif
 
 			/* AT Command Set */
-			len += snprintf(buf + len, sizeof(buf) - len, ",\"%u.%u.%u\"", 
+			len += snprintf(buf + len, sizeof(buf) - len, ",\"%u.%u.%u\"",
 					ATCMD_VER_MAJOR, ATCMD_VER_MINOR, ATCMD_VER_REVISION);
 
 			/* Date & Time */
@@ -705,16 +758,18 @@ static atcmd_info_t g_atcmd_basic_version =
 
 /**********************************************************************************************/
 
-static char g_atcmd_boot_reason[32];
-
 static int _atcmd_basic_boot_get (int argc, char *argv[])
 {
 	switch (argc)
 	{
 		case 0:
-			_atcmd_info("boot_get: %s", g_atcmd_boot_reason);
-			ATCMD_MSG_INFO("BOOT", "\"%s\"", g_atcmd_boot_reason);
+		{
+			char *boot_reason = atcmd_boot_reason_string();
+
+			_atcmd_info("boot_get: %s", boot_reason);
+			ATCMD_MSG_INFO("BOOT", "\"%s\"", boot_reason);
 			break;
+		}
 
 		default:
 			return ATCMD_ERROR_INVAL;
@@ -854,7 +909,7 @@ static int _atcmd_basic_uart_get (int argc, char *argv[])
 			ATCMD_MSG_INFO("UART", "%d,%d,%d,%d,%d",
 							uart.baudrate,
 							uart.data_bits + 5, uart.stop_bits + 1, uart.parity,
-							uart.hfc);
+							uart.hfc ? (uart.hfc_rx_irq ? 2 : 1) : 0);
 			break;
 		}
 
@@ -916,8 +971,20 @@ static int _atcmd_basic_uart_set (int argc, char *argv[])
 
 			switch (atoi(param_hfc))
 			{
-				case 0: uart.hfc = false; break;
-				case 1: uart.hfc = true; break;
+				case 0:
+					uart.hfc = UART_HFC_DISABLE;
+					uart.hfc_rx_irq = false;
+					break;
+
+				case 1:
+					uart.hfc = UART_HFC_ENABLE;
+					uart.hfc_rx_irq = false;
+					break;
+
+				case 2:
+					uart.hfc = UART_HFC_ENABLE;
+					uart.hfc_rx_irq = true;
+					break;
 
 				default:
 					return ATCMD_ERROR_INVAL;
@@ -1182,41 +1249,48 @@ static atcmd_info_t g_atcmd_basic_gpio_value =
 
 /**********************************************************************************************/
 
+#if !defined(NRC7292)
+
 static int _atcmd_basic_adc_get (int argc, char *argv[])
 {
 	int channel = -1;
-
-	if (!g_atcmd_adc_enable)
-		return ATCMD_ERROR_NOTSUPP;
 
 	switch (argc)
 	{
 		case 1:
 			channel = atoi(argv[0]);
-#if !defined(NRC7292)
-			channel += 2;
-#endif
+
 			if (!_atcmd_adc_channel_valid(channel))
+			{
+				_atcmd_info("adc_get: invalid channel (%s)", argv[0]);
 				return ATCMD_ERROR_INVAL;
+			}
 
 		case 0:
 		{
 			int start = 0;
-			int end = 3;
+			int end = 1;
+			int gpio;
+			int value;
 
 			if (channel != -1)
 				start = end = channel;
 
 			for (channel = start ; channel <= end ; channel++)
 			{
-				if (!_atcmd_adc_channel_valid(channel))
-					continue;
+				ASSERT(_atcmd_adc_channel_valid(channel));
 
-#if defined(NRC7292)
-				ATCMD_MSG_INFO("ADC", "%d,%u", channel, _atcmd_adc_get_value(channel));
-#else
-				ATCMD_MSG_INFO("ADC", "%d,%u", channel - 2, _atcmd_adc_get_value(channel));
-#endif
+				gpio = g_atcmd_adc[channel].gpio;
+				ASSERT(_atcmd_adc_gpio_valid(gpio));
+
+				if (g_atcmd_adc[channel].enable)
+					value = _atcmd_adc_get_value(ADC0 + channel);
+				else
+					value = -1;
+
+				_atcmd_info("adc_get: channel=%d value=%d gpio=%d", channel, value, gpio);
+
+				ATCMD_MSG_INFO("ADC", "%d,%d,%d", channel, value, gpio);
 			}
 
 			break;
@@ -1231,24 +1305,59 @@ static int _atcmd_basic_adc_get (int argc, char *argv[])
 
 static int _atcmd_basic_adc_set (int argc, char *argv[])
 {
+	char *param_channel = NULL;
+	char *param_gpio = NULL;
+
 	switch (argc)
 	{
 		case 0:
-			ATCMD_MSG_HELP("AT+ADC={0|1}");
+			ATCMD_MSG_HELP("AT+ADC={0|1}[,<channel>[,<gpio>]]");
 			break;
+
+		case 3:
+			param_gpio = argv[2];
+
+		case 2:
+			param_channel = argv[1];
 
 		case 1:
 		{
-			int param = atoi(argv[0]);
+			int enable = atoi(argv[0]);
 
-			if (param == 1)
+			if (enable == 0 || enable == 1)
 			{
-				_atcmd_adc_enable();
-				break;
-			}
-			else if (param == 0)
-			{
-				_atcmd_adc_disable();
+				int channel = -1;
+				int gpio = -1;
+
+				if (param_channel)
+				{
+					channel = atoi(param_channel);
+
+					if (!_atcmd_adc_channel_valid(channel))
+					{
+						_atcmd_info("adc_set: invalid channel (%s)", param_channel);
+						return ATCMD_ERROR_INVAL;
+					}
+				}
+
+				if (param_gpio)
+				{
+					gpio = atoi(param_gpio);
+
+					if (!_atcmd_adc_gpio_valid(gpio))
+					{
+						_atcmd_info("adc_set: invalid gpio (%s)", param_gpio);
+						return ATCMD_ERROR_INVAL;
+					}
+				}
+
+				_atcmd_info("adc_set: enable=%d channel=%d gpio=%d", enable, channel, gpio);
+
+				if (enable)
+					_atcmd_adc_enable(channel, gpio);
+				else
+					_atcmd_adc_disable(channel);
+
 				break;
 			}
 		}
@@ -1274,6 +1383,8 @@ static atcmd_info_t g_atcmd_basic_adc =
 	.handler[ATCMD_HANDLER_GET] = _atcmd_basic_adc_get,
 	.handler[ATCMD_HANDLER_SET] = _atcmd_basic_adc_set,
 };
+
+#endif /* #if !defined(NRC7292) */
 
 /**********************************************************************************************/
 
@@ -1372,7 +1483,7 @@ static int _atcmd_basic_firmware_update_set (int argc, char *argv[])
 
 					return ATCMD_ERROR_BUSY;
 				}
-					
+
 				_atcmd_info("fw_update_set: invalid binary size (%u), max_fw_size=%u", size, max_fw_size);
 			}
 
@@ -1524,7 +1635,7 @@ static int _atcmd_basic_sf_user_get (int argc, char *argv[])
 			uint32_t sf_user_area_addr = nrc_get_user_data_area_address();
 			uint32_t sf_user_area_size = nrc_get_user_data_area_size();
 
-			_atcmd_info("sf_user_size: addr=0x%X size=%u", sf_user_area_addr, sf_user_area_size); 
+			_atcmd_info("sf_user_size: addr=0x%X size=%u", sf_user_area_addr, sf_user_area_size);
 			ATCMD_MSG_INFO("SFUSER", "0x%X,%u", sf_user_area_addr, sf_user_area_size / 1024);
 			break;
 		}
@@ -1629,7 +1740,7 @@ static int _atcmd_basic_sf_user_set (int argc, char *argv[])
 
 						return ATCMD_SUCCESS;
 					}
-				
+
 					case SF_USER_ERASE:
 						if (argc == 1)
 						{
@@ -1722,7 +1833,7 @@ static int _atcmd_basic_sf_sys_user_get (int argc, char *argv[])
 			if (nrc_get_user_factory_info(&sf_sys_user_addr, &sf_sys_user_size) != NRC_SUCCESS)
 				return ATCMD_ERROR_NOTSUPP;
 
-			_atcmd_info("sf_sys_user_get: addr=0x%X size=%u", sf_sys_user_addr, sf_sys_user_size); 
+			_atcmd_info("sf_sys_user_get: addr=0x%X size=%u", sf_sys_user_addr, sf_sys_user_size);
 			ATCMD_MSG_INFO("SFSYSUSER", "0x%X,%u", sf_sys_user_addr, sf_sys_user_size);
 			break;
 		}
@@ -1768,7 +1879,7 @@ static int _atcmd_basic_sf_sys_user_set (int argc, char *argv[])
 				char msg[ATCMD_MSG_LEN_MAX];
 				int len_msg;
 
-				_atcmd_debug("sf_sys_user_set: offset=%u length=%u/%u", offset, length, sf_sys_user_size); 
+				_atcmd_debug("sf_sys_user_set: offset=%u length=%u/%u", offset, length, sf_sys_user_size);
 
 				buf = _atcmd_malloc(sf_sys_user_size);
 				if (!buf || nrc_get_user_factory(buf, sf_sys_user_size) != NRC_SUCCESS)
@@ -2039,7 +2150,9 @@ static atcmd_info_t *g_atcmd_info_basic[] =
 #endif
 	&g_atcmd_basic_gpio_config,
 	&g_atcmd_basic_gpio_value,
+#if !defined(NRC7292)
 	&g_atcmd_basic_adc,
+#endif
 
 #if defined(CONFIG_ATCMD_FWUPDATE)
 	&g_atcmd_basic_firmware_update,
@@ -2051,7 +2164,7 @@ static atcmd_info_t *g_atcmd_info_basic[] =
 #endif
 #if defined(CONFIG_ATCMD_SFSYSUSER)
 	&g_atcmd_basic_sf_sys_user,
-#endif	
+#endif
 
 /*	&g_atcmd_basic_timeout, */
 
@@ -2071,7 +2184,7 @@ int atcmd_basic_enable (void)
 			return -1;
 	}
 
-#if defined(CONFIG_ATCMD_INTERNAL)	
+#if defined(CONFIG_ATCMD_INTERNAL)
 	for (i = 0 ; g_atcmd_info_basic_internal[i] ; i++)
 	{
 		if (atcmd_info_register(ATCMD_GROUP_BASIC, g_atcmd_info_basic_internal[i]) != 0)
@@ -2092,7 +2205,7 @@ void atcmd_basic_disable (void)
 
 	_atcmd_adc_deinit();
 
-#if defined(CONFIG_ATCMD_INTERNAL)	
+#if defined(CONFIG_ATCMD_INTERNAL)
 	for (i = 0 ; g_atcmd_info_basic_internal[i] ; i++)
 		atcmd_info_unregister(ATCMD_GROUP_BASIC, g_atcmd_info_basic_internal[i]->id);
 #endif
@@ -2104,41 +2217,6 @@ void atcmd_basic_disable (void)
 }
 
 /**********************************************************************************************/
-
-extern uint8_t drv_get_boot_reason (void);
-
-void atcmd_boot_reason (void)
-{
-	char *str_boot_reason = g_atcmd_boot_reason;
-	uint8_t boot_reason = drv_get_boot_reason();
-	int len = 0;
-
-	if (boot_reason & BR_POR)
-		len += sprintf(str_boot_reason, "POR");
-
-	if (boot_reason & BR_WDOG)
-		len += sprintf(str_boot_reason + len, "%sWDT", len > 0 ? "|" : "");
-
-	if (boot_reason & BR_PMC)
-		len += sprintf(str_boot_reason + len, "%sPMC", len > 0 ? "|" : "");
-
-	if (boot_reason & BR_HOSTINF)
-		len += sprintf(str_boot_reason + len, "%sHSPI", len > 0 ? "|" : "");
-
-#if defined(NRC7292) && defined(CPU_CM0)		
-	if (boot_reason & BR_SYSRST_CM0)
-		len += sprintf(str_boot_reason + len, "%sCPU", len > 0 ? "|" : "");
-#else	
-	if (boot_reason & BR_SYSRST_CM3)
-		len += sprintf(str_boot_reason + len, "%sCPU", len > 0 ? "|" : "");
-#endif	
-
-	str_boot_reason[len] = '\0';
-
-	_atcmd_info("Boot_Reason: %s (0x%X)", str_boot_reason, boot_reason);
-
-	ATCMD_MSG_EVENT("BOOT", "\"%s\"", str_boot_reason);
-}
 
 bool atcmd_gpio_pin_valid (int pin)
 {

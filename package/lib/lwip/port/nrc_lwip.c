@@ -100,6 +100,12 @@ int nrc_idx_get_by_name(char *argv)
 	}
 }
 
+struct netif* nrc_netif_get_by_name(const char* ifname)
+{
+	int idx = nrc_idx_get_by_name((char *)ifname);
+	return (idx >= 0) ? nrc_netif_get_by_idx(idx) : NULL;
+}
+
 int nrc_is_local_mac(uint8_t *addr)
 {
 	int i = 0;
@@ -110,6 +116,157 @@ int nrc_is_local_mac(uint8_t *addr)
 			return i;
 	}
 	return -1;
+}
+
+int netif_ip_update(struct netif *netif)
+{
+	ip_recovery_t *config = system_recovery_wifi_ip_get();
+	int config_size = sizeof(ip_recovery_t);
+
+#if defined(INCLUDE_FAST_CONNECT)
+	if (!system_modem_api_get_fc()) {
+		return -1;
+	}
+#endif
+
+	if (system_recovery_wifi_ip_get_in_recovery()) {
+		return 0;
+	}
+
+	LWIP_ERROR("netif_ip_update: config is null", config != NULL, return -1);
+
+	/* Sorry, multi netif is not supported */
+	if (config->valid && netif->num != config->net_id)
+		return -1;
+
+	if (ip_addr_isany(netif_ip_addr4(netif)) ||
+		ip_addr_isany(netif_ip_netmask4(netif)) ||
+		ip_addr_isany(netif_ip_gw4(netif))) {
+#if defined(INCLUDE_FAST_CONNECT)
+		if (!system_modem_api_write_fc_ip(true)) {
+			I(TT_NET, "%s%d Failed to clear IP\n", module_name(), netif->num);
+			return -1;
+		}
+#endif
+		return 0;
+	}
+
+	/* Fill IP config */
+	config->ip_addr = ip_addr_get_ip4_u32(netif_ip_addr4(netif));
+	config->netmask = ip_addr_get_ip4_u32(netif_ip_netmask4(netif));
+	config->gw = ip_addr_get_ip4_u32(netif_ip_gw4(netif));
+
+	config->dhcps = !!dhcps_get_interface();
+	if (config->dhcps) {
+		config->lease_time = wifi_softap_get_dhcps_lease_time();
+	}
+
+	config->net_id = netif->num;
+	config->valid = 1;
+
+#if defined(INCLUDE_FAST_CONNECT)
+	if (!system_modem_api_write_fc_ip(false)) {
+		I(TT_NET, "%s%d Failed to flash IP\n", module_name(), netif->num);
+		return -1;
+	}
+#endif
+
+	I(TT_NET, "%s%d %sIP(%s) retention updated(%dB)\n", module_name(), netif->num,
+		config->dhcps ? "DHCP server " : "",
+		ipaddr_ntoa(netif_ip_addr4(netif)), config_size);
+	return config_size;
+}
+
+int netif_ip_recovery(struct netif *netif)
+{
+	ip_recovery_t *config = system_recovery_wifi_ip_get();
+	struct ip_info ipinfo;
+
+#if defined(INCLUDE_FAST_CONNECT)
+	if (!system_modem_api_get_recovered_by_fc(netif->num)) {
+		return -1;
+	}
+#endif
+
+	LWIP_ERROR("netif_ip_recovery: config is null", config != NULL, return -1);
+
+	if (!config->valid || config->net_id != netif->num) {
+		return -1;
+	}
+
+	system_recovery_wifi_ip_set_in_recovery(true);
+
+	ip_addr_set_ip4_u32(&ipinfo.ip, config->ip_addr);
+	ip_addr_set_ip4_u32(&ipinfo.netmask, config->netmask);
+	ip_addr_set_ip4_u32(&ipinfo.gw, config->gw);
+
+	if (config->dhcps) {
+		/* DHCP server */
+#if LWIP_DHCPS
+		netif_set_addr(netif, ip_2_ip4(&ipinfo.ip),
+			ip_2_ip4(&ipinfo.netmask), ip_2_ip4(&ipinfo.gw));
+#if LWIP_DNS
+		captdnsInit();
+#endif
+		dhcps_start(&ipinfo, netif);
+		if(config->lease_time > 0)
+			wifi_softap_set_dhcps_lease_time(config->lease_time);
+
+		for (int i = 0; i < MAX_RECOVERY_STA; i++) {
+			recovery_peer_config_t *peer = system_recovery_wifi_ip_get_peer(i);
+			ip_addr_t ipaddr;
+			if (peer == NULL || peer->ipaddr == 0 || peer->ipaddr == UINT32_MAX)
+				continue;
+			ip_addr_set_ip4_u32(&ipaddr, peer->ipaddr);
+
+			if (!dhcps_add_client(peer->ipaddr, peer->mac,
+					wifi_softap_get_dhcps_lease_time())) {
+				E(TT_NET, "Failed to add DHCP client["MACSTR"] IP(%s)\n",
+					MAC2STR(peer->mac), ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&ipaddr)));
+			} else {
+				I(TT_NET, "Client["MACSTR"] IP(%s) recorvered\n",
+					MAC2STR(peer->mac), ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&ipaddr)));
+			}
+		}
+#endif
+	} else {
+		netif_set_addr(netif, ip_2_ip4(&ipinfo.ip),
+			ip_2_ip4(&ipinfo.netmask), ip_2_ip4(&ipinfo.gw));
+		wifi_set_dns_server(NULL, NULL);
+	}
+
+	CPA("IP:%s\n", ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&netif->ip_addr)));
+	CPA("Gateway:%s\n",ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&netif->gw)));
+	CPA("Netmask:%s\n", ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&netif->netmask)));
+	I(TT_NET, "%s%d IP recovered\n", module_name(), netif->num);
+
+	/* ARP entries */
+	for (int i = 0; i < MAX_RECOVERY_STA; i++) {
+		recovery_peer_config_t *peer = system_recovery_wifi_ip_get_peer(i);
+		err_t err = ERR_OK;
+		ip4_addr_t adrs;
+		struct eth_addr ethaddr;
+		if (peer == NULL || peer->ipaddr == 0)
+			continue;
+
+		if (peer->ipaddr != UINT32_MAX) {
+			adrs.addr = peer->ipaddr;
+			memcpy(ethaddr.addr, peer->mac, ETH_HWADDR_LEN);
+			err = etharp_add_static_entry(&adrs, &ethaddr);
+			I(TT_NET, "%s%d ARP(%s,"MACSTR") %s\n", module_name(), netif->num,
+				ip4addr_ntoa(&adrs), MAC2STR(peer->mac),
+				err == ERR_OK ? "recovered" : "failed");
+		}
+
+		if (nrc_update_route_by_aid(peer->net_id, peer->aid, peer->mac)) {
+			I(TT_NET, "%s%d Route(%d,"MACSTR") recovered\n", module_name(),
+				netif->num, peer->aid, MAC2STR(peer->mac));
+		}
+	}
+
+	system_recovery_wifi_ip_set_in_recovery(false);
+
+	return 0;
 }
 
 int static_run(int vif)
@@ -188,6 +345,8 @@ static int _wifi_dhcpc_start(int vif, dhcp_event_handler_t event_handler)
 		ip_addr_set_zero(&target_if->ip_addr);
 		ip_addr_set_zero(&target_if->netmask);
 		ip_addr_set_zero(&target_if->gw);
+
+		netif_ip_update(target_if);
 	}
 
 	result = dhcp_start(target_if);
@@ -255,6 +414,8 @@ int wifi_dhcpc_stop(int vif)
 	dhcp_stop(target_if);
 	dhcp_cleanup(target_if);
 	dhcpc_start_flag[vif] = false;
+
+	netif_ip_update(target_if);
 
 	if (vif == BRIDGE_INTERFACE)
 		snprintf(if_name, sizeof(if_name), "br");
@@ -370,6 +531,8 @@ void reset_ip_address(int vif)
 #endif /* LWIP_IPV6_ADDRESS_LIFETIMES */
 	}
 #endif
+
+	netif_ip_update(netif);
 }
 
 bool wifi_get_ip_address(int vif_id, char **ip_addr)
@@ -599,6 +762,8 @@ bool wifi_ifconfig(int argc, char *argv[])
 			IP4_ADDR(nm, 255, 255, 255, 0);
 
 		netif_set_addr(nif, ip4, nm, gw);
+
+		netif_ip_update(nif);
 	}
 	else
 #endif
@@ -732,6 +897,9 @@ int setup_wifi_ap_mode(struct netif *net_if, int updated_lease_time)
 
 	vif = net_if->num;
 
+	if (net_if->dhcps_pcb)
+		return 0;
+
 	CPA("%s vif:%d :%d min\n", __func__, vif, updated_lease_time);
 
 #if LWIP_DHCPS && LWIP_IPV4
@@ -768,6 +936,8 @@ int setup_wifi_ap_mode(struct netif *net_if, int updated_lease_time)
 		wifi_softap_set_dhcps_lease_time(updated_lease_time);
 #endif
 
+	netif_ip_update(net_if);
+
 	return 0;
 }
 
@@ -777,8 +947,12 @@ int start_dhcps_on_if(struct netif *net_if, int updated_lease_time)
 	struct ip_info ipinfo;
 	ip4_addr_t ip4;
 
+	if (net_if->dhcps_pcb)
+		return 0;
+
 	CPA("%s netif name : %c%c\n", __func__, net_if->name[0], net_if->name[1]);
 	CPA("%s lease time : %d min\n", __func__, updated_lease_time);
+
 	ipinfo.ip = net_if->ip_addr;
 	ipinfo.gw = net_if->gw;
 	ipinfo.netmask = net_if->netmask;
@@ -813,6 +987,8 @@ int start_dhcps_on_if(struct netif *net_if, int updated_lease_time)
 		wifi_softap_set_dhcps_lease_time(updated_lease_time);
 #endif
 
+	netif_ip_update(net_if);
+
 	return 0;
 }
 #endif /* LWIP_BRIDGE */
@@ -828,6 +1004,7 @@ int reset_wifi_ap_mode(int vif)
 #if LWIP_DHCPS
 	dhcps_stop();
 	s_wifi_ip_mode[vif].dhcp_running = DHCP_STOPPED;
+	netif_ip_update(nrc_netif_get_by_idx(vif));
 #endif
 
 	return 0;
@@ -855,7 +1032,9 @@ status_callback(struct netif *state_netif)
 			ip_addr_debug_print_val(LWIP_DBG_ON, (state_netif->ip_addr));
 			CPA("\n", module_name());
 #endif /* INCLUDE_TRACE_WAKEUP */
-			set_standalone_ipaddr(0,
+			if (state_netif == &br_netif && netif_ip_update(state_netif) >= 0)
+				return;
+			set_standalone_ipaddr(state_netif->num,
 				ip4_addr_get_u32(ip_2_ip4(&state_netif->ip_addr)),
 				ip4_addr_get_u32(ip_2_ip4(&state_netif->netmask)),
 				ip4_addr_get_u32(ip_2_ip4(&state_netif->gw)));
@@ -918,7 +1097,6 @@ bool wifi_setup_interface(WIFI_INTERFACE i)
 	}
 
 	nrc_netif[i] = (struct netif*)mem_malloc(sizeof(struct netif));
-	nrc_netif[i]->num = i;
 
 	/* set MAC hardware address to be used by lwIP */
 	get_standalone_macaddr(i, nrc_netif[i]->hwaddr);
@@ -942,6 +1120,7 @@ bool wifi_setup_interface(WIFI_INTERFACE i)
 	CPA("ip6 linklocal address: %s\n", ip6addr_ntoa(netif_ip6_addr(nrc_netif[i], 0)));
 #endif
 
+	nrc_netif[i]->num = i;
 	netif_set_flags(nrc_netif[i], NETIF_FLAG_ETHARP | NETIF_FLAG_ETHERNET);
 	netif_set_status_callback(nrc_netif[i], status_callback);
 	netif_set_link_callback(nrc_netif[i], link_callback);
@@ -1134,6 +1313,7 @@ bool setup_wifi_bridge_interface(void)
 	bridge_data.max_fdb_dynamic_entries = 128;
 	bridge_data.max_fdb_static_entries = 16;
 	netif_add(&br_netif, &ipaddr, &netmask, &gw, &bridge_data, bridgeif_init, tcpip_input);
+	br_netif.num = BRIDGE_INTERFACE;
 	if(bridgeif_fdb_add(&br_netif, &ethbroadcast, BR_FLOOD) < 0){
 		CPA("Bridge interface creation failed : fdb memory err\n");
 		netif_remove(&br_netif);

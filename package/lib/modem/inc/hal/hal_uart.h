@@ -27,8 +27,10 @@ enum uart_parity_bit {
 };
 
 enum uart_hardware_flow_control {
-    UART_HFC_DISABLE,
-    UART_HFC_ENABLE,
+    UART_HFC_DISABLE = 0,
+	UART_HFC_CTS_ENABLE = (1 << 0),
+	UART_HFC_RTS_ENABLE = (1 << 1),
+    UART_HFC_ENABLE = (UART_HFC_CTS_ENABLE | UART_HFC_RTS_ENABLE),
 };
 
 enum uart_fifo {
@@ -72,6 +74,8 @@ void nrc_hsuart_fifo_level(int ch, uint32_t tx_level, uint32_t rx_level);
 void nrc_hsuart_set_alt_uart_to_gpio(int ch);
 void hal_uart_disable_irq(void);
 void hal_uart_enable_irq(void);
+void nrc_hsuart_get_rts (int ch, bool *asserted);
+void nrc_hsuart_set_rts (int ch, bool assert);
 
 #ifdef RELEASE
 	#define system_printf

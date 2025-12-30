@@ -4385,6 +4385,12 @@ void wpa_supplicant_enable_network(struct wpa_supplicant *wpa_s,
 		}
 
 		if (wpa_supplicant_fast_associate(wpa_s) != 1) {
+#if defined(NRC_WPA_SUPP)
+			/* If we are in AP mode, we need to connect without scan */
+			if (ssid != NULL && ssid->mode == WPAS_MODE_AP) {
+				wpa_s->connect_without_scan = ssid;
+			}
+#endif
 			wpa_s->scan_req = NORMAL_SCAN_REQ;
 			wpa_supplicant_req_scan(wpa_s, 0, 0);
 		}

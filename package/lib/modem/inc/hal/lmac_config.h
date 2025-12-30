@@ -158,10 +158,19 @@ void set_enable_auth_ctrl(bool v);
 bool get_enable_auth_ctrl(void);
 #endif /* defined(INCLUDE_AUTH_CONTROL) */
 
+bool set_frag_threshold(int32_t v);
+int32_t get_frag_threshold(void);
+
 void set_group_mcs(int8_t mcs);
 int8_t get_group_mcs();
 
 void set_dhcp_mcs(int8_t mcs);
 int8_t get_dhcp_mcs();
+
+void set_null_mcs(int8_t mcs);
+int8_t get_null_mcs();
+
+void set_probe_resp_mcs(int8_t mcs);
+int8_t get_probe_resp_mcs();
 
 #endif /* LMAC_CONFIG_H */

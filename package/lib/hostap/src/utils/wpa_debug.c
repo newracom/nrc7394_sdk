@@ -220,8 +220,10 @@ void wpa_printf(int level, const char *fmt, ...)
 
 	if (level >= wpa_debug_level) {
 #ifdef _FREERTOS
+	va_start(ap, fmt);
 	system_vprintf(fmt, ap);
 	system_printf("\n");
+	va_end(ap);
 #else	
 #ifdef CONFIG_ANDROID_LOG
 		va_start(ap, fmt);

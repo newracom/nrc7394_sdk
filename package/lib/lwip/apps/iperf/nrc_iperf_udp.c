@@ -43,6 +43,11 @@ struct udp_client_data {
 	struct udp_client_data *next;
 };
 
+#define MAX_REPORT_LOG_SIZE 512
+
+char iperf_udp_server_report_log[MAX_REPORT_LOG_SIZE];
+size_t iperf_udp_server_report_offset;
+
 static struct udp_client_data *udp_client_list = NULL;
 
 extern void sys_arch_msleep(u32_t delay_ms);
@@ -100,14 +105,24 @@ static void iperf_udp_client_init_datagram (iperf_opt_t * option,
 	iperf_udp_client_init_payload(datagram, option->mBufLen);
 }
 
-static void iperf_udp_client_report (iperf_opt_t * option)
+static void iperf_udp_client_report(iperf_opt_t *option)
 {
 	iperf_time_t start_time = 0;
 	iperf_time_t end_time = option->client_info.end_time - option->client_info.start_time;
 	iperf_time_t interval = end_time;
 
-	uint32_t byte = option->client_info.datagram_cnt * option->mBufLen;
+	uint64_t byte = option->client_info.datagram_cnt * option->mBufLen;
 	uint32_t bps = byte_to_bps(interval, byte);
+
+	float byte_disp = 0.0f, bps_disp = 0.0f;
+	char byte_unit_str[8];
+	char bps_unit_str[8];
+	char format = option->mFormat;
+
+	iperf_format_output(byte, bps, format,
+					&byte_disp, &bps_disp,
+					byte_unit_str, sizeof(byte_unit_str),
+					bps_unit_str, sizeof(bps_unit_str));
 
 	uint8_t snr = 0;
 	int8_t rssi = 0;
@@ -152,32 +167,43 @@ static void iperf_udp_client_report (iperf_opt_t * option)
 	}
 
 	nrc_iperf_spin_lock();
-	CPA("[iperf UDP Client Report for server %s, snr:%u, rssi:%d]\n", ipaddr_ntoa(&option->addr), snr, rssi);
+	CPA("\n[iperf UDP Client Report for server %s, snr:%u, rssi:%d]\n",
+	    ipaddr_ntoa(&option->addr), snr, rssi);
 	CPA("  Interval          Transfer      Bandwidth\n");
-	CPA("  %4.1f - %4.1f sec  %7sBytes  %7sbits/sec\n",
-					start_time, end_time,
-					byte_to_string(byte), bps_to_string(bps));
+	CPA("  %4.1f - %4.1f sec  %7.2f %6s  %7.2f %6s\n",
+	     start_time, end_time, byte_disp, byte_unit_str, bps_disp, bps_unit_str);
 	CPA("  sent : %llu datagrams\n", option->client_info.datagram_cnt);
 	nrc_iperf_spin_unlock();
 }
 
-static void iperf_udp_client_report_from_server (iperf_server_header_t *header)
+static void iperf_udp_client_report_from_server(iperf_server_header_t *header, char format)
 {
-	iperf_time_t time = ntohl(header->stop_sec) + (ntohl(header->stop_usec) / 1000000.);
+	iperf_time_t time = ntohl(header->stop_sec) + (ntohl(header->stop_usec) / 1000000.0);
 	int32_t byte = ntohl(header->total_len2);
 	int32_t datagrams = ntohl(header->datagrams);
 	int32_t errors = ntohl(header->error_cnt);
-	iperf_time_t jitter = ntohl(header->jitter1) + (ntohl(header->jitter2) / 1000000.);
+	iperf_time_t jitter = ntohl(header->jitter1) + (ntohl(header->jitter2) / 1000000.0);
+
+	uint32_t bps = byte_to_bps(time, byte);
+
+	float byte_disp = 0.0f, bps_disp = 0.0f;
+	char byte_unit_str[8];
+	char bps_unit_str[8];
+
+	iperf_format_output(byte, bps, format,
+					&byte_disp, &bps_disp,
+					byte_unit_str, sizeof(byte_unit_str),
+					bps_unit_str, sizeof(bps_unit_str));
 
 	nrc_iperf_spin_lock();
-	CPA("  Server Report:\n");
-	CPA("  %4.1f - %4.1f sec  %7sBytes  %7sbits/sec  %.3f ms  %ld/%ld (%.2g%%)\n",
-					0., time,
-					byte_to_string(byte),
-					bps_to_string(byte_to_bps(time, byte)),
-					jitter * 1000,
-					errors, datagrams,
-					(double)((errors * 100.) / datagrams));
+	CPA("\n  Server Report:\n");
+	CPA("  %4.1f - %4.1f sec  %7.2f %6s  %7.2f %6s  %.3f ms  %ld/%ld (%.2f%%)\n",
+	     0.0, time,
+	     byte_disp, byte_unit_str,
+	     bps_disp, bps_unit_str,
+	     jitter * 1000.0,
+	     errors, datagrams,
+	     datagrams > 0 ? ((double)errors * 100.0 / datagrams) : 0.0);
 	nrc_iperf_spin_unlock();
 }
 
@@ -223,7 +249,7 @@ static int iperf_await_server_fin_packet (iperf_opt_t * option, 	iperf_udp_datag
 	if ((!ack_success))
 		CPA("Not received server fin packet\n");
 	else
-		iperf_udp_client_report_from_server((iperf_server_header_t *)&buf->server_header);
+		iperf_udp_client_report_from_server((iperf_server_header_t *)&buf->server_header, option->mFormat);
 
 	if(buf) mem_free(buf);
 	return ack_success;
@@ -297,32 +323,37 @@ ATTR_NC __attribute__((optimize("O3"))) void iperf_udp_client(void *pvParameters
 	}
 
 #if LWIP_IPV4
-	if(IP_IS_V4(&option->addr)) {
-		struct sockaddr_in *to4 = (struct sockaddr_in*)&to;
-		struct sockaddr_in *bind4 = (struct sockaddr_in*)&bind;
+		if(IP_IS_V4(&option->addr)) {
+			struct sockaddr_in *to4 = (struct sockaddr_in*)&to;
+			struct sockaddr_in *bind4 = (struct sockaddr_in*)&bind;
 
-		sock = socket(AF_INET, SOCK_DGRAM, 0);
-		if (sock < 0) {
-			CPA("create socket failed!\n");
-			goto exit;
+			sock = socket(AF_INET, SOCK_DGRAM, 0);
+			if (sock < 0) {
+				CPA("create socket failed!\n");
+				goto exit;
+			}
+
+			bind4->sin_len	  = sizeof(struct sockaddr_in);
+			bind4->sin_family = AF_INET;
+			bind4->sin_port   = htons(0);
+
+			if (!ip_addr_isany(&option->bindAddr)) {
+				inet_addr_from_ip4addr(&bind4->sin_addr, ip_2_ip4(&option->bindAddr));
+			} else {
+				bind4->sin_addr.s_addr = htonl(INADDR_ANY);
+			}
+
+			if (bind(sock, (struct sockaddr*)&bind, sizeof(struct sockaddr_in)) < 0) {
+				int err = errno;
+				CPA("[%s] bind(%d) returned error: %d.\n", __func__, sock, -err);
+				goto exit;
+			}
+
+			to4->sin_len	= sizeof(struct sockaddr_in);
+			to4->sin_family = AF_INET;
+			to4->sin_port	= htons(option->mPort);
+			inet_addr_from_ip4addr(&to4->sin_addr, ip_2_ip4(&option->addr));
 		}
-
-		bind4->sin_len	= sizeof(bind4);
-		bind4->sin_family = AF_INET;
-		bind4->sin_port = htons(0);
-		bind4->sin_addr.s_addr = htonl(INADDR_ANY);
-
-		if (bind(sock, (struct sockaddr*)&bind, sizeof(bind)) < 0){
-			int err = errno;
-			CPA("[%s] bind(%d) returned error: %d.\n", __func__, sock, -err);
-			goto exit;
-		}
-
-		to4->sin_len	= sizeof(to4);
-		to4->sin_family = AF_INET;
-		to4->sin_port = htons(option->mPort);
-		inet_addr_from_ip4addr(&to4->sin_addr, ip_2_ip4(&option->addr));
-	}
 #endif /* LWIP_IPV4 */
 
 	tosval = (int)option->mTOS;
@@ -417,8 +448,10 @@ ATTR_NC __attribute__((optimize("O3"))) void iperf_udp_client(void *pvParameters
 
 	iperf_udp_client_report(option);
 
-	if (wpa_driver_get_associate_status(vif)== true)
+	if (wpa_driver_get_associate_status(vif) == true &&
+		!ip4_addr_ismulticast(ip_2_ip4(&option->addr))) {
 		iperf_await_server_fin_packet(option, datagram);
+	}
 
 exit:
 	nrc_iperf_task_list_del(option);
@@ -488,13 +521,30 @@ ATTR_NC __attribute__((optimize("O3"))) static struct udp_client_data *find_matc
 	return NULL;
 }
 
-static void iperf_udp_server_report (struct udp_client_data *client)
+void iperf_udp_server_results_print(void)
+{
+	CPA("%s", iperf_udp_server_report_log);
+}
+
+static void iperf_udp_server_report(struct udp_client_data *client)
 {
 	iperf_time_t start_time = 0;
 	iperf_time_t stop_time = client->option->server_info.stop_time - client->option->server_info.start_time;
 	iperf_time_t interval = stop_time;
+
 	uint64_t byte = client->option->server_info.recv_byte;
-	uint32_t bps = (interval)? (byte*8)/interval : 0;
+	uint32_t bps = byte_to_bps(interval, byte);
+
+	float byte_disp = 0.0f, bps_disp = 0.0f;
+	char byte_unit_str[8];
+	char bps_unit_str[8];
+	char format = client->option->mFormat;
+
+	iperf_format_output(byte, bps, format,
+					&byte_disp, &bps_disp,
+					byte_unit_str, sizeof(byte_unit_str),
+					bps_unit_str, sizeof(bps_unit_str));
+
 	struct sockaddr_in *from = (struct sockaddr_in*)&client->option->server_info.clientaddr;
 	uint8_t snr = 0;
 	int8_t rssi = 0;
@@ -541,21 +591,33 @@ static void iperf_udp_server_report (struct udp_client_data *client)
 	}
 
 	nrc_iperf_spin_lock();
-	CPA("[iperf UDP Server Report for %s:%d, snr:%u, rssi:%d]\n", inet_ntoa(from->sin_addr), ntohs(from->sin_port), snr, rssi);
-	CPA("  %4.1f - %4.1f sec  %7sBytes  %7sbits/sec  %6.3f ms  %4ld/%5ld (%.2g%%)",
-	  start_time, stop_time,
-	  byte_to_string(byte), bps_to_string(bps),
-	  client->option->server_info.jitter * 1000,
-	  client->option->server_info.error_cnt,
-	  client->option->server_info.datagram_seq,
-	  (double)(client->option->server_info.error_cnt * 100.) / client->option->server_info.datagram_seq);
+	iperf_reset_report_log(iperf_udp_server_report_log, &iperf_udp_server_report_offset);
+
+	iperf_report_log_append(iperf_udp_server_report_log, &iperf_udp_server_report_offset, MAX_REPORT_LOG_SIZE,
+			"\n[iperf UDP Server Report for %s:%d, snr:%u, rssi:%d]\n",
+	     inet_ntoa(from->sin_addr), ntohs(from->sin_port), snr, rssi);
+
+	iperf_report_log_append(iperf_udp_server_report_log, &iperf_udp_server_report_offset, MAX_REPORT_LOG_SIZE,
+			"  %4.1f - %4.1f sec  %7.2f %6s  %7.2f %6s  %6.3f ms  %4ld/%5ld (%.2g%%)",
+		start_time, stop_time,
+		byte_disp, byte_unit_str,
+		bps_disp, bps_unit_str,
+		client->option->server_info.jitter * 1000,
+		client->option->server_info.error_cnt,
+		client->option->server_info.datagram_seq,
+		(double)(client->option->server_info.error_cnt * 100.0) /
+		(client->option->server_info.datagram_seq ? client->option->server_info.datagram_seq : 1));
 
 	if (client->option->server_info.outoforder_cnt > 0)
-		CPA("\t OUT_OF_ORDER(%ld)\n", client->option->server_info.outoforder_cnt);
+		iperf_report_log_append(iperf_udp_server_report_log, &iperf_udp_server_report_offset, MAX_REPORT_LOG_SIZE,
+				"\t OUT_OF_ORDER(%ld)\n", client->option->server_info.outoforder_cnt);
 	else
-		CPA("\n");
+		iperf_report_log_append(iperf_udp_server_report_log, &iperf_udp_server_report_offset, MAX_REPORT_LOG_SIZE,"\n");
+
+	iperf_udp_server_results_print();
 	nrc_iperf_spin_unlock();
 }
+
 
 ATTR_NC __attribute__((optimize("O3"))) static void udp_free_client(struct udp_client_data *client)
 {
@@ -830,7 +892,11 @@ ATTR_NC __attribute__((optimize("O3"))) void iperf_udp_server(void *pvParameters
 		bind4->sin_len	= sizeof(bind4);
 		bind4->sin_family = AF_INET;
 		bind4->sin_port = htons(option->mPort);
-		bind4->sin_addr.s_addr = htonl(INADDR_ANY);
+		if (ip4_addr_isany_val(option->bindAddr)) {
+			bind4->sin_addr.s_addr = htonl(INADDR_ANY);
+		} else {
+			bind4->sin_addr.s_addr = option->bindAddr.addr;
+		}
 
 		if (bind(sock, (struct sockaddr*)&server, sizeof(server)) < 0){
 			int err = errno;

@@ -76,6 +76,15 @@ typedef enum {
 /* function prototype for scheduled callbacks */
 typedef void (*scheduled_callback)();
 #if defined (INCLUDE_PS_SCHEDULE)
+#define NET_INIT_IS_SET(s, i)   (((s)->net_init_mask >> (i)) & 0x1u)
+#define NET_INIT_ASSIGN(s, idx, val)           \
+    do {                                       \
+        if (val)                               \
+            (s)->net_init_mask |=  (1u << (idx)); \
+        else                                   \
+            (s)->net_init_mask &= ~(1u << (idx)); \
+    } while (0)
+
 //65B
 #define MAX_PS_SCHEDULES 4
 /* data structure to support regularly scheduled deep sleep */
@@ -90,7 +99,7 @@ struct ret_schedule_info {
 	/* Whether the callback will require network support */
 	scheduled_callback gpio_callback;
 	uint64_t next_wakeup;
-	bool net_init[MAX_PS_SCHEDULES];
+	uint8_t  net_init_mask;
 	/* next scheduled bitmap */
 	uint8_t next_schedule:4;
 	/* number of scheduled callbacks configured */

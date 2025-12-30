@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2022 Newracom, Inc.
+ * Copyright (c) 2025 Newracom, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -276,14 +276,39 @@ tWIFI_STATUS nrc_wifi_disable_duty_cycle (void);
 
 
 /**********************************************
- * @fn bool nrc_wifi_tx_avaliable_duty_cycle(void)
+ * @fn bool nrc_wifi_tx_available_duty_cycle(void)
  *
- * @brief check the tx is availabe in duty cycle
+ * @brief check the tx is available in duty cycle
  *
  * @return If enabled, then true. Otherwise, false is returned.
  ***********************************************/
-bool nrc_wifi_tx_avaliable_duty_cycle(void);
+bool nrc_wifi_tx_available_duty_cycle(void);
 
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_enable_scan_random_delay(bool enable)
+ *
+ * @brief Enable or disable random additional delay before transmitting
+ *        active Probe Request frames during scanning. This introduces
+ *        a jitter (uniform random 0 ~ 2/3 dwell time) to reduce probe
+ *        bursts collision patterns when multiple devices start scans
+ *        simultaneously.
+ *
+ * @param enable: true = enable random delay, false = disable.
+ *
+ * @return WIFI_SUCCESS on success, otherwise tWIFI_STATUS error code.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_enable_scan_random_delay(bool enable);
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_get_scan_random_delay(bool *enabled)
+ *
+ * @brief Query whether random scan delay is currently enabled.
+ *
+ * @param enabled: Output pointer; set to true if enabled, else false.
+ *
+ * @return WIFI_SUCCESS on success, otherwise tWIFI_STATUS error code.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_scan_random_delay(bool *enabled);
 
 /**********************************************
  * @fn tWIFI_STATE_ID nrc_wifi_get_state (int vif_id)
@@ -333,6 +358,20 @@ tWIFI_STATUS nrc_wifi_add_network (int vif_id);
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
 tWIFI_STATUS nrc_wifi_remove_network (int vif_id);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_device_mode (int vif_id, tWIFI_DEVICE_MODE mode)
+ *
+ * @brief Set Wi-Fi device mode
+ *
+ * @param vif_id: Network interface index
+ *
+ * @param mode: Wi-Fi device mode
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_device_mode (int vif_id, tWIFI_DEVICE_MODE mode);
 
 
 /**********************************************
@@ -601,20 +640,67 @@ tWIFI_STATUS nrc_wifi_set_sae_pwe (int vif_id, int sae_pwe);
  ***********************************************/
 tWIFI_STATUS nrc_wifi_get_sae_pwe (int vif_id, int *sae_pwe);
 
+
 /**********************************************
- * @fn tWIFI_STATUS nrc_wifi_get_scan_freq (int vif_id, uint16_t *freq_list, uint8_t *num_freq)
+ * @fn tWIFI_STATUS nrc_wifi_get_ndp_preq (int vif_id, bool *ndp_preq)
  *
- * @brief Get scan list for scan AP
+ * @brief Get NDP Probe Request support
  *
  * @param vif_id: Network interface index
  *
- * @param freq_list: freq list to scan
+ * @param ndp_preq: 0 = disable, 1 = enable
  *
- * @param num_freq: num of freq
++ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
++ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_ndp_preq(int vif_id, bool *ndp_preq);
 
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_ndp_preq (int vif_id, int ndp_preq)
+ *
+ * @brief Enable or disable NDP Probe Request
+ *
+ * @param vif_id: Network interface index
+ *
+ * @param ndp_preq: 0 = disable, 1 = enable
+ *
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-tWIFI_STATUS nrc_wifi_get_scan_freq (int vif_id, uint16_t *freq, uint8_t *num_freq);
+tWIFI_STATUS nrc_wifi_set_ndp_preq(int vif_id, int ndp_preq);
+
+
+/**********************************************
+ *	@fn		tWIFI_STATUS nrc_wifi_get_scan_freq_alloc (int vif_id,
+ *				uint16_t **out_list, size_t *out_count)
+ *
+ *	@brief	Allocate and return the configured scan frequency list (S1G MHz).
+ *
+ *	@param	vif_id		Network interface index (VIF).
+ *	@param	out_list	[OUT] Pointer to heap-allocated array of frequencies (MHz).
+ *						On success and out_count>0, *out_list is non-NULL and must be freed
+ *						by calling nrc_wifi_scan_freq_free().
+ *	@param	out_count	[OUT] Number of valid entries in *out_list.
+ *
+ *	@return	If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ *
+ *	@note	On success with no valid frequencies, *out_count == 0 and *out_list == NULL.
+ *	@note	Memory for *out_list is obtained via nrc_mem_malloc().
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_scan_freq_alloc(int vif_id, uint16_t **out_list, size_t *out_count);;
+
+
+/**********************************************
+ *	@fn		void nrc_wifi_get_scan_freq_free (uint16_t *list)
+ *
+ *	@brief	Release memory previously returned by nrc_wifi_get_scan_freq_alloc().
+ *
+ *	@param	list	Pointer to the frequency array to free (NULL is allowed).
+ *
+ *	@return	None.
+ *
+ *	@note	This uses nrc_mem_free() to match the allocator used internally.
+ ***********************************************/
+void nrc_wifi_get_scan_freq_free(uint16_t *list);
 
 
 /**********************************************
@@ -677,6 +763,24 @@ tWIFI_STATUS nrc_wifi_set_scan_freq_nons1g(int vif_id, uint16_t *freq_list, uint
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
 tWIFI_STATUS nrc_wifi_get_aid (int vif_id, int *aid);
+
+
+/**********************************************
+ * @fn     tWIFI_STATUS nrc_wifi_scan_ex(const SCAN_CONFIG *cfg)
+ *
+ * @brief  Unified Wi-Fi scan API (async)
+ *
+ * @param  cfg: Pointer to SCAN_CONFIG
+ *         - vif_id: Network interface index
+ *         - timeout_ms: Blocking time (0 = wait until done)
+ *         - ssid: SSID filter (NULL = all)
+ *         - freq_list: Frequency list (NULL = all freqs by setting nrc_wifi_set_scan_freq()
+ *         - num_freq: Number of freqs in list
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ *
+ **********************************************/
+tWIFI_STATUS nrc_wifi_scan_ex(const SCAN_CONFIG *cfg);
 
 
 /**********************************************
@@ -810,6 +914,31 @@ tWIFI_STATUS nrc_wifi_connect(int vif_id, uint32_t timeout);
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
 tWIFI_STATUS nrc_wifi_disconnect (int vif_id, uint32_t timeout);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_connect_abort(int vif_id)
+ *
+ * @brief Abort ongoing Wi-Fi connection attempt
+ *
+ * @param vif_id: Network interface index
+ *
+ * @return
+ *  - WIFI_SUCCESS : Abort request accepted and event notified
+ *  - WIFI_ABORTED : Connection attempt was aborted successfully
+ *  - WIFI_NOOP    : No connection attempt in progress (nothing to abort)
+ *  - WIFI_INVALID : Invalid vif_id
+ *  - WIFI_INVALID_STATE : Invalid Wi-Fi state for abort
+ *
+ * @note
+ *  - This API is intended to stop a connection attempt in TRY_CONNECT state.
+ *  - If called while not in connection attempt state, it returns WIFI_NOOP.
+ *  - It does not disconnect an already established connection.
+ *    For that case, use nrc_wifi_disconnect().
+ *  - When aborted, nrc_wifi_connect() waiting on event will return immediately
+ *    with WIFI_ABORTED status.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_connect_abort(int vif_id);
 
 
 /**********************************************
@@ -1031,6 +1160,22 @@ tWIFI_STATUS nrc_wifi_softap_get_sta_list(int vif_id, STA_LIST *info, uint16_t l
 
 
 /**********************************************
+ * @fn uint16_t nrc_wifi_child_node_list(int vif_id, uint8_t (*bssid_list)[6], uint8_t len)
+ *
+ * @brief Get child node list
+ *
+ * @param vif_id: Network interface index
+ *
+ * @param bssid_list: BSSID list of child nodes
+ *
+ * @param len: length of bssid_list
+ *
+ * @return number of child nodes associated
+ ***********************************************/
+uint16_t nrc_wifi_child_node_list(int vif_id, uint8_t (*bssid_list)[6], uint8_t len);
+
+
+/**********************************************
  * @fn tWIFI_STATUS nrc_wifi_softap_get_sta_by_addr(int vif_id, uint8_t *addr, STA_INFO *sta)
  *
  * @brief get STA's information using MAC addr (only for AP)
@@ -1056,6 +1201,17 @@ tWIFI_STATUS nrc_wifi_softap_get_sta_by_addr(int vif_id, uint8_t *addr, STA_INFO
  * @return number of STA associated
  ***********************************************/
 uint16_t nrc_wifi_softap_get_sta_num(int vif_id);
+
+/**********************************************
+ * @fn uint16_t nrc_wifi_child_node_num(int vif_id)
+ *
+ * @brief Get number of child nodes associated
+ *
+ * @param vif_id: Network interface index
+ *
+ * @return number of child nodes associated
+ ***********************************************/
+uint16_t nrc_wifi_child_node_num(int vif_id);
 
 
 /**********************************************
@@ -1409,6 +1565,59 @@ void nrc_wifi_set_use_4address(bool value);
 bool nrc_wifi_get_use_4address(void);
 
 /**********************************************
+ * @fn  void nrc_wifi_set_4address_bcmc_as_uni(bool value)
+ *
+ * @brief Sets whether to use unicast when forwarding BC/MC frames from the AP to devices using four-address mode.
+ *
+ * @param value A boolean value indicating whether to use unicast for forwarding BC/MC frames.
+ *              Set to true to enable, false to disable.
+ *
+ * @return void
+***********************************************/
+void nrc_wifi_set_4address_bcmc_as_uni(bool value);
+
+/**********************************************
+ * @fn bool  nrc_wifi_get_4address_bcmc_as_uni(void)
+ *
+ * @brief Check whether unicast is used for forwarding BC/MC frames in four-address mode for Wi-Fi communication.
+ *
+ * This get the current setting for whether to use unicast for forwarding BC/MC frames.
+ *
+ * @return A boolean value indicating whether use unicast for forwarding BC/MC frames.
+ *         frames are enabled (true) or disabled (false).
+ ***********************************************/
+bool nrc_wifi_get_4address_bcmc_as_uni(void);
+
+/**********************************************
+ * @fn nrc_wifi_set_ap_dhcp_forward_block
+ *
+ * @brief Enable or disable suppression of downstream DHCP rebroadcast in SoftAP
+ *        relay / 4-address mode. When enabled, DHCP frames (DISCOVER, REQUEST etc.)
+ *        received from child 4-address stations are still forwarded upstream toward
+ *        the existing DHCP server, but they are NOT rebroadcast back downstream. Use
+ *        this when an upstream DHCP server exists to reduce airtime usage and
+ *        mitigate excessive DHCP broadcast traffic with many 4-address stations
+ *        connected.
+ *
+ * @param block true  = suppress downstream rebroadcast (only upstream forwarding kept)
+ *              false = normal behavior (forward upstream and rebroadcast downstream)
+ *
+ * @return WIFI_SUCCESS on success; otherwise a tWIFI_STATUS error code.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_ap_dhcp_forward_block(bool block);
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_get_ap_dhcp_forward_block(bool *block)
+ *
+ * @brief Query current DHCP forward block setting in SoftAP mode.
+ *
+ * @param block: Output pointer; true if DHCP forwarding is blocked, false otherwise.
+ *
+ * @return WIFI_SUCCESS on success, otherwise tWIFI_STATUS error code.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_ap_dhcp_forward_block(bool *block);
+
+/**********************************************
  * @fn uint16_t nrc_get_hw_version
  *
  * @brief Get hw_version
@@ -1539,7 +1748,31 @@ tWIFI_STATUS nrc_wifi_set_enable_auth_control(int vif_id, bool enable);
 
 
 /**********************************************
- * @fn tWIFI_STATUS nrc_wifi_get_enable_auth_control(uint8_t *enable)
+ * @fn  tWIFI_STATUS nrc_wifi_set_fast_connect(bool enable)
+ *
+ * @brief enable fast connect ((STA ONLY) connection recovery by information in flash)
+ *
+ * @param enable : true(enable), false(disable)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_fast_connect(bool value);
+
+
+/**********************************************
+ * @fn  bool nrc_wifi_get_recovered_by_fast_connect(int vif_id)
+ *
+ * @brief return connection is recovered by fast connect
+ *
+ * @param vif_id : vif_id
+ *
+ * @return If recovered, then true. Otherwise, fasle is returned.
+ ***********************************************/
+bool nrc_wifi_get_recovered_by_fast_connect(int vif_id);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_get_enable_auth_control(int vif_id, uint8_t *val)
  *
  * @brief get current DAC (Distributed Auth Control)
  *
@@ -1609,7 +1842,7 @@ tWIFI_STATUS nrc_wifi_get_auth_control_scale(uint8_t *scale_factor);
 
 
 /**********************************************
- * @fn tWIFI_STATUS nrc_wifi_get_auth_current_ti(int *ti)
+ * @fn tWIFI_STATUS nrc_wifi_get_auth_current_ti(uint8_t *ti)
  *
  * @brief get current transmission interval(TI) value of DAC
  *
@@ -1617,11 +1850,32 @@ tWIFI_STATUS nrc_wifi_get_auth_control_scale(uint8_t *scale_factor);
  *
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-tWIFI_STATUS nrc_wifi_get_auth_current_ti(int *ti);
+tWIFI_STATUS nrc_wifi_get_auth_current_ti(uint8_t *ti);
+
 
 
 /**********************************************
- * @fn tWIFI_STATUS nrc_wifi_get_auth_bo_cnt(int *cnt);
+ * @fn tWIFI_STATUS nrc_wifi_set_auth_current_ti()
+ *
+ * @brief set current TI
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_auth_current_ti();
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_reset_auth_current_ti()
+ *
+ * @brief reset current TI
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_reset_auth_current_ti();
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_get_auth_bo_cnt(uint8_t *cnt);
  *
  * @brief get auth ctrl backoff count
  *
@@ -1629,7 +1883,132 @@ tWIFI_STATUS nrc_wifi_get_auth_current_ti(int *ti);
  *
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-tWIFI_STATUS nrc_wifi_get_auth_bo_cnt(int *cnt);
+tWIFI_STATUS nrc_wifi_get_auth_bo_cnt(uint8_t *cnt);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_auth_bo_cnt(uint8_t cnt)
+ *
+ * @brief set backoff count
+ *
+ * @param cnt value
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_auth_bo_cnt(uint8_t cnt);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_auth_control_ps(uint32_t threshold_ms)
+ *
+ * @brief set auth control powersave threshold (ms)
+ *
+ * @param threshold_ms threshold in ms. (0: disable, >=1000: enable)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_auth_control_ps(uint32_t threshold_ms);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_get_auth_control_start_auth_rtc(uint64_t *time)
+ *
+ * @brief get start auth rtc time in auth control
+ *
+ * @param rtc time
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_auth_control_start_auth_rtc(uint64_t *time);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_auth_control_start_auth_rtc(uint64_t time)
+ *
+ * @brief set start auth rtc time in auth control
+ *
+ * @param rtc time in usec
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_auth_control_start_auth_rtc(uint64_t time);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_auth_control_retry_cnt(uint8_t count)
+ *
+ * @brief set retry count
+ *
+ * @param count value
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_auth_control_retry_cnt(uint8_t count);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_get_auth_control_retry_cnt(uint8_t *count)
+ *
+ * @brief get retry count
+ *
+ * @param count value
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_auth_control_retry_cnt(uint8_t *count);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_retry_block_limit(int vif_id, uint8_t limit)
+ *
+ * @brief When the consecutive failure count(8) reaches retry_block_limit,
+ *        the STA is added to a blacklist and further TX retries/queuing for that STA are blocked.
+ *        - 0 disables the blocking logic
+ *        - Large values delay blacklist reaction
+ *        - Only meaningful in SoftAP; ignored in STA mode
+ *
+ * @param vif_id VIF index
+ * @param limit  threshold count (0~255 recommended)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, WIFI_FAIL.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_retry_block_limit(int vif_id, uint8_t limit);
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_get_retry_block_limit(int vif_id, uint8_t *limit)
+ *
+ * @brief  Get current retry_block_limit (blacklist trigger threshold).
+ *
+ * @param vif_id VIF index
+ * @param limit  out pointer
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, WIFI_FAIL.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_retry_block_limit(int vif_id, uint8_t *limit);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_auth_control_msg_cnt(uint32_t count)
+ *
+ * @brief set message count
+ *
+ * @param count value
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_auth_control_msg_cnt(uint32_t count);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_get_auth_control_msg_cnt(uint32_t *count)
+ *
+ * @brief get retry count
+ *
+ * @param count value
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_auth_control_msg_cnt(uint32_t *count);
 
 
 /**********************************************
@@ -1683,6 +2062,30 @@ tWIFI_STATUS nrc_wifi_set_bcmc_mcs(int8_t mcs);
 
 
 /**********************************************
+ * @fn bool nrc_wifi_get_bcmc_buffering()
+ *
+ * @brief Get broadcast/multicast buffering status for DTIM period.
+ *
+ * @param void
+ *
+ * @return Returns true if bcmc buffering enabled, false otherwise
+ ***********************************************/
+bool nrc_wifi_get_bcmc_buffering();
+
+
+/**********************************************
+ * @fn void nrc_wifi_set_bcmc_buffering(bool enable)
+ *
+ * @brief Whether to enable buffering broadcast/multicast packets in DTIM period.
+ *
+ * @param enable : true(enable), false(disable)
+ *
+ * @return void
+ ***********************************************/
+void nrc_wifi_set_bcmc_buffering(bool enable);
+
+
+/**********************************************
  * @fn tWIFI_STATUS nrc_wifi_get_dhcp_mcs(int8_t *mcs)
  *
  * @brief get current mcs for dhcp frames
@@ -1705,6 +2108,308 @@ tWIFI_STATUS nrc_wifi_get_dhcp_mcs(int8_t *mcs);
  ***********************************************/
 tWIFI_STATUS nrc_wifi_set_dhcp_mcs(int8_t mcs);
 
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_get_beacon_mcs(int vif_id, int8_t *mcs)
+ *
+ * @brief get current mcs for beacon frames
+ *
+ * @param vif_id : vif_id
+ *
+ * @param mcs (10 or [0-7] : enabled (manual setting), -1 : disabled (system setting))
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_beacon_mcs(int vif_id, int8_t *mcs);
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_beacon_mcs(int vif_id, int8_t mcs)
+ *
+ * @brief set mcs for beacon frames
+ *
+ * @param vif_id : vif_id
+ *
+ * @param mcs (10 or [0-7] : enable (manual setting), -1 : disable (system setting))
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_beacon_mcs(int vif_id, int8_t mcs);
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_get_probe_resp_mcs(int vif_id, int8_t *mcs)
+ *
+ * @brief get current mcs for probe response frames
+ *
+ * @param mcs (10 or [0-7] : enabled (manual setting), -1 : disabled (system setting))
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_probe_resp_mcs(int8_t *mcs);
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_probe_resp_mcs(int vif_id, int8_t mcs)
+ *
+ * @brief set mcs for probe response frames
+ *
+ * @param mcs (10 or [0-7] : enable (manual setting), -1 : disable (system setting))
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_probe_resp_mcs(int8_t mcs);
+
+/**********************************************
+ * @fn  tWIFI_STATUS nrc_wifi_get_route_expire_time(uint32_t *time)
+ *
+ * @brief Get the current expiration timeout for Wi-Fi route entries.
+ *
+ * This function retrieves the configured timeout value (in seconds) used to
+ * automatically remove inactive route entries from the routing table.
+ *
+ * @param[out] time timeout value. A value of 0 indicates that expiration is disabled.
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ **********************************************/
+tWIFI_STATUS nrc_wifi_get_route_expire_time(uint32_t *time);
+
+/**********************************************
+ * @fn  tWIFI_STATUS nrc_wifi_set_route_expire_time(uint32_t value)
+ *
+ * @brief Set the expiration timeout for Wi-Fi route entries.
+ *
+ * This function sets the duration (in seconds) after which inactive
+ * route entries will be automatically removed from the routing table.
+ *
+ * Note: The expiration timer is activated only when 4address mode is enabled.
+ *       Routing is only supported in SoftAP mode with 4address enabled.(ex Relay)
+ *
+ * @param value Timeout value in seconds. Set to 0 to disable expiration.
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ **********************************************/
+tWIFI_STATUS nrc_wifi_set_route_expire_time(uint32_t time);
+
+/**********************************************
+ * @fn	bool nrc_wifi_get_relay_time_sync(void)
+ *
+ * @brief Get the current status of relay time synchronization
+ *
+ * @param void
+ *
+ * @return Returns true if relay time synchronization is enabled
+ *			 otherwise, returns false
+ ***********************************************/
+bool nrc_wifi_get_relay_time_sync(void);
+
+
+/**********************************************
+ * @fn void nrc_wifi_set_relay_time_sync(bool enable)
+ *
+ * @brief Enable or disable relay time synchronization
+ *
+ * @param enable : true(enable), false(disable)
+ *
+ * @return void
+ ***********************************************/
+void nrc_wifi_set_relay_time_sync(bool enable);
+
+
+/**********************************************
+ * @fn  uint16_t nrc_wifi_get_bi_offset(void)
+ *
+ * @brief Get the current TBTT (Target Beacon Transmission Time) offset value
+ *
+ * @param void
+ *
+ * @return Returns the current beacon interval offset in Time Units (TU, 1 TU = 1024 µs)
+ ***********************************************/
+uint16_t nrc_wifi_get_bi_offset(void);
+
+
+/**********************************************
+ * @fn  void nrc_wifi_set_bi_offset(uint16_t offset)
+ *
+ * @brief Set the TBTT (Target Beacon Transmission Time) offset value
+ *
+ * @param offset : Beacon interval offset in Time Units (TU, 1 TU = 1024 µs)
+ *
+ * @return void
+ ***********************************************/
+void nrc_wifi_set_bi_offset(uint16_t offset);
+
+
+/**********************************************
+ * @fn int nrc_wifi_get_null_data_mcs(void)
+ *
+ * @brief Get the MCS (Modulation and Coding Scheme) used for null data frames.
+ *
+ * This function retrieves the current MCS setting used for transmitting null data.
+ *
+ * Special values:
+ *	 - `-1`: Use robust MCS 10 (Default)
+ *	 - `-2`: Use internal rate control
+ *	 - `0–7, 10`: Manual MCS setting
+ *
+ * @return Current Null data MCS value.
+ ***********************************************/
+ int nrc_wifi_get_null_data_mcs(void);
+
+/**********************************************
+ * @fn void nrc_wifi_set_null_data_mcs(int mcs)
+ *
+ * @brief Set the MCS (Modulation and Coding Scheme) for null data frames.
+ *
+ * This function configures the MCS to be used when sending null data packets.
+ *
+ * Special values:
+ *	 - `-1`: Use robust MCS 10
+ *	 - `-2`: Use internal rate control
+ *	 - `0–7, 10`: Manual MCS setting
+ *
+ * @param mcs The MCS value to set for Null data.
+ ***********************************************/
+void nrc_wifi_set_null_data_mcs(int mcs);
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_dpp_configurator(int vif_id, int configurator);
+ *
+ * @brief set DPP configurator
+ *
+ * @param vif_id : vif_id
+ *
+ * @param configurator : (0: enrollee, 1: configurator)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_dpp_configurator(int vif_id, int configurator);
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_dpp_push_button(int vif_id, int configurator);
+ *
+ * @brief push button for DPP
+ *
+ * @param vif_id : vif_id
+ *
+ * @param configurator : (0: enrollee, 1: configurator)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_dpp_push_button(int vif_id, int configurator);
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_softap_add_vendor_ie_from_beacon (int vif_id, uint8_t subcmd, char *vendor_ie)
+ *
+ * @brief add vendor IE to beacon frame
+ *
+ * @param vif_id : vif_id
+ *
+ * @param oui : oui
+ *
+ * @param subcmd : sub command index
+ *
+ * @param vendor_ie : VENDOR IE data
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_softap_add_vendor_ie_from_beacon (int vif_id, uint32_t oui, uint8_t subcmd, char *vendor_ie);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_softap_remove_vendor_ie_from_beacon (int vif_id, uint8_t subcmd)
+ *
+ * @brief remove vendor IE to beacon frame
+ *
+ * @param vif_id : vif_id
+ *
+ * @param oui : oui
+ *
+ * @param subcmd : sub command index
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_softap_remove_vendor_ie_from_beacon (int vif_id, uint32_t oui, uint8_t subcmd);
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_softap_get_best_ch(int pref_bw, int dwell_time, opt_ch_results *ch_info, int *cnt, uint16_t* scan_freq_list, uint8_t scan_freq_num)
+ *
+ * @brief Retrieve the best channel(s) based on CCA scanning.
+ *
+ * This function performs a CCA scan internally and selects up to @p cnt
+ * channels with the lowest CCA values (i.e., the clearest channels).
+ *
+ * @param pref_bw
+ *   - Preferred bandwidth to filter scan results.
+ *   - Accepted values:
+ *       - 0 : All bandwidths (1/2/4 MHz). Top-N selected across all.
+ *       - 1 : Only 1 MHz channels.
+ *       - 2 : Only 2 MHz channels.
+ *       - 4 : Only 4 MHz channels.
+ *
+ * @param dwell_time
+ *   - Dwell time (milliseconds) per channel during scan.
+ *   - A longer dwell time increases scan accuracy, but also increases
+ *     overall API execution time.
+ *
+ * @param ch_info
+ *   - Output array of channel information structures.
+ *   - Each element includes:
+ *       - freq     : Channel frequency in MHz.
+ *       - s1g_ch_idx : Channel index (mapped internally).
+ *       - bw       : Bandwidth in MHz (1 / 2 / 4).
+ *       - cca      : Raw value (the percentage is obtained by dividing this value by 10, lower value = clearer channel)
+ *   - Caller must allocate an array with at least @p *cnt entries.
+ *
+ * @param cnt
+ *   - [in]  Maximum number of channel results to return (capacity of @p ch_info).
+ *   - [out] Actual number of channels returned (<= input value).
+ *
+ * @param scan_freq_list: freq list to scan
+ *
+ * @param scan_freq_num: num of freq to scan
+ *
+ * @return
+ *   - WIFI_SUCCESS : Successfully scanned and selected channel(s).
+ *   - Other error code (tWIFI_STATUS) if scan failed or parameters invalid.
+ *
+ * @note
+ *   - If @p pref_bw is 0, results include all bandwidths and the top
+ *     channels are selected globally by CCA value.
+ *   - If no valid channel is found, @p *cnt is set to 0 and
+ *     @p ch_info contents are cleared.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_softap_get_best_ch(int pref_bw, int dwell_time, OPT_CH_RESULTS *ch_info, int *cnt, uint16_t* scan_freq_list, uint8_t scan_freq_num);
+
+/**********************************************
+ * @fn bool nrc_wifi_softap_get_ssid_match_probing(void)
+ *
+ * @brief Get current SSID Match Probing configuration for SoftAP.
+ *
+ * This API returns whether SSID Match Probing is enabled.
+ * When enabled, the SoftAP will NOT respond to probe requests
+ * whose SSID field is a wildcard.
+ *
+ * Note:
+ *    This setting must be applied before starting the SoftAP.
+ *
+ * @return true if SSID Match Probing is enabled, false otherwise.
+ **********************************************/
+bool nrc_wifi_softap_get_ssid_match_probing(void);
+
+/**********************************************
+ * @fn void nrc_wifi_softap_set_ssid_match_probing(bool enable)
+ *
+ * @brief Configure SSID Match Probing behavior for SoftAP.
+ *
+ * @param enable :
+ *        - false : SoftAP responds normally to probe requests,
+ *                  including wildcard SSID probe requests.
+ *        - true  : SoftAP will NOT respond to probe requests
+ *                  whose SSID is wildcard.
+ *
+ * Note:
+ *    This setting must be applied before starting the SoftAP.
+ *
+ * @return void
+ **********************************************/
+void nrc_wifi_softap_set_ssid_match_probing(bool enable);
 
 #ifdef __cplusplus
 }

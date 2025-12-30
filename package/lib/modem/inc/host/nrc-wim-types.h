@@ -755,7 +755,8 @@ struct wim_drv_info_param {
 	uint32_t kern_ver			:12;
 	uint32_t supported_ch_width	:2;
 	uint32_t ps_pretend_flag	:1;
-	uint32_t reserved			:11;
+	uint32_t sub_xtal_bypass	:1;
+	uint32_t reserved			:10;
 	uint32_t vendor_oui;
 	uint32_t deepsleep_gpio_dir;
 	uint32_t deepsleep_gpio_out;

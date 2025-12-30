@@ -75,6 +75,8 @@ uint32_t 	system_sflash_get_fota_address(void);
 uint32_t 	system_sflash_get_fota_info_address(void);
 uint32_t	system_sflash_get_fw_info_address(void);
 uint32_t	system_sflash_get_core_dump_address(void);
+uint32_t	system_sflash_get_core_dump_area_size(void);
+bool		system_sflash_erase_core_dump_area(void);
 #ifdef __cplusplus
 extern "C" {
 void 		nrc_sf_init_memory_map(void);
@@ -142,15 +144,20 @@ bool 		system_sflash_update_slot(uint32_t address, uint8_t *data, size_t size);
 #define EN25QH16B_JEDEC_ID (0x1C7015)
 #define W25Q16FW_JEDEC_ID (0xEF6015)
 #define W25Q80EW_JEDEC_ID (0xEF6014)
+#define W25Q32JVIQ_JEDEC_ID (0xEF4016)
+#define W25Q32JWBYIQ_JEDEC_ID (0xEF6016)
+#define W25Q32JWBYIM_JEDEC_ID (0xEF8016)
 #define GD25LQ16C_JEDEC_ID (0xC86015)
 #define GD25LQ40C_JEDEC_ID (0xC86013)
 #define GD25WQ16E_JEDEC_ID (0xC86515)
 #define GD25WQ32E_JEDEC_ID (0xC86516)
+#define GD25Q32E_JEDEC_ID (0xC84016)
 #define GD25WQ128E_JEDEC_ID (0xC86518)
 #define GD25Q16CE2GR_JEDEC_ID (0xC84015)
 #define MX25V8035F_JEDEC_ID (0xC22314)
 #define MX25V1635F_JEDEC_ID (0xC22315)
 #define MX25U1633F_JEDEC_ID (0xC22535)
+#define MX25U3232F_JEDEC_ID (0xC22536)
 #define MX25R3235F_JEDEC_ID (0xC22816)
 #define MX25R1635F_JEDEC_ID (0xC22815)
 #define MX25R8035F_JEDEC_ID (0xC22814)
@@ -170,6 +177,7 @@ bool 		system_sflash_update_slot(uint32_t address, uint8_t *data, size_t size);
 #define FM25W32A_JEDEC_ID (0xA12816)
 #define ZB25WQ16A_JEDEC_ID (0x5E3415)
 #define BY25Q32ES_JEDEC_ID (0x684016)
+#define ZD25WQ32C_JEDEC_ID (0xBA6016)
 
 /* ----------------------------------
  * W26XX JEDEC ID

@@ -106,7 +106,6 @@ static void softap_udp_server_task(void *pvParameters)
 	nrc_usr_print("Receive buffer size :%d \n", RECV_BUF_SIZE);
 	nrc_usr_print("Listener on port %d \n", PORT);
 
-
 	while (1) {
 		memset(rx_buffer, 0, RECV_BUF_SIZE);
 
@@ -156,7 +155,6 @@ static void softap_udp_server_task(void *pvParameters)
 		}
 	}
 	error_val = 0;
-
 exit:
 	if (sockfd  >= 0) {
 		nrc_usr_print("Shutting down and close socket\n");

@@ -107,7 +107,7 @@ void node_insert_to_list(list_node** phead, list_node* pinsert)
 }
 
 /******************************************************************************
- * FunctionName : node_delete_from_list
+ * FunctionName : node_remove_from_list
  * Description  : remove the node from list
  * Parameters   : phead -- the head node of the list
  *                pdelete -- the remove node of the list
@@ -130,6 +130,7 @@ void node_remove_from_list(list_node** phead, list_node* pdelete)
 				if (plist->pnext == pdelete) {
 					plist->pnext = pdelete->pnext;
 					pdelete->pnext = NULL;
+					break;
 				}
 				plist = plist->pnext;
 			}
@@ -143,6 +144,49 @@ void node_remove_from_list(list_node** phead, list_node* pdelete)
 			("Removed static ARP entry: IP = %s\n", ip4addr_ntoa(&current_node->ip)));
 	}
 #endif /* STATIC_ARP_ENTRY_ENABLE */
+}
+
+list_node* dhcps_add_client(u32_t ip, u8_t *mac, u32_t lease_time)
+{
+	list_node *pnode = NULL;
+	ip4_addr_t addr_tmp;
+	struct dhcps_pool* client = (struct dhcps_pool*)mem_malloc(sizeof(struct dhcps_pool));
+
+	if (client == NULL) {
+		return NULL;
+	}
+
+	client->ip.addr = ip;
+	memcpy(client->mac, mac, sizeof(client->mac));
+	client->lease_timer = lease_time;
+
+	pnode = (list_node*)mem_malloc(sizeof(list_node));
+	if (pnode == NULL) {
+		mem_free(client);
+		return NULL;
+	}
+	pnode->pnode = client;
+	pnode->pnext = NULL;
+	node_insert_to_list(&plist, pnode);
+
+	return pnode;
+}
+
+void dhcps_remove_client(list_node* pnode)
+{
+	struct dhcps_pool* client = NULL;
+
+	if (!pnode) {
+		return;
+	}
+	node_remove_from_list(&plist, pnode);
+
+	client = pnode->pnode;
+	if (client) {
+		mem_free(pnode->pnode);
+		pnode->pnode = NULL;
+	}
+	mem_free(pnode);
 }
 
 /******************************************************************************
@@ -688,38 +732,22 @@ static s16_t parse_msg(struct dhcps_msg* m, u16_t len)
 			pdhcps_pool = NULL;
 			pnode = NULL;
 		} else {
-			pdhcps_pool = (struct dhcps_pool*)mem_malloc(sizeof(struct dhcps_pool));
-			pdhcps_pool->ip.addr = client_address.addr;
-			memcpy(pdhcps_pool->mac, m->chaddr, sizeof(pdhcps_pool->mac));
-			pdhcps_pool->lease_timer = lease_timer;
-			pnode = (list_node*)mem_malloc(sizeof(list_node));
-			pnode->pnode = pdhcps_pool;
-			pnode->pnext = NULL;
-			node_insert_to_list(&plist, pnode);
-
-			if (client_address.addr == dhcps_lease.end_ip.addr) {
-				client_address_plus.addr = dhcps_lease.start_ip.addr;
-			} else {
-				addr_tmp.addr = htonl(client_address.addr);
-				addr_tmp.addr++;
-				client_address_plus.addr = htonl(addr_tmp.addr);
+			pnode = dhcps_add_client(client_address.addr, m->chaddr, lease_timer);
+			if (pnode) {
+				if (client_address.addr == dhcps_lease.end_ip.addr) {
+					client_address_plus.addr = dhcps_lease.start_ip.addr;
+				} else {
+					addr_tmp.addr = htonl(client_address.addr);
+					addr_tmp.addr++;
+					client_address_plus.addr = htonl(addr_tmp.addr);
+				}
 			}
 		}
 
 		POOL_CHECK:
 
 		if ((client_address.addr > dhcps_lease.end_ip.addr) ){//|| (ip_addr_isany(&client_address))) {
-			if (pnode != NULL) {
-				node_remove_from_list(&plist, pnode);
-				mem_free(pnode);
-				pnode = NULL;
-			}
-
-			if (pdhcps_pool != NULL) {
-				mem_free(pdhcps_pool);
-				pdhcps_pool = NULL;
-			}
-
+			dhcps_remove_client(pnode);
 			return 4;
 		}
 
@@ -950,18 +978,9 @@ void dhcps_stop(void)
 		softap_if->dhcps_pcb = NULL;
 	}
 
-	list_node* pnode = NULL;
-	list_node* pback_node = NULL;
-	pnode = plist;
-
-	while (pnode != NULL) {
-		pback_node = pnode;
-		pnode = pback_node->pnext;
-		node_remove_from_list(&plist, pback_node);
-		mem_free(pback_node->pnode);
-		pback_node->pnode = NULL;
-		mem_free(pback_node);
-		pback_node = NULL;
+	while (plist) {
+		list_node *n = plist;
+		dhcps_remove_client(n);
 	}
 	softap_if = NULL;
 }
@@ -1053,12 +1072,10 @@ bool wifi_softap_get_dhcps_lease(struct dhcps_lease* please)
 *******************************************************************************/
 static void kill_oldest_dhcps_pool(void)
 {
-	list_node* pre = NULL, *p = NULL;
-	list_node* minpre = NULL, *minp = NULL;
+	list_node* p = NULL;
+	list_node* minp = NULL;
 	struct dhcps_pool* pdhcps_pool = NULL, *pmin_pool = NULL;
-	pre = plist;
-	p = pre->pnext;
-	minpre = pre;
+	p = plist;
 	minp = p;
 
 	while (p != NULL) {
@@ -1067,18 +1084,12 @@ static void kill_oldest_dhcps_pool(void)
 
 		if (pdhcps_pool->lease_timer < pmin_pool->lease_timer) {
 			minp = p;
-			minpre = pre;
 		}
 
-		pre = p;
 		p = p->pnext;
 	}
 
-	minpre->pnext = minp->pnext;
-	mem_free(minp->pnode);
-	minp->pnode = NULL;
-	mem_free(minp);
-	minp = NULL;
+	dhcps_remove_client(minp);
 }
 
 /******************************************************************************
@@ -1102,11 +1113,7 @@ void dhcps_coarse_tmr(void)
 		if (pdhcps_pool->lease_timer == 0) {
 			pback_node = pnode;
 			pnode = pback_node->pnext;
-			node_remove_from_list(&plist, pback_node);
-			mem_free(pback_node->pnode);
-			pback_node->pnode = NULL;
-			mem_free(pback_node);
-			pback_node = NULL;
+			dhcps_remove_client(pback_node);
 		} else {
 			pnode = pnode ->pnext;
 			num_dhcps_pool ++;

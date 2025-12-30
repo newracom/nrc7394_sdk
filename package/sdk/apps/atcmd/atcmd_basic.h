@@ -47,8 +47,6 @@ enum ATCMD_BASIC_EVENT
 extern int atcmd_basic_enable (void);
 extern void atcmd_basic_disable (void);
 
-extern void atcmd_boot_reason (void);
-
 extern bool atcmd_gpio_pin_valid (int pin);
 
 #if defined(CONFIG_ATCMD_FWUPDATE)

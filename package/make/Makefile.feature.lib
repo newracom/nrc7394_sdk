@@ -89,6 +89,12 @@ endif #CONFIG_CJSON
 ifeq ($(CONFIG_MQTT), y)
 	MQTT_BASE = $(LIB_PATH)/paho.mqtt
 	include $(MQTT_BASE)/module.mk
+	ifeq ($(CONFIG_MQTT_RECOVERY), y)
+		DEFINE += -DINCLUDE_MQTT_RECOVERY
+		ifneq ($(MAX_MQTT_RETENT_TOPICS),)
+			DEFINE += -DMAX_MQTT_RETENT_TOPICS=$(MAX_MQTT_RETENT_TOPICS)
+		endif #MAX_MQTT_RETENT_TOPICS
+	endif #CONFIG_MQTT_RECOVERY
 endif #CONFIG_MQTT
 
 #// --------------------------------------------------
@@ -285,4 +291,28 @@ TCP_CLI_ROOT    = $(LIB_PATH)/tcp_cli
 ifeq ($(CONFIG_TCP_CLI), y)
 	DEFINE	+= -DSUPPORT_TCP_CLI
 	include $(TCP_CLI_ROOT)/module.mk
+endif
+
+#// --------------------------------------------------
+#// FATFS
+#// --------------------------------------------------
+ifeq ($(CONFIG_FATFS), y)
+	FATFS_BASE = $(LIB_PATH)/fatfs
+	include $(FATFS_BASE)/module.mk
+endif
+
+#// --------------------------------------------------
+#// SPISD
+#// --------------------------------------------------
+ifeq ($(CONFIG_DISKIO), y)
+	DISKIO_BASE = $(LIB_PATH)/diskio
+	include $(DISKIO_BASE)/module.mk
+endif
+
+#// --------------------------------------------------
+#// LittleFS
+#// --------------------------------------------------
+ifeq ($(CONFIG_LITTLEFS), y)
+        LITTLEFS_BASE = $(LIB_PATH)/littlefs
+        include $(LITTLEFS_BASE)/module.mk
 endif

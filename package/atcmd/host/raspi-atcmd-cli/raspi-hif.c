@@ -146,7 +146,7 @@ int raspi_hif_open (int type, char *device, uint32_t speed, uint32_t flags)
 							switch (eirq_mode)
 							{
 								case HSPI_EIRQ_MODE_HIGH:
-								case HSPI_EIRQ_MODE_FALLING:
+								case HSPI_EIRQ_MODE_RISING:
 									rising = true;
 
 								default:
@@ -176,6 +176,49 @@ int raspi_hif_open (int type, char *device, uint32_t speed, uint32_t flags)
 				hif->read = raspi_uart_read;
 				hif->write = raspi_uart_write;
 			}
+			break;
+
+		default:
+			return -ENODEV;
+	}
+
+	return ret;
+}
+
+int raspi_hif_reopen (int type, char *device, uint32_t speed, uint32_t flags)
+{
+	int ret = 0;
+	int i;
+
+	if (type == RASPI_HIF_NONE || !device || !speed)
+		return -EINVAL;
+
+	switch (type)
+	{
+		case RASPI_HIF_SPI:
+		{
+			enum HSPI_EIRQ_MODE eirq_mode = HSPI_EIRQ_MODE_NONE;
+
+			if (flags & RASPI_HIF_EIRQ_MASK)
+			{
+				for (i = 1 ; i <= 4 ; i++)
+				{
+					if (flags & (1 << i))
+						eirq_mode = i - 1;
+				}
+			}
+
+			raspi_hif_mutex_lock();
+
+			ret = nrc_hspi_reopen(eirq_mode);
+			if (ret < 0)
+				log_error("raspi_hif_reopen(), %s\n", strerror(-ret));
+
+			raspi_hif_mutex_unlock();
+			break;
+		}
+
+		case RASPI_HIF_UART:
 			break;
 
 		default:
@@ -263,3 +306,17 @@ int raspi_hif_write (char *buf, int len)
 
 	return ret;
 }
+
+enum HSPI_EIRQ_STATUS raspi_hif_hspi_eirq_status (void)
+{
+	enum HSPI_EIRQ_STATUS eirq_status = 0;
+
+	raspi_hif_mutex_lock();
+
+	eirq_status = nrc_hspi_eirq_status();
+
+	raspi_hif_mutex_unlock();
+
+	return eirq_status;
+}
+

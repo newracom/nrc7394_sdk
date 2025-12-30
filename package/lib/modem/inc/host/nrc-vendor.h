@@ -18,7 +18,7 @@
 #define _NRC_VENDOR_H_
 
 #define OUI_IEEE_REGISTRATION_AUTHORITY		0xFCFFAA
-
+#define OUI_WMM_WME					0x0050F2
 /**
  * iw vendor command can be worked and accepted which includes the same
  * OUI with this 'VENDOR_OUI'
@@ -129,7 +129,7 @@ enum nrc_vendor_attributes {
 struct remotecmd_params {
 	struct wiphy *wiphy;
 	struct wireless_dev *wdev;
-	u8 subcmd;
+	uint8_t subcmd;
 };
 
 #endif /* _NRC_VENDOR_H_ */

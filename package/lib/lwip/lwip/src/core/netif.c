@@ -90,6 +90,7 @@
 #include "lwip/nd6.h"
 #endif
 #include "system_modem_api.h"
+#include "system_recovery.h"
 
 #if LWIP_NETIF_STATUS_CALLBACK
 #define NETIF_STATUS_CALLBACK(n) do{ if (n->status_callback) { (n->status_callback)(n); }}while(0)
@@ -901,7 +902,8 @@ netif_issue_reports(struct netif *netif, u8_t report_type)
 #if LWIP_ARP
     /* For Ethernet network interfaces, we would like to send a "gratuitous ARP" */
     if ((netif->flags & NETIF_FLAG_ETHARP) &&
-        !(system_modem_api_ps_get_ret_recovered())) {
+        !(system_modem_api_ps_get_ret_recovered() ||
+        system_recovery_wifi_ap_get_in_recovery())) {
         etharp_gratuitous(netif);
     }
 #endif /* LWIP_ARP */

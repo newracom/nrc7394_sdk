@@ -133,6 +133,7 @@ list_node* dhcps_get_list(void);
 		ipaddr = pool? &pool->ip : NULL, \
 		macaddr = pool? pool->mac : NULL \
 	)
+list_node* dhcps_add_client(u32_t ip, u8_t *mac, u32_t lease_time);
 
 #endif /* LWIP_IPV4 && LWIP_DHCPS */
 #endif /* __DHCPS_H__ */

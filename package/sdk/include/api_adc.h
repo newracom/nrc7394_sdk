@@ -44,6 +44,19 @@ typedef enum  {
 
 
 /**********************************************
+ * @fn nrc_err_t nrc_adc_set_gpio(ADC_CH ch, uint16_t pin)
+ *
+ * @brief Configure a GPIO pin to be used as an ADC input channel.
+ *
+ * @param ch   ADC channel number to assign the GPIO pin to.
+ * @param pin  GPIO pin number to be mapped for ADC input.
+ *
+ * @return If successful, returns NRC_SUCCESS. Otherwise, returns NRC_FAIL.
+ ***********************************************/
+nrc_err_t nrc_adc_set_gpio(ADC_CH ch, uint16_t pin);
+
+
+/**********************************************
  * @fn nrc_err_t nrc_adc_init(bool enable)
  *
  * @brief Initialize ADC controller
@@ -66,23 +79,27 @@ nrc_err_t nrc_adc_deinit(void);
 
 
 /**********************************************
- * @fn void nrc_adc_enable(void)
+ * @fn void nrc_adc_enable(ADC_CH ch)
  *
  * @brief Enable ADC controller
  *
+ * @param ch   ADC channel number to assign the GPIO pin to.
+ *
  * @return void
  ***********************************************/
-void nrc_adc_enable(void);
+void nrc_adc_enable(ADC_CH ch);
 
 
 /**********************************************
- * @fn void nrc_adc_disable(void)
+ * @fn void nrc_adc_disable(ADC_CH ch)
  *
  * @brief Disable ADC controller
  *
+ * @param ch   ADC channel number to assign the GPIO pin to.
+ *
  * @return  void
  ***********************************************/
-void nrc_adc_disable(void);
+void nrc_adc_disable(ADC_CH ch);
 
 
 /**********************************************

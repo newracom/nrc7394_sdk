@@ -45,6 +45,9 @@ void drv_rf_set_rx_filter(bw_t bw);
 void drv_rf_set_tx_filter(bw_t bw);
 void drv_rf_loopback_rx_mode(bool enable);
 void drv_rf_loopback_tx_mode(bool enable);
+uint8_t drv_rf_get_txcal_tlpf_gac(void);
+uint8_t drv_rf_get_txcal_tx_lo_tlpf(void);
+void drv_rf_set_txcal_tlpf_gac(uint8_t value);
 void drv_rf_cfo_ppm(double cfo_ppm);
 void drv_rf_show();
 ////////////////////////////////////////////////////////

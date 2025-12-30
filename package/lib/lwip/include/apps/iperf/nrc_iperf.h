@@ -94,9 +94,7 @@
 # define	IPTOS_DSCP_EF		0xb8
 #endif /* IPTOS_DSCP_EF */
 
-#define KILO 1000
-#define MEGA ( KILO * KILO )
-#define MAX_IPERF_THROUGHPUT 12*MEGA
+#define MAX_IPERF_THROUGHPUT 12*1000*1000 // 12M
 
 typedef double iperf_time_t ; // sec
 
@@ -234,28 +232,33 @@ struct client_hdr_ack {
 
 typedef struct iperf_opt
 {
-	uint32_t mAmount; // -n or -t
-	uint32_t mInterval;      // -i option (sec)     
-	uint32_t mBufLen;	// -l
-	uint32_t mAppRate; // -b
-	uint32_t mSock;
-	uint16_t mPort; // -p
-	uint32_t mSendInterval; // -g
+	uint32_t mAmount;         // Duration in 0.01s units (-t)
+	uint32_t mInterval;       // Interval in milliseconds (-i)
+	uint32_t mBufLen;         // Buffer length (-l)
+	uint32_t mAppRate;        // Application rate in bps (-b)
+	uint32_t mSock;           // Socket handle (internal)
+	uint16_t mPort;           // Port number (-p)
+	uint32_t mSendInterval;   // Delay between packets in ms (-g)
 
-	ip_addr_t addr;
+	ip_addr_t addr;           // Destination address (-c)
+	ip_addr_t bindAddr;       // Bind address (-B)
+
 	union {
 		iperf_server_info_t server_info;
 		iperf_client_info_t client_info;
 	};
 
-	uint8_t mTOS ;	// -S
-	enum ThreadMode mThreadMode;         // -s or -c
-	bool mUDP;                    // -u
-	bool mForceStop;
-	bool mNodelay; // -N
-	TaskHandle_t task_handle;
-} iperf_opt_t;
+	uint8_t mTOS;             // Type of Service / DSCP (-S)
+	char mFormat;             // Output format: 'K', 'M', etc. (-f)
 
+	enum ThreadMode mThreadMode; // Thread mode: client or server (-c / -s)
+
+	bool mUDP;                // UDP mode flag (-u)
+	bool mForceStop;         // Stop current session (stop)
+	bool mNodelay;           // Disable delay (-N)
+
+	TaskHandle_t task_handle; // RTOS task handle (internal)
+} iperf_opt_t;
 
 iperf_opt_t * iperf_option_alloc(void);
 void iperf_option_free(iperf_opt_t* option);
@@ -273,7 +276,13 @@ bool iperf_time_expried(iperf_time_t start_time, iperf_time_t duration);
 uint32_t byte_to_bps (iperf_time_t time, uint32_t byte);
 char *byte_to_string (uint32_t byte);
 char *bps_to_string (uint32_t bps);
+void iperf_format_output(uint64_t bytes, uint32_t bps, char format,
+                         float *byte_disp, float *bps_disp,
+                         char *byte_unit_str, size_t byte_unit_len,
+                         char *bps_unit_str, size_t bps_unit_len);
 int iperf_send(int fd, const char *buf, int count,
 	const struct sockaddr *to, socklen_t tolen);
+void iperf_report_log_append(char *buf, size_t *offset, size_t max_len, const char *fmt, ...);
+void iperf_reset_report_log(char *buf, size_t *offset);
 
 #endif /* __NRC_IPERF_H__ */

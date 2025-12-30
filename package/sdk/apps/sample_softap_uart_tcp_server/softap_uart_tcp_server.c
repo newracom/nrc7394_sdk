@@ -41,16 +41,27 @@
 
 #define UART_LOCAL_ECHO
 
-#define LOCAL_PORT 50000
-#define MAX_RETRY 5
-#define BUFFER_SIZE (1024*4)
+#define LOCAL_PORT			50000
+#define MAX_RETRY			5
+#define BUFFER_SIZE			(1024*4)
 
-#define START_MARKER 0x02
-#define END_MARKER 0x03
+#define START_MARKER			0x02
+#define END_MARKER			0x03
+
+/* UART DMA tuning (new API) */
+#define UART_BAUDRATE			9600
+#define UART_RX_RING_SIZE		(16 * 1024)	/* RX DMA ring (bytes). 0 disables ring mode */
+#define UART_TX_FIFO_SIZE		(8 * 1024)	/* TX DMA FIFO (bytes). 0 disables TX DMA */
+
+/* If you want driver "idle-frame" delivery, set nonzero (ms). Default off. */
+#ifndef UART_IDLE_FRAME_TIMEOUT_MS
+#define UART_IDLE_FRAME_TIMEOUT_MS	0
+#endif
 
 static uint16_t server_port = LOCAL_PORT;
 static uint16_t control_port = 4000;
 static NRC_UART_CONFIG uart_config;
+
 static char uart_rx_buffer[BUFFER_SIZE] = {0, };
 
 static WIFI_CONFIG wifi_config;
@@ -66,6 +77,13 @@ static int send_buffer_size = 0;
 
 static SemaphoreHandle_t sync_sem;
 
+/* New API: keep UART DMA open params globally */
+static uart_dma_info_t g_uart_info;
+
+/* Optional: let driver allocate rx ring / tx fifo when addr = NULL */
+static char *g_rx_ring_mem = NULL;
+static char *g_tx_fifo_mem = NULL;
+
 static void uart_transmit(char *buffer, int size)
 {
 	int bytes_sent = 0;
@@ -74,13 +92,17 @@ static void uart_transmit(char *buffer, int size)
 
 	while (remain > 0) {
 		ptr += bytes_sent;
-		/* nrc_uart_write sends maximum of 16 bytes at a time */
+
 		bytes_sent = nrc_uart_write(ptr, remain);
+		if (bytes_sent <= 0) {
+			taskYIELD();
+			continue;
+		}
+
 		if (remain == bytes_sent) {
 			break;
-		} else {
-			remain -= bytes_sent;
 		}
+		remain -= bytes_sent;
 	}
 }
 
@@ -98,8 +120,6 @@ int tcp_transmit_data(char *buffer, int len)
 			close_socket(&sta_clients, station);
 		}
 	}
-
-//	nrc_usr_print("[%s] sent %d bytes\n", __func__, retval);
 	return retval;
 }
 
@@ -127,12 +147,21 @@ static void uart_to_tcp_task(void *pvParameters)
 			continue;
 		}
 
-		xSemaphoreTake(sync_sem, portMAX_DELAY);
-		if (tcp_transmit_data(tcp_send_buffer, send_buffer_size)) {
+		/* Protect shared tcp_send_buffer/send_buffer_size */
+		if (sync_sem) {
+			xSemaphoreTake(sync_sem, portMAX_DELAY);
+		}
+
+		if (send_buffer_size > 0) {
+			(void)tcp_transmit_data(tcp_send_buffer, send_buffer_size);
+
 			memset(tcp_send_buffer, 0, BUFFER_SIZE);
 			send_buffer_size = 0;
 		}
-		xSemaphoreGive(sync_sem);
+
+		if (sync_sem) {
+			xSemaphoreGive(sync_sem);
+		}
 
 		_delay_ms(10);
 	}
@@ -152,41 +181,56 @@ static void tcp_server_task(void *pvParameters)
  * Parameters   : None
  * Returns      : 0 or -1 (0: success, -1: fail)
  *******************************************************************************/
-static nrc_err_t start_servers()
+static nrc_err_t start_servers(void)
 {
-	int count;
-	SCAN_RESULTS results;
-	int ssid_found =false;
-	int i = 0, j=0;
-	int scanning_retry_count = 0;
-	int backoff_time = 1;
-
-	sync_sem = xSemaphoreCreateMutex();
-
 	nrc_usr_print("[%s] server port : %d\n", __func__, server_port);
 	nrc_usr_print("[%s] control port : %d\n", __func__, control_port);
 
 	xTaskCreate(tcp_server_task, "tcp_server_task", 2048,
-						(void*) &server_port, uxTaskPriorityGet(NULL), NULL);
+		    (void*)&server_port, uxTaskPriorityGet(NULL), NULL);
 
-	xTaskCreate(uart_to_tcp_task, "uart to tcp task", 2048,
-				NULL, uxTaskPriorityGet(NULL), &uart_tcp_task_handle);
+	xTaskCreate(uart_to_tcp_task, "uart_to_tcp_task", 2048,
+		    NULL, uxTaskPriorityGet(NULL), &uart_tcp_task_handle);
 
 	_delay_ms(1000);
-
 	return 0;
 }
 
+/* UART RX callback (called from driver's RX task context) */
 void uart_data_receive(char *buf, int len)
 {
+	/* This callback can fire before user_init finishes creating sem/task.
+	 * Make it safe.
+	 */
+	if (!buf || len <= 0) {
+		return;
+	}
+
+	/* If queues not ready yet, drop to avoid crash */
+	if (!sync_sem) {
+		return;
+	}
+
 	xSemaphoreTake(sync_sem, portMAX_DELAY);
-	memcpy(tcp_send_buffer + send_buffer_size, buf, len);
-	send_buffer_size += len;
+
+	/* Prevent overflow if sender sends > BUFFER_SIZE before END_MARKER */
+	int space = BUFFER_SIZE - send_buffer_size;
+	int copy = (len <= space) ? len : space;
+
+	if (copy > 0) {
+		memcpy(tcp_send_buffer + send_buffer_size, buf, copy);
+		send_buffer_size += copy;
+	} else {
+		/* No space left -> drop until END_MARKER arrives */
+	}
+
 	xSemaphoreGive(sync_sem);
 
 	/* when end marker is found, notify uart_tcp_task */
 	if (buf[len - 1] == END_MARKER) {
-		xTaskNotifyGive(uart_tcp_task_handle);
+		if (uart_tcp_task_handle) {
+			xTaskNotifyGive(uart_tcp_task_handle);
+		}
 	}
 }
 
@@ -198,23 +242,43 @@ void uart_data_receive(char *buf, int len)
  *******************************************************************************/
 int uart_handler_init(void)
 {
-	uart_dma_info_t info;
+	memset(&g_uart_info, 0, sizeof(g_uart_info));
 
 #if defined(NRC7292)
-	info.uart.channel = NRC_UART_CH2;
+	g_uart_info.uart.channel = NRC_UART_CH2;
 #else
-	info.uart.channel = NRC_UART_CH1;
+	g_uart_info.uart.channel = NRC_UART_CH1;
 #endif
-	info.uart.baudrate = 9600;
-	info.uart.data_bits = UART_DB8;
-	info.uart.stop_bits = UART_SB1;
-	info.uart.parity = UART_PB_NONE;
-	info.uart.hfc = UART_HFC_DISABLE;
-	info.rx_params.buf.addr = uart_rx_buffer;
-	info.rx_params.buf.size = BUFFER_SIZE;
-	info.rx_params.cb = uart_data_receive;
+	g_uart_info.uart.baudrate = UART_BAUDRATE;
+	g_uart_info.uart.data_bits = UART_DB8;
+	g_uart_info.uart.stop_bits = UART_SB1;
+	g_uart_info.uart.parity = UART_PB_NONE;
 
-	return nrc_uart_dma_open(&info);
+	/* HFC must be disabled to use RX DMA ring + TX DMA in this driver */
+	g_uart_info.uart.hfc = UART_HFC_DISABLE;
+
+	/* RX DMA ring (enable with size > 0) */
+	g_uart_info.rx_fifo.addr = g_rx_ring_mem;	/* NULL => let driver alloc if supported */
+	g_uart_info.rx_fifo.size = UART_RX_RING_SIZE;
+
+	/* TX DMA FIFO (enable with size > 0 when HFC disabled) */
+	g_uart_info.tx_fifo.addr = g_tx_fifo_mem;	/* NULL => let driver alloc if supported */
+	g_uart_info.tx_fifo.size = UART_TX_FIFO_SIZE;
+
+	/* RX staging buffer + callback */
+	g_uart_info.rx_params.buf.addr = uart_rx_buffer;
+	g_uart_info.rx_params.buf.size = BUFFER_SIZE;
+	g_uart_info.rx_params.cb = uart_data_receive;
+
+	if (nrc_uart_dma_open(&g_uart_info) != 0) {
+		return -1;
+	}
+
+#if UART_IDLE_FRAME_TIMEOUT_MS > 0
+	nrc_uart_dma_set_idle_frame_timeout(UART_IDLE_FRAME_TIMEOUT_MS);
+#endif
+
+	return 0;
 }
 
 
@@ -250,37 +314,48 @@ static void init_default_backoff()
 void user_init(void)
 {
 	VERSION_T app_version;
+
 	app_version.major = SAMPLE_SOFTAP_UART_TCP_SERVER_MAJOR;
 	app_version.minor = SAMPLE_SOFTAP_UART_TCP_SERVER_MINOR;
 	app_version.patch = SAMPLE_SOFTAP_UART_TCP_SERVER_PATCH;
 	nrc_set_app_version(&app_version);
 	nrc_set_app_name(SAMPLE_SOFTAP_UART_TCP_SERVER_APP_NAME);
 
-	if (uart_handler_init()) {
-		nrc_usr_print("** UART2 init failed **\n");
+	/* IMPORTANT: Create sync semaphore BEFORE UART open,
+	 * because RX callback may fire immediately after open.
+	 */
+	sync_sem = xSemaphoreCreateMutex();
+	if (!sync_sem) {
+		nrc_usr_print("** sync_sem create failed **\n");
+		return;
+	}
+
+	if (uart_handler_init() != 0) {
+		nrc_usr_print("** UART init failed **\n");
 		return;
 	}
 
 	memset(param, 0x0, WIFI_CONFIG_SIZE);
 	nrc_wifi_set_config(param);
+
 #ifdef INCLUDE_SCAN_BACKOFF
 	init_default_backoff();
 #endif
 
 	nrc_wifi_set_use_4address(true);
 
-	while(1){
-		if (wifi_init(param)== WIFI_SUCCESS) {
-			nrc_usr_print ("[%s] wifi_init Succeeded!! \n", __func__);
+	while (1) {
+		if (wifi_init(param) == WIFI_SUCCESS) {
+			nrc_usr_print("[%s] wifi_init Succeeded!! \n", __func__);
 			break;
 		} else {
-			nrc_usr_print ("[%s] wifi_init Failed!! \n", __func__);
+			nrc_usr_print("[%s] wifi_init Failed!! \n", __func__);
 			_delay_ms(1000);
 		}
 	}
 
-	if (wifi_start_softap(param)!= WIFI_SUCCESS) {
-		nrc_usr_print ("[%s] Failed to start softap\n", __func__);
+	if (wifi_start_softap(param) != WIFI_SUCCESS) {
+		nrc_usr_print("[%s] Failed to start softap\n", __func__);
 		return;
 	}
 
@@ -290,8 +365,8 @@ void user_init(void)
 	}
 
 	if (param->dhcp_server == 1) {
-		nrc_usr_print("[%s] Trying to start DHCP Server\n",	__func__);
-		if(nrc_wifi_softap_start_dhcp_server(0) != WIFI_SUCCESS) {
+		nrc_usr_print("[%s] Trying to start DHCP Server\n", __func__);
+		if (nrc_wifi_softap_start_dhcp_server(0) != WIFI_SUCCESS) {
 			nrc_usr_print("[%s] Failed to start dhcp server\n", __func__);
 			return;
 		}

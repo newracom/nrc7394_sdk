@@ -460,6 +460,7 @@ static int __atcmd_socket_send_data (atcmd_socket_t *socket, char *data, int len
 				_atcmd_socket_close(socket->id, ret);
 				break;
 
+			case -ENOMEM:
 			case -ENOBUFS:
 			case -EWOULDBLOCK:
 				if (++retry < retry_max)

@@ -512,11 +512,11 @@
  * function.
  */
 /* Required for all the functions in this section */
-//#define MBEDTLS_ECP_INTERNAL_ALT
+#define MBEDTLS_ECP_INTERNAL_ALT
 /* Support for Weierstrass curves with Jacobi representation */
 //#define MBEDTLS_ECP_RANDOMIZE_JAC_ALT
-//#define MBEDTLS_ECP_ADD_MIXED_ALT
-//#define MBEDTLS_ECP_DOUBLE_JAC_ALT
+#define MBEDTLS_ECP_ADD_MIXED_ALT
+#define MBEDTLS_ECP_DOUBLE_JAC_ALT
 //#define MBEDTLS_ECP_NORMALIZE_JAC_MANY_ALT
 //#define MBEDTLS_ECP_NORMALIZE_JAC_ALT
 /* Support for curves with Montgomery arithmetic */
@@ -2635,6 +2635,22 @@
  * This module adds support for the PKCS#5 functions.
  */
 #define MBEDTLS_PKCS5_C
+
+/**
+ * \def MBEDTLS_PKCS7_C
+ *
+ * Enable PKCS7 core for using PKCS7 formatted signatures.
+ * RFC Link - https://tools.ietf.org/html/rfc2315
+ *
+ * Module:  library/pkcs7.c
+ *
+ * Requires: MBEDTLS_ASN1_PARSE_C, MBEDTLS_OID_C, MBEDTLS_PK_PARSE_C,
+ *           MBEDTLS_X509_CRT_PARSE_C MBEDTLS_X509_CRL_PARSE_C,
+ *           MBEDTLS_MD_C
+ *
+ * This module is required for the PKCS7 parsing modules.
+ */
+#define MBEDTLS_PKCS7_C
 
 /**
  * \def MBEDTLS_PKCS11_C

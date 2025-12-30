@@ -73,25 +73,29 @@ nrc_err_t run_sample_vendor_ie(WIFI_CONFIG *param)
 	while(1){_delay_ms(500);}
 }
 
-static void vendor_ie_event_handler(int vif, tWIFI_EVENT_ID event, int data_len, void *data)
+static void vendor_ie_event_handler(int vif, tWIFI_EVENT_ID event, int subcmd, void *data)
 {
-	uint8_t cmd_id = 0;
-    char ssid[33] = {'\0',};
-    vendor_ie_bcn_t* vendor_ie_bcn;
-	switch(event) {
-		case WIFI_EVT_VENDOR_IE:
-            vendor_ie_bcn = (vendor_ie_bcn_t*) data;
-            strncpy(ssid, vendor_ie_bcn->ssid, vendor_ie_bcn->ssid_len);
-            nrc_usr_print("BSSID("MACSTR") RSSI:%d SSID:%s ",
-                    MAC2STR(vendor_ie_bcn->bssid), vendor_ie_bcn->rssi, ssid);
-            cmd_id = ((unsigned char *)vendor_ie_bcn->vie_data)[0];
-            nrc_usr_print("[%02X] ", cmd_id);
-			for(int i=1; i< vendor_ie_bcn->vie_len; i++){
-				nrc_usr_print("%02X ", ((unsigned char *)vendor_ie_bcn->vie_data)[i]);
+	if (event == WIFI_EVT_VENDOR_IE) {
+		if (subcmd >=0 && subcmd <= 4) { // vendor specific IE from beacon frame
+			char ssid[33] = {'\0',};
+			vendor_ie_bcn_t* v = (vendor_ie_bcn_t*)data;
+			strncpy(ssid, v->ssid, v->ssid_len);
+			nrc_usr_print("- OUI: 0x%02x%02x%02x\n", *(v->vie_data), *(v->vie_data + 1), *(v->vie_data + 2));
+			nrc_usr_print("- BSSID: "MACSTR"\n", MAC2STR(v->bssid));
+			nrc_usr_print("- RSSI: %d\n", v->rssi);
+			nrc_usr_print("- SSID: %s (%d)\n", ssid, v->ssid_len);
+			nrc_usr_print("- DATA: ");
+			for(int i = 4; i < v->vie_len; i++){
+				nrc_usr_print("%02X ", ((unsigned char *)v->vie_data)[i]);
 			}
-			break;
-		default:
-			break;
+		}
+	} else if (event == WIFI_EVT_BEACON) {
+		char ssid[256] = {'\0',};
+		vendor_ie_bcn_t* v = (vendor_ie_bcn_t*)data;
+		strncpy(ssid, v->ssid, v->ssid_len);
+		nrc_usr_print("- BSSID: "MACSTR"\n", MAC2STR(v->bssid));
+		nrc_usr_print("- RSSI: %d\n", v->rssi);
+		nrc_usr_print("- SSID: %s (%d)\n", ssid, v->ssid_len);
 	}
 	nrc_usr_print("\n");
 

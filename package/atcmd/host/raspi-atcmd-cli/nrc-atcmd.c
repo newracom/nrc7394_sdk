@@ -148,9 +148,14 @@ static void nrc_atcmd_print_data (char *data, int len)
 	}
 }
 
-bool nrc_atcmd_is_ready (void)
+bool nrc_atcmd_get_ready (void)
 {
 	return g_atcmd_info.ready;
+}
+
+void nrc_atcmd_set_ready (bool ready)
+{
+	g_atcmd_info.ready = ready;
 }
 
 static void nrc_atcmd_init_return (void)
@@ -192,13 +197,13 @@ static void nrc_atcmd_wait_return (char *cmd)
 
 	if (strcmp(cmd, "ATZ\r\n") == 0)
 	{
-		g_atcmd_info.ready = false;	
+		nrc_atcmd_set_ready(false);
 		timeout = 5;
 	}
 	else if (strlen(cmd) > 8 && memcmp(cmd, "AT+UART=", 8) == 0)
 		timeout = 1;
 	else if (strlen(cmd) > 14 && memcmp(cmd, "AT+WDEEPSLEEP=", 14) == 0)
-		g_atcmd_info.ready = false;	
+		nrc_atcmd_set_ready(false);
 
 	pthread_mutex_lock(&g_atcmd_info.ret.mutex);
 
@@ -231,6 +236,7 @@ static void nrc_atcmd_wait_return (char *cmd)
 
 		case ETIMEDOUT:
 			log_info("NO RETURN\n");
+			nrc_atcmd_set_return(ATCMD_RET_TIMEOUT);
 			break;
 
 		default:
@@ -309,7 +315,7 @@ int nrc_atcmd_send_cmd (const char *fmt, ...)
 		name[i] = '\0';
 	}
 
-	len += snprintf(cmd + len, ATCMD_MSG_LEN_MAX - len, "\r\n");
+	len += snprintf(cmd + len, sizeof(cmd) - len, "\r\n");
 
 	nrc_atcmd_init_return();
 
@@ -389,11 +395,9 @@ static int nrc_atcmd_recv_boot (char *msg, int len)
 		len -= 6;
 	}
 
-	if (!g_atcmd_info.ready)
-	{
-		g_atcmd_info.ready = true;	
-		nrc_atcmd_set_return(ATCMD_RET_NONE);
-	}
+	nrc_atcmd_set_return(ATCMD_RET_NONE);
+
+	nrc_atcmd_set_ready(true);
 
 	if (strstr(msg, "POR"))
 		reason |= ATCMD_BOOT_POR;
@@ -415,16 +419,47 @@ static int nrc_atcmd_recv_boot (char *msg, int len)
 	return 0;
 }
 
-/* static int nrc_atcmd_recv_info (char *msg, int len)
+static int nrc_atcmd_recv_info (char *msg, int len)
 {
+	char *cmd;
+	char *argv[10];
+	int argc;
+	int i;
+
 	if (!msg || !len)
 		return -1;
 
+	cmd = msg + 1;
+
+	msg = strchr(msg, ':');
+	if (!msg)
+		return -1;
+
+	*msg = '\0';
+
+	argv[0] = ++msg;
+	argc = 1;
+
+	len -= (1 + strlen(cmd) + 1); /* +<cmd>: */
+
+	for (i = 0 ; i < len ; i++)
+	{
+		if (msg[i] == ',')
+		{
+			msg[i] = '\0';
+
+			if (argc < 10)
+				argv[argc] = &msg[i + 1];
+
+			argc++;
+		}
+	}
+
 	if (g_atcmd_info.cb.info)
-		g_atcmd_info.cb.info(0, 1, &msg);
+		g_atcmd_info.cb.info(cmd, argc, argv);
 
 	return 0;
-} */
+}
 
 static int nrc_atcmd_recv_event (char *msg, int len)
 {
@@ -507,12 +542,10 @@ static int nrc_atcmd_recv_event (char *msg, int len)
 		{
 			if (event == ATCMD_WEVENT_DEEPSLEEP_WAKEUP)
 			{
-				if (!g_atcmd_info.ready)
-				{
-					g_atcmd_info.ready = true;
-					nrc_atcmd_set_return(ATCMD_RET_NONE);
-				}
-			}
+				nrc_atcmd_set_ready(true);
+
+				nrc_atcmd_set_return(ATCMD_RET_NONE);
+			} 
 
 			if (g_atcmd_info.cb.event)
 				g_atcmd_info.cb.event(event, argc - 1, argv + 1);
@@ -762,16 +795,30 @@ void nrc_atcmd_recv (char *buf, int len)
 	{
 		if (data.rxd)
 		{
-			data.buf[data.cnt] = buf[i];
-
-			if (++data.cnt == data.rxd->length)
+			if (data.rxd->length > 0)
 			{
-				atcmd_log_recv("DATA %d\n", data.cnt);
-				if (g_atcmd_info.data.print_recv)
-					nrc_atcmd_print_data(data.buf, data.cnt);
+				data.buf[data.cnt] = buf[i];
 
-				g_atcmd_info.data.recv += data.cnt;
+				if (++data.cnt == data.rxd->length)
+				{
+					atcmd_log_recv("DATA %d\n", data.cnt);
+					if (g_atcmd_info.data.print_recv)
+						nrc_atcmd_print_data(data.buf, data.cnt);
 
+					g_atcmd_info.data.recv += data.cnt;
+
+					if (g_atcmd_info.cb.rxd)
+						g_atcmd_info.cb.rxd(data.rxd, data.buf);
+
+					free(data.rxd);
+					data.rxd = NULL;
+					data.cnt = 0;
+				}
+
+				continue;
+			}
+			else
+			{
 				if (g_atcmd_info.cb.rxd)
 					g_atcmd_info.cb.rxd(data.rxd, data.buf);
 
@@ -779,14 +826,16 @@ void nrc_atcmd_recv (char *buf, int len)
 				data.rxd = NULL;
 				data.cnt = 0;
 			}
-
-			continue;
 		}
 
 		if (msg.cnt >= ATCMD_MSG_LEN_MAX)
 		{
+			msg.buf[ATCMD_MSG_LEN_MAX] = '\0';
+			log_info("type: %d\n", msg.type);
+			log_info("message: %d, %s\n", msg.cnt, msg.buf);
+
 			if (msg.type != ATCMD_MSG_NONE)
-				log_error("message length > %d\n", ATCMD_MSG_LEN_MAX);
+				log_error("message length (%d) > %d\n", msg.cnt, ATCMD_MSG_LEN_MAX);
 
 			msg.type = ATCMD_MSG_NONE;
 			msg.cnt = 0;
@@ -907,7 +956,7 @@ void nrc_atcmd_recv (char *buf, int len)
 					break;
 
 				case ATCMD_MSG_INFO:
-					/* nrc_atcmd_recv_info(msg.buf, msg.cnt); */
+					nrc_atcmd_recv_info(msg.buf, msg.cnt);
 					break;
 
 				case ATCMD_MSG_BOOT:

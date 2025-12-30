@@ -128,6 +128,7 @@ static struct wpa_ssid * wpa_config_read_network(char* str_conf, int id,
 	dl_list_init(&ssid->psk_list);
 	ssid->id = id;
 	wpa_config_set_network_defaults(ssid);
+	ssid->mode = -1;
 
 	while (pos++ < str_conf + end - 1) {
 		char name[255], value[1024];

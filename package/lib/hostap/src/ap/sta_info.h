@@ -181,7 +181,7 @@ struct sta_info {
 
 	u64 acct_session_id;
 	struct os_reltime acct_session_start;
-	int acct_session_started;
+	bool acct_session_started;
 	int acct_terminate_cause; /* Acct-Terminate-Cause */
 	int acct_interim_interval; /* Acct-Interim-Interval */
 	unsigned int acct_interim_errors;
@@ -330,7 +330,7 @@ struct sta_info {
 #ifdef CONFIG_PASN
 	struct pasn_data *pasn;
 #endif /* CONFIG_PASN */
-};
+} __attribute__((packed));
 
 
 /* Default value for maximum station inactivity. After AP_MAX_INACTIVITY has
@@ -385,6 +385,8 @@ void ap_sta_stop_sa_query(struct hostapd_data *hapd, struct sta_info *sta);
 int ap_check_sa_query_timeout(struct hostapd_data *hapd, struct sta_info *sta);
 const char * ap_sta_wpa_get_keyid(struct hostapd_data *hapd,
 				  struct sta_info *sta);
+const u8 *ap_sta_wpa_get_dpp_pkhash(struct hostapd_data *hapd,
+				    struct sta_info *sta);
 void ap_sta_disconnect(struct hostapd_data *hapd, struct sta_info *sta,
 		       const u8 *addr, u16 reason);
 

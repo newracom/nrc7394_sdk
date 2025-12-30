@@ -10,6 +10,7 @@ extern struct netif br_netif;
 nrc_err_t start_softap(WIFI_CONFIG* param)
 {
 	/* set initial wifi configuration */
+	param->scan_period = 0;
 	while(1) {
 		if (wifi_init(param) == WIFI_SUCCESS) {
 			nrc_usr_print ("\033[31m [%s] wifi_init Success !! \033[39m\n", __func__);

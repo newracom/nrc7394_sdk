@@ -7,8 +7,8 @@ SECTIONS
         __isr_vector_end = .;
 		/* *(.text) */
 		/* *(.text*) */
-		*(EXCLUDE_FILE(*driver_nrc*.c.o *lmac*.c.o *umac_s1g*.c.o *ec*.c.o *bignum*.c.o).text)
-		*(EXCLUDE_FILE(*driver_nrc*.c.o *lmac*.c.o *umac_s1g*.c.o *ec*.c.o *bignum*.c.o).text*)
+		*(EXCLUDE_FILE(*driver_nrc*.c.o *lmac*.c.o *umac_s1g*.c.o *bignum*.c.o).text)
+		*(EXCLUDE_FILE(*driver_nrc*.c.o *lmac*.c.o *umac_s1g*.c.o *bignum*.c.o).text*)
 
 		. = ALIGN(4);
 		PROVIDE_HIDDEN (__preinit_array_start = .);
@@ -85,7 +85,6 @@ SECTIONS
 		KEEP(*driver_nrc*.c.o(.text* .rodata*))
 		KEEP(*lmac*.c.o(.text* .rodata*))
 		KEEP(*umac_s1g*.c.o(.text* .rodata*))
-		KEEP(*ec*.c.o(.text* .rodata*))
 		KEEP(*bignum*.c.o(.text* .rodata*))
 		. = ALIGN(4);
 

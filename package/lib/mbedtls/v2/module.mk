@@ -91,7 +91,8 @@ X509_SRCS += \
     x509_crt.c \
     x509_csr.c \
     x509write_crt.c \
-    x509write_csr.c
+    x509write_csr.c \
+    pkcs7.c
 
 # tls
 TLS_SRCS += \

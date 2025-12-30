@@ -15,24 +15,17 @@ endif
 #// CONFIG
 #//--------------------------------------------------
 
+# Self configuration on host mode AP
+CONFIG_SELF_CONFIG_USE=y
+
 # SoftAP-Role ONLY
 CONFIG_ONLY_AP=n
 # STA-Role ONLY
 CONFIG_ONLY_STA=n
 ifeq ($(CONFIG_ONLY_AP),y)
 CONFIG_ONLY_STA=n
-endif
-
-ifeq ($(CONFIG_ONLY_AP),y)
-LIB_ROLE	= AP
 else ifeq ($(CONFIG_ONLY_STA),y)
-LIB_ROLE	= STA
-endif
-
-# Synchronize with the library's config.
-LIB_CONFIG_FILE       =   lib/modem/libModem$(LIB_ROLE).config
-ifneq ($(wildcard $(LIB_CONFIG_FILE)),)
-include $(LIB_CONFIG_FILE)
+CONFIG_SELF_CONFIG_USE=n
 endif
 
 # HW Security Accelerator
@@ -52,6 +45,9 @@ endif
 
 # lwIP socket recovery
 CONFIG_LWIP_RECOVERY=n
+
+# MQTT client recovery
+CONFIG_MQTT_RECOVERY=n
 
 # RELEASE FW
 CONFIG_LOG=n
@@ -83,6 +79,11 @@ DEFINE				+= -DEEPROM_I2C_CLK=400000
 DEFINE				+= -DEEPROM_I2C_DEV_ADDR=0xA0
 DEFINE				+= -DEEPROM_WP_PIN=25
 DEFINE				+= -DEEPROM_PAGE_WRITE_BUF_SIZE=32
+endif
+
+# Set sub XTAL bypass
+ifneq ($(findstring subxtalbypass, $(ALIAS)), )
+DEFINE				+= -DINCLUDE_SUB_XTAL_BYPASS
 endif
 
 #// --------------------------------------------------
@@ -118,6 +119,11 @@ else
 CONFIG_IPV6=n
 endif
 
+# DPP (WiFi Easy Connect)
+ifeq ($(CONFIG_FLASH_SIZE), 4M)
+CONFIG_DPP=y
+endif
+
 #// --------------------------------------------------
 #// APP Core
 #// --------------------------------------------------
@@ -146,9 +152,27 @@ include $(SDK_PROJECT)/.config
 include $(SDK_PROJECT)/Makefile
 endif
 
-ifneq ($(findstring ov5640, $(ALIAS)), )
-DEFINE  += -DBOARD_OV5640
+# External RAM
+ifneq ($(findstring extram, $(ALIAS)), )
 CONFIG_EXT_RAM = y
+else
+CONFIG_EXT_RAM = n
+endif
+
+ifeq ($(CONFIG_EXT_RAM),y)
+EXT_RAM_MODE = ExtRAM
+endif
+
+ifeq ($(CONFIG_ONLY_AP),y)
+LIB_ROLE	= AP
+else ifeq ($(CONFIG_ONLY_STA),y)
+LIB_ROLE	= STA
+endif
+
+# Synchronize with the library's config.
+LIB_CONFIG_FILE       =   lib/modem/libModem$(LIB_ROLE)$(EXT_RAM_MODE).config
+ifneq ($(wildcard $(LIB_CONFIG_FILE)),)
+include $(LIB_CONFIG_FILE)
 endif
 
 #// --------------------------------------------------
@@ -196,7 +220,11 @@ DEFINE				+=	-DINCLUDE_ACCESS_POINT
 DEFINE				+=	-DINCLUDE_UMAC_BEACON
 DEFINE                          +=      -DINCLUDE_BEACON_AP_BEACON
 DEFINE                          +=      -DINCLUDE_BEACON_BCMC
-DEFINE				+=	-DMAX_STA=75
+ifeq ($(CONFIG_EXT_RAM), y)
+DEFINE				+=	-DMAX_STA=30
+else
+DEFINE				+=	-DMAX_STA=65
+endif
 else
 DEFINE				+=	-DMAX_STA=1
 endif
@@ -295,6 +323,8 @@ READELF				=	$(PREFIX)readelf
 #// --------------------------------------------------
 #// Common Path
 #// --------------------------------------------------
+SYSTEM_PATH			=	system/$(SYSTEM)
+
 OUT_PATH			=	out/$(SYSTEM)/$(TARGET)/$(BUILD_NAME)
 OBJ_PATH			=	$(OUT_PATH)/objs
 
@@ -355,27 +385,35 @@ INCLUDE	+= -I$(LIB_MODEM_FDK_CSP_PATH)
 INCLUDE	+= -I$(LIB_MODEM_FDK_DEVICE_PATH)
 INCLUDE	+= -I$(LIB_MODEM_FDK_CMSIS_PATH)
 
-include make/configure-in.os
-
 #// --------------------------------------------------
 #// Specific LD File
 #// --------------------------------------------------
 ifeq ($(CONFIG_RUNRAM), y)
-ifeq ($(CONFIG_EXT_RAM), y)
-LD_FILE_NAME = cm3_$(TARGET)_extram_runram.ld
+  LD_CM_FILE_NAME = cm3_common_runram.ld
+
+  ifeq ($(CONFIG_EXT_RAM), y)
+    LD_FILE_NAME = cm3_$(TARGET)_extram_runram.ld
+  else
+    LD_FILE_NAME = cm3_$(TARGET)_runram.ld
+  endif
+
 else
-LD_FILE_NAME = cm3_$(TARGET)_runram.ld
-endif
-else
-ifeq ($(CONFIG_EXT_RAM), y)
-LD_FILE_NAME = cm3_$(TARGET)_extram.ld
-else
-LD_FILE_NAME = cm3_$(TARGET).ld
-endif
+  LD_CM_FILE_NAME = cm3_common.ld
+
+  ifeq ($(CONFIG_EXT_RAM), y)
+    LD_FILE_NAME = cm3_$(TARGET)_extram.ld
+  else
+    LD_FILE_NAME = cm3_$(TARGET).ld
+  endif
 endif
 
-LD_FILE = $(LIB_MODEM_PATH)/$(LD_FILE_NAME)
+LD_CM_FILE		=	$(LIB_MODEM_PATH)/$(LD_CM_FILE_NAME)
+LD_FILE			=	$(LIB_MODEM_PATH)/$(LD_FILE_NAME)
 
+#// --------------------------------------------------
+#// Other configuration
+#// --------------------------------------------------
+include make/configure-in.os
 include make/configure-in.flash
 
 #// --------------------------------------------------
@@ -397,12 +435,8 @@ else
 ifeq ($(CONFIG_IPV6),y)
 DEFINE	+= -DconfigTOTAL_HEAP_SIZE=220000
 else
-ifneq ($(findstring ov5640, $(ALIAS)), )
 ifeq ($(CONFIG_EXT_RAM), y)
-DEFINE	+= -DconfigTOTAL_HEAP_SIZE=107520
-else
-DEFINE	+= -DconfigTOTAL_HEAP_SIZE=511960
-endif
+DEFINE	+= -DconfigTOTAL_HEAP_SIZE=512000
 else
 DEFINE	+= -DconfigTOTAL_HEAP_SIZE=320000
 endif
@@ -440,6 +474,7 @@ LFLAGS	+= $(ARCH_FLAGS) $(SYS_FLAGS)
 LFLAGS	+= -L$(LIB_PATH) -Os -Wl,-Map=$(OUT_PATH)/$(OUTPUT).map
 LFLAGS	+= -gdwarf-2
 LFLAGS	+= -T$(LD_FILE)
+LFLAGS  += $(SP_LFLAGS)
 
 CPFLAGS	= -O binary
 ODFLAGS = -S -C --demangle

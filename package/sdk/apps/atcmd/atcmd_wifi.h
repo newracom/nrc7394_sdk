@@ -47,6 +47,8 @@
 #define ATCMD_WIFI_PASSWORD_LEN_MIN		8
 #define ATCMD_WIFI_PASSWORD_LEN_MAX		64
 
+#define ATCMD_WIFI_HOSTNAME_LEN_MAX		32
+
 #define ATCMD_WIFI_IPADDR_LEN_MIN		ATCMD_IPADDR_LEN_MIN
 #define ATCMD_WIFI_IPADDR_LEN_MAX		ATCMD_IPADDR_LEN_MAX
 
@@ -56,24 +58,26 @@
 /*
  * Default Settings
  */
-/* #define ATCMD_WIFI_INIT_COUNTRY			"US" */
+/* #define ATCMD_WIFI_INIT_COUNTRY				"US" */
 
-#define ATCMD_WIFI_INIT_TXPOWER_TYPE	TX_POWER_AUTO
+#define ATCMD_WIFI_INIT_TXPOWER_TYPE			TX_POWER_AUTO
 
-#define ATCMD_WIFI_INIT_SSID			"halow"
-#define ATCMD_WIFI_INIT_BSSID			"00:00:00:00:00:00"
-#define ATCMD_WIFI_INIT_SECURITY		"open"
-#define ATCMD_WIFI_INIT_PASSWORD		""
-#define ATCMD_WIFI_INIT_SAE_PWE			2 /* 0:hunting-and-packing, 1:hash-to-element, 2:both */
+#define ATCMD_WIFI_INIT_CCA_SCAN_DWELL_TIME		100 /* msec */
 
-#define ATCMD_WIFI_INIT_PING_INTERVAL	1000
-#define ATCMD_WIFI_INIT_PING_COUNT		5
-#define ATCMD_WIFI_INIT_PING_SIZE		64
+#define ATCMD_WIFI_INIT_SSID					"halow"
+#define ATCMD_WIFI_INIT_BSSID					"00:00:00:00:00:00"
+#define ATCMD_WIFI_INIT_SECURITY				"open"
+#define ATCMD_WIFI_INIT_PASSWORD				""
+#define ATCMD_WIFI_INIT_SAE_PWE					2 /* 0:hunting-and-pecking, 1:hash-to-element, 2:both */
 
-#define ATCMD_WIFI_BSS_MAX_IDLE_PERIOD_MIN	1
-#define ATCMD_WIFI_BSS_MAX_IDLE_PERIOD_MAX	65535
-#define ATCMD_WIFI_BSS_MAX_IDLE_RETRY_MIN	3
-#define ATCMD_WIFI_BSS_MAX_IDLE_RETRY_MAX	100
+#define ATCMD_WIFI_INIT_PING_INTERVAL			1000
+#define ATCMD_WIFI_INIT_PING_COUNT				5
+#define ATCMD_WIFI_INIT_PING_SIZE				64
+
+#define ATCMD_WIFI_BSS_MAX_IDLE_PERIOD_MIN		1
+#define ATCMD_WIFI_BSS_MAX_IDLE_PERIOD_MAX		65535
+#define ATCMD_WIFI_BSS_MAX_IDLE_RETRY_MIN		3
+#define ATCMD_WIFI_BSS_MAX_IDLE_RETRY_MAX		100
 
 
 /*
@@ -142,6 +146,7 @@ typedef char atcmd_wifi_bssid_t[ATCMD_WIFI_BSSID_LEN + 1];
 typedef char atcmd_wifi_ssid_t[ATCMD_WIFI_SSID_LEN_MAX + 1];
 typedef char atcmd_wifi_security_t[ATCMD_WIFI_SECURITY_LEN_MAX + 1];
 typedef char atcmd_wifi_password_t[ATCMD_WIFI_PASSWORD_LEN_MAX + 1];
+typedef char atcmd_wifi_hostname_t[ATCMD_WIFI_HOSTNAME_LEN_MAX + 1];
 typedef char atcmd_wifi_ipaddr_t[ATCMD_WIFI_IPADDR_LEN_MAX + 1];
 
 typedef struct
@@ -169,10 +174,10 @@ typedef struct
 typedef struct
 {
 	bool recovery;
-
 	bool connected;
 	bool connecting;
 	bool disconnecting;
+	bool ndp_preq;
 
 	atcmd_wifi_ssid_t ssid;
 	atcmd_wifi_bssid_t bssid;
@@ -223,6 +228,17 @@ typedef struct
 
 typedef struct
 {
+#define ATCMD_WIFI_CCA_SCAN_DWELL_TIME_DEFAULT	ATCMD_WIFI_INIT_CCA_SCAN_DWELL_TIME
+#define ATCMD_WIFI_CCA_SCAN_DWELL_TIME_MAX		60000
+
+	uint8_t pref_bw;
+	uint8_t optimal_ch;
+	uint16_t dwell_time; /* msec */
+	cca_scan_results_t results;
+} atcmd_wifi_cca_scan_t;
+
+typedef struct
+{
 	SemaphoreHandle_t lock;
 
 	atcmd_wifi_event_t event;
@@ -230,7 +246,8 @@ typedef struct
 	atcmd_wifi_country_t country;
 	atcmd_wifi_channels_t supported_channels;
 	atcmd_wifi_txpower_t txpower;
-
+	atcmd_wifi_cca_scan_t cca_scan;
+	
 	atcmd_wifi_scan_t scan;
 	atcmd_wifi_bgscan_t bgscan;
 	atcmd_wifi_connect_t connect;
@@ -251,6 +268,8 @@ typedef struct
 			int sae_pwe_relay_ap;
 		};
 	};
+
+	atcmd_wifi_hostname_t hostname;
 } atcmd_wifi_info_t;
 
 /**********************************************************************************************/
@@ -266,7 +285,7 @@ extern void atcmd_wifi_disable (void);
 extern bool atcmd_wifi_lock (void);
 extern bool atcmd_wifi_unlock (void);
 
-extern void atcmd_wifi_deep_sleep_send_event (void);
+extern int atcmd_wifi_deep_sleep_send_event (int wake_reason);
 
 extern bool atcmd_wifi_softap_active (void);
 

@@ -3,8 +3,14 @@
 #// --------------------------------------------------
 
 LIB_NAME	= Modem
-LIB_FULL_NAME   = $(LIB_MODEM_PATH)/lib$(LIB_NAME)$(LIB_ROLE).a
-LIB_FLAG	+= -L$(LIB_MODEM_PATH) -Wl,--whole-archive -l$(LIB_NAME)$(LIB_ROLE) -Wl,--no-whole-archive
+LIB_FULL_NAME   = $(LIB_MODEM_PATH)/lib$(LIB_NAME)$(LIB_ROLE)$(EXT_RAM_MODE).a
+LIB_FLAG	+= -L$(LIB_MODEM_PATH) -Wl,--whole-archive -l$(LIB_NAME)$(LIB_ROLE)$(EXT_RAM_MODE) -Wl,--no-whole-archive
+
+WRAP_MALLOC_FLAGS = \
+  -Wl,--wrap=malloc    -Wl,--wrap=free    -Wl,--wrap=calloc    -Wl,--wrap=realloc \
+  -Wl,--wrap=_malloc_r -Wl,--wrap=_free_r -Wl,--wrap=_calloc_r -Wl,--wrap=_realloc_r
+
+LFLAGS += $(WRAP_MALLOC_FLAGS)
 
 OBJS	+= $(patsubst %.S,$(OBJ_PATH)/%.S.o,$(ASRCS))
 OBJS	+= $(patsubst %.c,$(OBJ_PATH)/%.c.o,$(CSRCS))

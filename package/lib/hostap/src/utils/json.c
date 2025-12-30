@@ -9,7 +9,7 @@
 #include "includes.h"
 
 #include "common.h"
-#include "base64.h"
+#include "hostap_base64.h"
 #include "json.h"
 
 #define JSON_MAX_DEPTH 10

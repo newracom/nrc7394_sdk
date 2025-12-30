@@ -202,6 +202,16 @@ static const struct {
 	{ NULL, -1 }
 };
 
+static const char* tos_to_string(int tos)
+{
+	for (int i = 0; ipqos[i].value != -1; i++) {
+		if (ipqos[i].value == tos) {
+			return ipqos[i].name;
+		}
+	}
+	return "Unknown";
+}
+
 static int parse_qos(const char *cp)
 {
 	unsigned int i;
@@ -241,20 +251,22 @@ bool iperf_time_expried(iperf_time_t start_time, iperf_time_t duration)
 
 uint32_t byte_to_bps (iperf_time_t time, uint32_t byte)
 {
-	iperf_time_t divide_time = (time == 0.0) ? (1.0) : time;
-	return (8 * byte) / divide_time;
+	if (time <= 0.0) {
+		return 0;
+	}
+	return (uint32_t)((8.0 * byte) / time);
 }
 
 char *byte_to_string (uint32_t byte)
 {
 	static char buf[20];
 
-	if (byte < 1024)
-		snprintf(buf, sizeof(buf), "%lu ", byte);
-	else if (byte < (1024 * 1024))
-		snprintf(buf, sizeof(buf), "%4.2f K", byte / 1024.);
+	if (byte < 1000)
+		snprintf(buf, sizeof(buf), "%lu ", (unsigned long)byte);
+	else if (byte < (1000 * 1000))
+		snprintf(buf, sizeof(buf), "%4.2f K", byte / 1000.0);
 	else
-		snprintf(buf, sizeof(buf), "%4.2f M", (byte / 1024.) / 1024.);
+		snprintf(buf, sizeof(buf), "%4.2f M", byte / 1000000.0);
 
 	return buf;
 }
@@ -266,65 +278,152 @@ char *bps_to_string (uint32_t bps)
 	if (bps < 1000)
 		snprintf(buf, sizeof(buf), "%lu ", bps);
 	else if (bps < (1000 * 1000))
-		snprintf(buf, sizeof(buf), "%4.2f K", bps / 1000.);
+		snprintf(buf, sizeof(buf), "%4.2f K", bps / 1000.0);
 	else
-		snprintf(buf, sizeof(buf), "%4.2f M", (bps / 1000.) / 1000.);
+		snprintf(buf, sizeof(buf), "%4.2f M", (bps / 1000.0) / 1000.0);
 
 	return buf;
 }
+
+void iperf_format_output(uint64_t bytes, uint32_t bps, char format,
+                         float *byte_disp, float *bps_disp,
+                         char *byte_unit_str, size_t byte_unit_len,
+                         char *bps_unit_str, size_t bps_unit_len)
+{
+	char unit_byte = 'B', unit_bps = 'b';
+
+	switch (format) {
+		case 'M':
+		case 'm':
+			*byte_disp = bytes / 1000000.0f;
+			*bps_disp  = bps / 1000000.0f;
+			unit_byte = unit_bps = 'M';
+			break;
+
+		case 'K':
+		case 'k':
+			*byte_disp = bytes / 1000.0f;
+			*bps_disp  = bps / 1000.0f;
+			unit_byte = unit_bps = 'K';
+			break;
+
+		case 'B':
+		case 'b':
+			*byte_disp = (float)bytes;
+			*bps_disp  = (float)bps;
+			unit_byte = 'B';
+			unit_bps  = 'b';
+			break;
+
+		default:
+		case 'a':
+		case 'A':
+			if (bytes >= 1000000) {
+				*byte_disp = bytes / 1000000.0f;
+				unit_byte = 'M';
+			} else if (bytes >= 1000) {
+				*byte_disp = bytes / 1000.0f;
+				unit_byte = 'K';
+			} else {
+				*byte_disp = (float)bytes;
+				unit_byte = 'B';
+			}
+
+			if (bps >= 1000000) {
+				*bps_disp = bps / 1000000.0f;
+				unit_bps = 'M';
+			} else if (bps >= 1000) {
+				*bps_disp = bps / 1000.0f;
+				unit_bps = 'K';
+			} else {
+				*bps_disp = (float)bps;
+				unit_bps = 'b';
+			}
+			break;
+	}
+
+	// Write formatted strings
+	snprintf(byte_unit_str, byte_unit_len,
+	         (unit_byte == 'B') ? "Bytes" : "%cB", unit_byte);
+
+	snprintf(bps_unit_str, bps_unit_len,
+	         (unit_bps == 'b') ? "bps" : "%cbps", unit_bps);
+}
+
 
 static void iperf_option_help (char *cmd)
 {
 	CPA("Usage: %s <-s|-c host> [options]\n", cmd);
 	CPA("\r\n");
 	CPA("Client/Server:\n");
-	CPA("  -b, --bandwidth #[kmKM]  bandwidth to send at in bits/sec or packets per second\n");
-	CPA("  -p, --port #          server port to listen on/connect to (default: %d)\n", IPERF_DEFAULT_SERVER_PORT);
-	CPA("  -u, --udp             use UDP rather than TCP\n");
-	CPA("  -S, --tos #           set the socket's IP_TOS (byte) field\n");
-	CPA("  -i, --interval  #     seconds between periodic bandwidth reports\n");
-	CPA("  -g, --sendInterval #    use TCP data send interval(ms)\n");
-	CPA("  -N, --nodelay         set TCP no delay, disabling Nagle's Algorithm\n");
+	CPA("  -b, --bandwidth #[kmKM] bandwidth to send at in bits/sec\n");
+	CPA("  -p, --port #              server port to listen/connect (default: %d)\n", IPERF_DEFAULT_SERVER_PORT);
+	CPA("  -u, --udp                 use UDP instead of TCP\n");
+	CPA("  -S, --tos #               set socket IP_TOS\n");
+	CPA("  -i, --interval #          report interval in seconds\n");
+	CPA("  -g, --sendInterval #      TCP send interval (ms)\n");
+	CPA("  -N, --nodelay             set TCP_NODELAY (disable Nagle)\n");
+	CPA("  -B, --bind <host>         bind to <host>, an interface or multicast address\n");
+	CPA("  -l, --len #[kmKM]         length of buffer in bytes to read or write\n");
+	CPA("  -f, --format [kmKM]       format to report\n");
 	CPA("\r\n");
-
 	CPA("Server specific:\n");
-	CPA("  -s, --server          run in server mode\n");
+	CPA("  -s, --server              run in server mode\n");
 	CPA("\r\n");
-
 	CPA("Client specific:\n");
-	CPA("  -c, --client <host>   run in client mode, connecting to <host>\n");
-	CPA("  -t, --time #          time in seconds to transmit for (default: %d sec)\n", IPERF_DEFAULT_SEND_TIME);
+	CPA("  -c, --client <host>       run in client mode, connecting to <host>\n");
+	CPA("  -t, --time #              transmit duration (seconds, default: %d)\n", IPERF_DEFAULT_SEND_TIME);
 	CPA("\r\n");
-
 	CPA("Miscellaneous:\n");
-	CPA("  -h, --help            print this message and quit\n");
+	CPA("  -h, --help                show help message\n");
 	CPA("\r\n");
 }
 
 #if 0
-static void iperf_option_print (iperf_opt_t *option)
+static void iperf_option_print(iperf_opt_t *option)
 {
-
 	CPA("[ IPERF OPTION ]\n");
-	CPA(" - Role: %s\n", (option->mThreadMode == kMode_Server)? "Server" :
-		 (option->mThreadMode == kMode_Client)? "Client"  : "unknown");
-	CPA(" - Protocol: %s\n", option->mUDP ? "UDP" : "TCP");
-	CPA(" - mPort: %d\n", option->mPort);
 
-	if (option->mThreadMode == kMode_Server){
-		CPA(" - server_ip: %s\n", ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&option->addr)));
-	} else if (option->mThreadMode == kMode_Client){
-		CPA(" - remote ip: %s\n", ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&option->addr)));
+	CPA(" - Role               : %s\n",
+		(option->mThreadMode == kMode_Server) ? "Server" :
+		(option->mThreadMode == kMode_Client) ? "Client" : "Unknown");
+
+	CPA(" - Protocol           : %s\n", option->mUDP ? "UDP" : "TCP");
+	CPA(" - Port               : %d\n", option->mPort);
+	CPA(" - Remote IP          : %s\n", ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&option->addr)));
+
+	if (!ip_addr_isany(&option->bindAddr)) {
+		CPA(" - Bind Address (-B)  : %s\n", ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&option->bindAddr)));
+	} else {
+		CPA(" - Bind Address (-B)  : N/A\n");
 	}
 
-	if (option->mUDP) {
-		CPA(" - Datagram_size: %ld\n", option->mBufLen);
-		if (option->mThreadMode == kMode_Client)
-			CPA(" - Data Rate[bps]: %ld\n", option->mAppRate);
+	CPA(" - Duration (Time)    : %ld sec\n", option->mAmount / 100);
+	CPA(" - TOS (DSCP)         : 0x%02X (%s)\n", option->mTOS, tos_to_string(option->mTOS));
+	CPA(" - Interval           : %ld ms\n", option->mInterval);
+	CPA(" - Buffer Length      : %ld bytes\n", option->mBufLen);
+	CPA(" - TCP no delay       : %s\n", option->mNodelay ? "Enabled" : "Disabled");
+
+	char fmt = option->mFormat ? option->mFormat : 'b';
+	const char *fmt_desc = NULL;
+
+	switch (fmt) {
+		case 'k': case 'K': fmt_desc = "kilobyte (10^3)"; break;
+		case 'm': case 'M': fmt_desc = "megabyte (10^6)"; break;
+		case 'a': case 'A': fmt_desc = "Auto"; break;
+		case 'b': case 'B': default:
+			fmt_desc = "byte";
+			break;
 	}
-	CPA(" - Time: %ld [sec]\n",(option->mAmount)/100);
-	CPA(" - TOS: %d\n", option->mTOS);
-	CPA("\r\n\n");
+
+	CPA(" - Format to report   : %c (%s)\n", fmt, fmt_desc);
+
+	if (option->mUDP && option->mThreadMode == kMode_Client) {
+		CPA(" - Data Rate (UDP)    : %ld bps\n", option->mAppRate);
+		CPA(" - Send Interval (UDP): %ld usec\n", option->mSendInterval);
+	}
+
+	CPA("\n");
 }
 #endif
 
@@ -483,65 +582,85 @@ void nrc_iperf_periodic_report(void *pvParameters)
 	while (1) {
 		uint64_t byte = 0;
 		uint32_t bps = 0;
+		float byte_disp = 0.0f, bps_disp = 0.0f;
+		char byte_unit_str[8];
+		char bps_unit_str[8];
+		char format;
+		iperf_time_t interval;
+
 		processing_start_time = system_get_time();
 
 		if (last_report > 0.0) {
 			iperf_time_t current_time = 0;
+
 			if (option->mThreadMode == kMode_Server) {
 				inet_ntop(AF_INET, &option->server_info.clientaddr.s2_data2, peer_addr, INET_ADDRSTRLEN);
-				if (option->mUDP) {
-					if (option->server_info.last_id < 0) {
-						break;
-					}
+
+				if (option->mUDP && option->server_info.last_id < 0) {
+					break;
 				}
+
 				byte = option->server_info.recv_byte - last_byte_count_reported;
 				last_byte_count_reported = option->server_info.recv_byte;
+
 			} else if (option->mThreadMode == kMode_Client) {
-				inet_ntop(AF_INET, (struct sockaddr_in *) &option->addr, peer_addr, INET_ADDRSTRLEN);
-				if(option->mUDP == 1) {
+				inet_ntop(AF_INET, (struct sockaddr_in *)&option->addr, peer_addr, INET_ADDRSTRLEN);
+
+				if (option->mUDP) {
 					byte = (option->client_info.datagram_cnt * option->mBufLen) - last_byte_count_reported;
 					last_byte_count_reported = option->client_info.datagram_cnt * option->mBufLen;
 				} else {
-					byte = (option->client_info.send_byte) - last_byte_count_reported;
+					byte = option->client_info.send_byte - last_byte_count_reported;
 					last_byte_count_reported = option->client_info.send_byte;
 				}
 			} else {
 				break;
 			}
 
+			interval = (option->mInterval / 1000.0);
+			bps = byte_to_bps(interval, byte);
+			format = option->mFormat;
+
+			iperf_format_output(byte, bps, format,
+							&byte_disp, &bps_disp,
+							byte_unit_str, sizeof(byte_unit_str),
+							bps_unit_str, sizeof(bps_unit_str));
+
+			// Print report
 			nrc_iperf_spin_lock();
-			bps = (byte * 8)/(option->mInterval / 1000.0);
-			CPA("[%15s][%c]  %4.1f - %4.1f sec  %7sBytes  %7sbits/sec\n",
-			  peer_addr, (option->mThreadMode == kMode_Server) ? 'S' : 'C',
-			  (last_report - option->mInterval) / 1000,
-			  last_report / 1000,
-			  byte_to_string(byte), bps_to_string(bps));
+			CPA("[%15s][%c]  %4.1f - %4.1f sec	%7.2f %6s  %7.2f %6s\n",
+				peer_addr, (option->mThreadMode == kMode_Server) ? 'S' : 'C',
+				(last_report - option->mInterval) / 1000.0,
+				last_report / 1000.0,
+				byte_disp, byte_unit_str,
+				bps_disp, bps_unit_str);
 			nrc_iperf_spin_unlock();
 
+			// Exit condition check for server mode
 			if (option->mThreadMode == kMode_Server) {
 				if (option->server_info.send_time) {
 					iperf_get_time(&current_time);
-					if ((current_time - option->server_info.start_time) >= option->server_info.send_time) {
+					if ((current_time - option->server_info.start_time) >= option->server_info.send_time)
 						break;
-					}
 				}
-
-				if (option->server_info.send_byte) {
-					if (option->server_info.recv_byte >= option->server_info.send_byte) {
-						break;
-					}
-				}
+				if (option->server_info.send_byte &&
+					option->server_info.recv_byte >= option->server_info.send_byte)
+					break;
 			}
 		}
+
+		// Sleep adjustment to align with mInterval
 		processing_end_time = system_get_time();
 		processing_time = processing_end_time - processing_start_time;
-		processing_sleep_duration = (option->mInterval > processing_time) ? (option->mInterval - processing_time) : 1;
+		processing_sleep_duration = (option->mInterval > processing_time) ?
+			(option->mInterval - processing_time) : 1;
+
 		last_report += option->mInterval;
 
-		if (ulTaskNotifyTake(pdTRUE, processing_sleep_duration) == pdTRUE) {
+		if (ulTaskNotifyTake(pdTRUE, processing_sleep_duration) == pdTRUE)
 			break;
-		}
 	}
+
 	xTaskNotifyGive(option->task_handle);
 	vTaskDelete(NULL);
 }
@@ -647,116 +766,167 @@ static int iperf_stop_session(iperf_opt_t* option)
 	return true;
 }
 
-static int iperf_option_parse (int argc, char *argv[], iperf_opt_t *option)
+static double parse_with_suffix(const char *arg, char opt)
+{
+	double value = 0.0;
+	int len = strlen(arg);
+	char suffix = '\0';
+	char buf[32];
+
+	if (len == 1 && (arg[0] == 'k' || arg[0] == 'K' || arg[0] == 'm' || arg[0] == 'M')) {
+		value = (opt == 'b') ? MAX_IPERF_THROUGHPUT : 1.0;
+		suffix = arg[0];
+	} else if (len > 1 && (arg[len - 1] == 'k' || arg[len - 1] == 'K' || arg[len - 1] == 'm' || arg[len - 1] == 'M')) {
+		suffix = arg[len - 1];
+		strncpy(buf, arg, len - 1);
+		buf[len - 1] = '\0';
+		value = atof(buf);
+	} else {
+		value = atof(arg);
+	}
+
+	switch (suffix) {
+		case 'k': case 'K': return value * 1000.0;
+		case 'm': case 'M': return value * 1000000.0;
+		default: return value;
+	}
+}
+
+static int iperf_option_parse(int argc, char *argv[], iperf_opt_t *option)
 {
 	int i;
-	int val = 0;
 	char *str = NULL;
-#if LWIP_IPV4
-	ip4_addr_t ip4;
-#endif
-#if LWIP_IPV6
-	ip6_addr_t ip6;
-#endif
-	ip_addr_t ip;
 
-	for(i = 1 ; i < argc ; i++) {
+	for (i = 1; i < argc; i++) {
 		str = argv[i];
 
-		if(str == NULL || str[0] == '\0'){
-			break;
-		}else if(strcmp(str, "-u") == 0){
-			option->mUDP = true;
-		}else if(strcmp(str, "-s") == 0){
-			option->mThreadMode = kMode_Server;
-		}else if(strcmp(str, "-c") == 0){
-			option->mThreadMode  = kMode_Client;
-			str = argv[++i];
-			if(!ipaddr_aton(str, &option->addr)){
-				E(TT_NET, "%s error!! unknown address value\n",
-					module_name());
-				return -2;
-			}
-		}else if(strcmp(str, "-t") == 0){
-			str = argv[++i];
-			option->mAmount = atoi(str)*100;
-		}else if (strcmp(str, "-i") == 0){
-			str = argv[++i];
-			option->mInterval = atoi(str)*1000; // interval in ms
-		}else if(strcmp(str, "-b") == 0){
-			double value = 0.0;
-			int len = 0;
-			char suffix = '\0';
-			str = argv[++i];
+		if (str == NULL) continue;
 
-			len = strlen(str);
-			if(str[len-1] == 'm' || str[len-1] == 'M'||str[len-1] == 'k'|| str[len-1] == 'K') {
-				if(len > 1) {
-					suffix = str[len-1];
-					str[len-1] = '\0';
-					value = atof(str);
-				}
-			} else {
-				value = atof(str);
-			}
-
-			switch(suffix) {
-				case 'm': case 'M':
-					option->mAppRate = (value == 0.0) ? MAX_IPERF_THROUGHPUT : (value*MEGA);
-					break;
-				case 'k': case 'K':
-					option->mAppRate = (value == 0.0) ? MAX_IPERF_THROUGHPUT : (value*KILO);
-					break;
-				default:
-					option->mAppRate = (value == 0.0) ? MAX_IPERF_THROUGHPUT : value;
-					break;
-			}
-		}else if(strcmp(str, "-p") == 0){
-			str = argv[++i];
-			option->mPort = atoi(str);
-		}else if(strcmp(str, "-S") == 0){
-			str = argv[++i];
-			val = parse_qos(str);
-			option->mTOS = (val>0) ? val : 0 ;
-		}else if(strcmp(str, "-l") == 0){
-			str = argv[++i];
-			option->mBufLen = atoi(str);
-		}else if(strcmp(str, "-g") == 0){
-			str = argv[++i];
-			option->mSendInterval = atoi(str);
-		}else if(strcmp(str, "-N") == 0){
-			option->mNodelay = true;
-		}else if(strcmp(str , "stop") == 0) {
+		// Handle special keyword commands (not options)
+		if (strcmp(str, "stop") == 0) {
 			option->mForceStop = true;
 			return 0;
-		}else if(strcmp(str, "-st") == 0){
-			nrc_iperf_list_print();
+		}
+		else if (strcmp(str, "-st") == 0) {
+			nrc_iperf_list_print(); // Print current iperf session list
 			return -2;
-		}else if(strcmp(str, "-h") == 0 || strcmp(str, "-help") == 0){
-			iperf_option_help(argv[0]);
+		}
+		else if (strcmp(str, "-h") == 0 || strcmp(str, "-help") == 0) {
+			iperf_option_help(argv[0]); // Show help
 			return -2;
-		}else{
-			CPA("%s unknown options : %s\n",
-				module_name(), str);
-			return -1;
+		}
+
+		// Skip if not an option
+		if (str[0] != '-') continue;
+		int len = strlen(str);
+		if (len < 2) continue;
+
+		// Handle grouped short options like -suB
+		for (int j = 1; j < len; ++j) {
+			char opt = str[j];
+			char *arg = NULL;
+			bool has_arg = false;
+
+			// Options without arguments
+			switch (opt) {
+				case 's':
+					option->mThreadMode = kMode_Server;
+					break;
+				case 'u':
+					option->mUDP = true;
+					break;
+				case 'N':
+					option->mNodelay = true;
+					break;
+				// Options that require arguments
+				case 'c': case 'B': case 't': case 'i':
+				case 'b': case 'p': case 'S': case 'l':
+				case 'g': case 'f':
+					has_arg = true;
+					break;
+				default:
+					CPA("%s unknown short option: -%c\n", module_name(), opt);
+					return -1;
+			}
+
+			// If the option requires an argument
+			if (has_arg) {
+				// It must be the last in a group like -suB
+				if (j != len - 1) {
+					CPA("%s option -%c must be the last in the group\n", module_name(), opt);
+					return -1;
+				}
+				// Ensure there's a following argument
+				if (i + 1 >= argc) {
+					CPA("%s missing argument for option -%c\n", module_name(), opt);
+					return -1;
+				}
+				arg = argv[++i];
+
+				switch (opt) {
+					case 'c':
+						if (!ipaddr_aton(arg, &option->addr)) {
+							E(TT_NET, "Invalid client IP address\n");
+							return -2;
+						}
+						option->mThreadMode = kMode_Client;
+						break;
+					case 'B':
+						if (!ipaddr_aton(arg, &option->bindAddr)) {
+							E(TT_NET, "Invalid bind address\n");
+							return -2;
+						}
+						break;
+					case 't':
+						option->mAmount = atoi(arg) * 100;
+						break;
+					case 'i':
+						option->mInterval = atoi(arg) * 1000;
+						break;
+					case 'b':
+						option->mAppRate = parse_with_suffix(arg, opt);
+						break;
+					case 'l':
+						option->mBufLen = parse_with_suffix(arg, opt);
+						break;
+					case 'p':
+						option->mPort = atoi(arg);
+						break;
+					case 'S':
+						option->mTOS = parse_qos(arg);
+						break;
+					case 'g':
+						option->mSendInterval = atoi(arg);
+						break;
+					case 'f':
+						option->mFormat = arg[0];
+						break;
+				}
+			}
 		}
 	}
+
 	return 0;
 }
 
-static void iperf_init_parameters(iperf_opt_t * option)
+static void iperf_init_parameters(iperf_opt_t *option)
 {
-	option->mSock = -1;
-	option->mBufLen       = IPERF_DEFAULT_DATA_BUF_LEN;
-	option->mPort         = 5001;          // -p,  ttcp port
-	option->mThreadMode   = kMode_Unknown; // -s,  or -c, none
-	option->mAmount       = IPERF_DEFAULT_SEND_TIME*100;          // -t,  10 seconds
-	option->mTOS          = 0;           // -S,  ie. don't set type of service
-	option->mAppRate       = 1000*1000;          // -b,  1 Mbps
-	option->mSendInterval        = 0;          // -g
-	option->mNodelay        = false;          // -N
-	option->task_handle    = NULL;
-	memset(&option->addr, 0, sizeof(ip_addr_t));
+	option->mSock           = -1;
+	option->mBufLen         = IPERF_DEFAULT_DATA_BUF_LEN; // -l, buffer length
+	option->mPort           = 5001;                       // -p, default port
+	option->mThreadMode     = kMode_Unknown;              // -s or -c, not set
+	option->mAmount         = IPERF_DEFAULT_SEND_TIME * 100; // -t, duration in 0.01s
+	option->mTOS            = 0;                          // -S, no TOS by default
+	option->mAppRate        = 1000 * 1000;                // -b, 1 Mbps
+	option->mSendInterval   = 0;                          // -g, send delay
+	option->mNodelay        = false;                      // -N, nodelay off
+	option->mUDP            = false;                      // -u, default TCP
+	option->mForceStop      = false;                      // 'stop' not triggered
+	option->mFormat         = 'a';                        // -f, format to report
+	option->task_handle     = NULL;                       // task not assigned
+
+	memset(&option->addr, 0, sizeof(ip_addr_t));          // -c, target IP
+	memset(&option->bindAddr, 0, sizeof(ip_addr_t));      // -B, bind IP
 }
 
 int iperf_stop(iperf_opt_t* option)
@@ -880,6 +1050,43 @@ int iperf_send(int fd, const char *buf, int count,
 		}
 	}
 	return count;
+}
+
+void iperf_report_log_append(char *buf, size_t *offset, size_t max_len, const char *fmt, ...)
+{
+	if (!buf || !offset || *offset >= max_len)
+		return;
+
+	va_list args;
+	char tmp[256];
+	int len;
+
+	va_start(args, fmt);
+	len = vsnprintf(tmp, sizeof(tmp), fmt, args);
+	va_end(args);
+
+	if (len > 0) {
+		size_t space_left = max_len - *offset - 1;
+		if ((size_t)len > space_left)
+			len = space_left;
+
+		memcpy(&buf[*offset], tmp, len);
+		*offset += len;
+
+		if (*offset >= max_len)
+			*offset = max_len - 1;
+
+		buf[*offset] = '\0';
+	}
+}
+
+void iperf_reset_report_log(char *buf, size_t *offset)
+{
+	if (!buf || !offset)
+		return;
+
+	*offset = 0;
+	buf[0] = '\0';
 }
 
 #endif /* LWIP_IPERF */

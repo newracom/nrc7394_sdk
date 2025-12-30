@@ -55,6 +55,15 @@
 #include "fils_hlp.h"
 #include "dpp_hostapd.h"
 #include "gas_query_ap.h"
+#if defined(NRC_WPA_SUPP)
+#include "wpa_supplicant_i.h"
+#ifdef CONFIG_GAS
+#include "gas_query.h"
+#endif /* CONFIG_GAS */
+#ifdef CONFIG_GAS_SERVER
+#include "gas_server.h"
+#endif /* CONFIG_GAS_SERVER */
+#endif /* NRC_WPA_SUPP */
 
 
 #ifdef CONFIG_FILS
@@ -1665,7 +1674,8 @@ static void auth_sae_queue(struct hostapd_data *hapd,
 #if !defined(INCLUDE_WLAN_STABLE_CONN)
 	if (queue_len >= 15)
 #else
-	if (queue_len >= 1)
+	if (queue_len >= 16)
+	//if (queue_len >= 1)
 #endif
 	{
 		wpa_printf(MSG_DEBUG,
@@ -6101,11 +6111,35 @@ static int handle_action(struct hostapd_data *hapd,
 
 			pos = &mgmt->u.action.u.public_action.action;
 			end = ((const u8 *) mgmt) + len;
+#if defined(NRC_WPA_SUPP) && defined(CONFIG_GAS)
+			struct wpa_supplicant *wpa_s = hapd->iface->owner;
+			gas_query_rx(wpa_s->gas, mgmt->da, mgmt->sa, mgmt->bssid,
+				 mgmt->u.action.category,
+				 pos, end - pos, freq);
+#else
 			gas_query_ap_rx(hapd->gas, mgmt->sa,
 					mgmt->u.action.category,
 					pos, end - pos, hapd->iface->freq);
+#endif /* defined(NRC_WPA_SUPP) && defined(CONFIG_GAS) */
 			return 1;
 		}
+#if defined(NRC_WPA_SUPP) && defined(CONFIG_GAS_SERVER)
+		if (len >= IEEE80211_HDRLEN + 2 &&
+		    (mgmt->u.action.u.public_action.action ==
+		     WLAN_PA_GAS_INITIAL_REQ ||
+		     mgmt->u.action.u.public_action.action ==
+		     WLAN_PA_GAS_COMEBACK_REQ)) {
+			const u8 *pos, *end;
+
+			pos = &mgmt->u.action.u.public_action.action;
+			end = ((const u8 *) mgmt) + len;
+			struct wpa_supplicant *wpa_s = hapd->iface->owner;
+			gas_server_rx(wpa_s->gas_server, mgmt->da, mgmt->sa,
+				 mgmt->bssid, mgmt->u.action.category,
+				 pos, end - pos, freq);
+			return 1;
+		}
+#endif /* defined(NRC_WPA_SUPP) && defined(CONFIG_GAS_SERVER) */
 #endif /* CONFIG_DPP */
 		if (hapd->public_action_cb) {
 			hapd->public_action_cb(hapd->public_action_cb_ctx,
@@ -6626,8 +6660,6 @@ static void handle_action_cb(struct hostapd_data *hapd,
 	struct sta_info *sta;
 	const struct rrm_measurement_report_element *report;
 
-	if (is_multicast_ether_addr(mgmt->da))
-		return;
 #ifdef CONFIG_DPP
 	if (len >= IEEE80211_HDRLEN + 6 &&
 	    mgmt->u.action.category == WLAN_ACTION_PUBLIC &&
@@ -6658,6 +6690,8 @@ static void handle_action_cb(struct hostapd_data *hapd,
 		return;
 	}
 #endif /* CONFIG_DPP */
+	if (is_multicast_ether_addr(mgmt->da))
+		return;
 	sta = ap_get_sta(hapd, mgmt->da);
 	if (!sta) {
 		wpa_printf(MSG_DEBUG, "handle_action_cb: STA " MACSTR

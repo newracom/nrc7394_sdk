@@ -56,7 +56,7 @@ static struct client_data *client_list = NULL;
 extern void sys_arch_msleep(u32_t delay_ms);
 extern bool wpa_driver_get_associate_status(uint8_t vif);
 
-static void iperf_tcp_client_report (iperf_opt_t * option )
+static void iperf_tcp_client_report(iperf_opt_t *option)
 {
 	iperf_time_t start_time = 0.0;
 	iperf_time_t end_time = option->client_info.end_time - option->client_info.start_time;
@@ -64,6 +64,16 @@ static void iperf_tcp_client_report (iperf_opt_t * option )
 
 	uint32_t byte = option->client_info.send_byte;
 	uint32_t bps = byte_to_bps(interval, byte);
+
+	float byte_disp = 0.0f, bps_disp = 0.0f;
+	char byte_unit_str[8];
+	char bps_unit_str[8];
+	char format = option->mFormat;
+
+	iperf_format_output(byte, bps, format,
+						&byte_disp, &bps_disp,
+						byte_unit_str, sizeof(byte_unit_str),
+						bps_unit_str, sizeof(bps_unit_str));
 
 	uint8_t snr = 0;
 	int8_t rssi = 0;
@@ -79,18 +89,18 @@ static void iperf_tcp_client_report (iperf_opt_t * option )
 		struct eth_addr *mac_addr;
 		STA_INFO info;
 
-		if (etharp_find_addr(nrc_netif[0], (const ip4_addr_t *) &option->addr, &mac_addr, &ip_addr) >= 0) {
+		if (etharp_find_addr(nrc_netif[0], (const ip4_addr_t *)&option->addr, &mac_addr, &ip_addr) >= 0) {
 			if (nrc_wifi_softap_get_sta_by_addr(0, mac_addr->addr, &info) == WIFI_SUCCESS) {
 				snr = info.snr;
 				rssi = info.rssi;
 			}
-		} else if (etharp_find_addr(nrc_netif[1], (const ip4_addr_t *) &option->addr, &mac_addr, &ip_addr) >= 0) {
+		} else if (etharp_find_addr(nrc_netif[1], (const ip4_addr_t *)&option->addr, &mac_addr, &ip_addr) >= 0) {
 			if (nrc_wifi_softap_get_sta_by_addr(1, mac_addr->addr, &info) == WIFI_SUCCESS) {
 				snr = info.snr;
 				rssi = info.rssi;
 			}
 #if LWIP_BRIDGE
-		} else if (etharp_find_addr(&br_netif, (const ip4_addr_t *) &option->addr, &mac_addr, &ip_addr) >= 0) {
+		} else if (etharp_find_addr(&br_netif, (const ip4_addr_t *)&option->addr, &mac_addr, &ip_addr) >= 0) {
 			if (nrc_wifi_softap_get_sta_by_addr(0, mac_addr->addr, &info) == WIFI_SUCCESS) {
 				snr = info.snr;
 				rssi = info.rssi;
@@ -108,11 +118,10 @@ static void iperf_tcp_client_report (iperf_opt_t * option )
 	}
 
 	nrc_iperf_spin_lock();
-	CPA("[iperf TCP Client Report for server %s, snr:%u, rssi:%d]\n", ipaddr_ntoa(&option->addr), snr, rssi);
+	CPA("\n[iperf TCP Client Report for server %s, snr:%u, rssi:%d]\n", ipaddr_ntoa(&option->addr), snr, rssi);
 	CPA("     Interval        Transfer      Bandwidth\n");
-	CPA("  %4.1f - %4.1f sec  %7sBytes  %7sbits/sec\n",
-					start_time, end_time,
-					byte_to_string(byte), bps_to_string(bps));
+	CPA("  %4.1f - %4.1f sec  %7.2f %6s  %7.2f %6s\n",
+	     start_time, end_time, byte_disp, byte_unit_str, bps_disp, bps_unit_str);
 	nrc_iperf_spin_unlock();
 }
 
@@ -154,7 +163,7 @@ void iperf_tcp_client(void *pvParameters)
 	uint8_t vif = 0;
 	iperf_time_t start_time, now, duration;
 	struct timeval tv;
-	struct sockaddr_storage to;
+	struct sockaddr_storage to, bind;
 	int count = 0;
 	int err_retry = 0;
 	char buffer[IPERF_DEFAULT_DATA_BUF_LEN];
@@ -182,6 +191,7 @@ void iperf_tcp_client(void *pvParameters)
 #if LWIP_IPV4
 	if(IP_IS_V4(&option->addr)) {
 		struct sockaddr_in *to4 = (struct sockaddr_in*)&to;
+		struct sockaddr_in *bind4 = (struct sockaddr_in*)&bind;
 
 		sock = socket(AF_INET, SOCK_STREAM, 0);
 		if (sock < 0) {
@@ -189,7 +199,23 @@ void iperf_tcp_client(void *pvParameters)
 			goto exit;
 		}
 
-		to4->sin_len	= sizeof(to4);
+		bind4->sin_len = sizeof(struct sockaddr_in);
+		bind4->sin_family = AF_INET;
+		bind4->sin_port = htons(0);
+
+		if (!ip_addr_isany(&option->bindAddr)) {
+			inet_addr_from_ip4addr(&bind4->sin_addr, ip_2_ip4(&option->bindAddr));
+		} else {
+			bind4->sin_addr.s_addr = htonl(INADDR_ANY);
+		}
+
+		if (bind(sock, (struct sockaddr*)&bind, sizeof(struct sockaddr_in)) < 0) {
+			int err = errno;
+			CPA("[%s] bind(%d) returned error: %d.\n", __func__, sock, -err);
+			goto exit;
+		}
+
+		to4->sin_len = sizeof(struct sockaddr_in);
 		to4->sin_family = AF_INET;
 		to4->sin_port = htons(option->mPort);
 		inet_addr_from_ip4addr(&to4->sin_addr, ip_2_ip4(&option->addr));
@@ -197,8 +223,7 @@ void iperf_tcp_client(void *pvParameters)
 #endif /* LWIP_IPV4 */
 
 	nrc_iperf_spin_lock();
-	CPA("Client connecting to %s, TCP port %d\n",
-		ipaddr_ntoa(&option->addr), option->mPort);
+	CPA("Client connecting to %s, TCP port %d\n", ipaddr_ntoa(&option->addr), option->mPort);
 	if(option->mSendInterval > 0)
 		CPA("send interval %d ms\n", option->mSendInterval);
 	nrc_iperf_spin_unlock();
@@ -256,7 +281,7 @@ void iperf_tcp_client(void *pvParameters)
 	option->mSock = sock;
 	option->mBufLen = IPERF_DEFAULT_DATA_BUF_LEN;
 	option->client_info.start_time = start_time;
-	option->client_info.duration= duration;
+	option->client_info.duration = duration;
 
 	vif = wifi_get_vif_id(&option->addr);
 
@@ -268,7 +293,7 @@ void iperf_tcp_client(void *pvParameters)
 	while (1) {
 		iperf_get_time(&now);
 
-		if(wpa_driver_get_associate_status(vif)== false) {
+		if(wpa_driver_get_associate_status(vif) == false) {
 			CPA("Wi-Fi connection lost\n");
 			option->client_info.end_time = now;
 			break;
@@ -316,7 +341,7 @@ void iperf_tcp_client(void *pvParameters)
 exit:
 	nrc_iperf_task_list_del(option);
 
-	if(sock!=-1) {
+	if(sock != -1) {
 		shutdown(sock, SHUT_RDWR);
 		closesocket(sock);
 	}
@@ -337,15 +362,26 @@ task_exit:
 	vTaskDelete(NULL);
 }
 
-static void iperf_tcp_server_report (struct client_data *client)
+static void iperf_tcp_server_report(struct client_data *client)
 {
 	iperf_time_t start_time = 0;
 	iperf_time_t stop_time = client->option->server_info.stop_time - client->option->server_info.start_time;
 	iperf_time_t interval = stop_time;
-	uint64_t byte = client->option->server_info.recv_byte;
-	uint32_t bps = (interval)? (byte*8)/interval:0;
 
-	char peer_addr[INET_ADDRSTRLEN];
+	uint64_t byte = client->option->server_info.recv_byte;
+	uint32_t bps = byte_to_bps(interval, byte);
+
+	float byte_disp = 0.0f, bps_disp = 0.0f;
+	char byte_unit_str[8];
+	char bps_unit_str[8];
+	char format = client->option->mFormat;
+
+	iperf_format_output(byte, bps, format,
+						&byte_disp, &bps_disp,
+						byte_unit_str, sizeof(byte_unit_str),
+						bps_unit_str, sizeof(bps_unit_str));
+
+	char peer_addr[INET_ADDRSTRLEN] = {0};
 	uint8_t snr = 0;
 	int8_t rssi = 0;
 	tWIFI_DEVICE_MODE mode;
@@ -361,7 +397,7 @@ static void iperf_tcp_server_report (struct client_data *client)
 		struct eth_addr *mac_addr;
 		STA_INFO info;
 
-		struct sockaddr_in *addr4 = (struct sockaddr_in *) &client->option->server_info.clientaddr;
+		struct sockaddr_in *addr4 = (struct sockaddr_in *)&client->option->server_info.clientaddr;
 		client_ip.addr = addr4->sin_addr.s_addr;
 		if (etharp_find_addr(nrc_netif[0], &client_ip, &mac_addr, &ip_addr) >= 0) {
 			if (nrc_wifi_softap_get_sta_by_addr(0, mac_addr->addr, &info) == WIFI_SUCCESS) {
@@ -392,15 +428,14 @@ static void iperf_tcp_server_report (struct client_data *client)
 	}
 
 	nrc_iperf_spin_lock();
-	/* mode is 1 if softAP, 0 if station */
-	/* For SoftAP, rssi is meaningless */
 	CPA("\n[iperf TCP Server Report for client %s, snr:%u, rssi:%d]\n",
-	  inet_ntop(AF_INET, client->option->server_info.clientaddr.s2_data2, peer_addr, INET_ADDRSTRLEN),
-	  snr, rssi);
-	CPA("[%3d]  %4.1f - %4.1f sec  %7sBytes  %7sbits/sec\n",
-					client->option->server_info.client_sock,
-					start_time, stop_time,
-					byte_to_string(byte), bps_to_string(bps));
+			inet_ntop(AF_INET, client->option->server_info.clientaddr.s2_data2, peer_addr, INET_ADDRSTRLEN),
+			snr, rssi);
+	CPA("[%3d]  %4.1f - %4.1f sec  %7.2f %6s  %7.2f %6s\n",
+			client->option->server_info.client_sock,
+			start_time, stop_time,
+			byte_disp, byte_unit_str,
+			bps_disp, bps_unit_str);
 	nrc_iperf_spin_unlock();
 }
 
@@ -622,7 +657,7 @@ ATTR_NC __attribute__((optimize("O3"))) static void tcp_server_loop(iperf_opt_t 
 	nrc_iperf_spin_unlock();
 }
 
-static int tcp_init_server(unsigned short port)
+static int tcp_init_server(unsigned short port, ip_addr_t *bind_addr)
 {
 	int sock;
 	int reuse = 1;
@@ -635,7 +670,12 @@ static int tcp_init_server(unsigned short port)
 	memset(&server_addr, 0, sizeof(struct sockaddr_in));
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_port = htons(port);
-	server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+	if (bind_addr && !ip_addr_isany(bind_addr)) {
+		inet_addr_from_ip4addr(&server_addr.sin_addr, ip_2_ip4(bind_addr));
+	} else {
+		server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	}
 
 	if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(int)) < 0) {
 		close(sock);
@@ -657,9 +697,7 @@ static int tcp_init_server(unsigned short port)
 
 void tcp_start_server(iperf_opt_t *option)
 {
-	int server_socket = 0;
-
-	if ((option->mSock = tcp_init_server(option->mPort)) < 0) {
+	if ((option->mSock = tcp_init_server(option->mPort, &option->bindAddr)) < 0) {
 		return;
 	}
 	tcp_server_loop(option);

@@ -31,7 +31,8 @@
 
 enum IF_MODE
 {
-	IF_MODE_APSTA = 0,
+	IF_MODE_AP = 0,
+	IF_MODE_STA,
 	IF_MODE_RELAY
 };
 
@@ -99,6 +100,8 @@ typedef struct
 	uint8_t rx;
 } wifi_mcs_t;
 
+typedef OPT_CH_RESULTS cca_scan_results_t[WIFI_CHANNEL_NUM_MAX];
+
 typedef struct
 {
 #define STR_WIFI_BSSID_LEN				17
@@ -135,6 +138,7 @@ extern const wifi_country_t *g_wifi_country_list;
 
 extern int wifi_api_register_event_callback (wifi_event_cb_t event_cb[]);
 
+extern void wifi_api_init_if_mode (void);
 extern int wifi_api_get_if_mode (void);
 extern int wifi_api_set_if_mode (int mode);
 
@@ -175,6 +179,8 @@ extern int wifi_api_set_duty_cycle (uint32_t window, uint32_t duration, uint32_t
 extern int wifi_api_get_cca_threshold (int *threshold);
 extern int wifi_api_set_cca_threshold (int threshold);
 
+extern int wifi_api_scan_cca (int pref_bw, int dwell_time, cca_scan_results_t results);
+
 extern int wifi_api_get_tx_time (uint16_t *cs_time, uint32_t *pause_time);
 extern int wifi_api_set_tx_time (uint16_t cs_time, uint32_t pause_time);
 
@@ -199,6 +205,9 @@ extern int wifi_api_get_beacon_interval (uint16_t *beacon_interval);
 extern int wifi_api_get_listen_interval (uint16_t *listen_interval, uint32_t *listen_interval_tu);
 extern int wifi_api_set_listen_interval (uint16_t listen_interval);
 
+extern int wifi_api_get_ndp_preq (bool *ndp_preq);
+extern int wifi_api_set_ndp_preq (bool ndp_preq);
+
 extern int wifi_api_set_ssid (char *ssid);
 extern int wifi_api_set_bssid (char *bssid);
 extern int wifi_api_set_security (char *security, char *password, int sae_pwe);
@@ -212,6 +221,8 @@ extern int wifi_api_connect (uint32_t timeout);
 extern int wifi_api_disconnect (uint32_t timeout);
 
 extern int wifi_api_get_ap_info (wifi_ap_info_t *info);
+
+extern int wifi_api_set_hostname (char *hostname);
 
 extern int wifi_api_get_ip4_address (char *address, char *netmask, char *gateway);
 extern int wifi_api_set_ip4_address (char *address, char *netmask, char *gateway);

@@ -86,6 +86,17 @@ tWIFI_STATUS wifi_init_with_vif(int vif, WIFI_CONFIG *param);
  *
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  **********************************************************************/
+tWIFI_STATUS wifi_deinit_with_vif(int vif);
+
+/*********************************************************************
+ * @fn wifi_deinit
+ *
+ * @brief deinitialize the wifi configurations for vif 0
+ *
+ * @param NONE
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ **********************************************************************/
 tWIFI_STATUS wifi_deinit(void);
 
 /*********************************************************************

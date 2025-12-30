@@ -327,6 +327,9 @@ static nrc_err_t eth_linkdown_handler(esp_eth_handle_t eth_handle)
 
 #if LWIP_BRIDGE
 	if (network_mode == NRC_NETWORK_MODE_BRIDGE) {
+		/* if ethernet link goes down, flush the FDB. */
+		bridgeif_flush_port(&br_netif, &eth_netif);
+
 		if (eth_mode == NRC_ETH_MODE_STA) {
 			memset(peer_mac.addr, 0, ETH_HWADDR_LEN);
 		}

@@ -235,8 +235,17 @@ endif
 
 ifdef CONFIG_DPP
 CFLAGS += -DCONFIG_DPP
-OBJS += ../src/common/dpp.o
-OBJS += dpp_supplicant.o
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/common/dpp.c
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/common/dpp_auth.c
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/common/dpp_backup.c
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/common/dpp_crypto.c
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/common/dpp_pkex.c
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/common/dpp_reconfig.c
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/common/dpp_tcp.c
+WPA_SUPP_CSRCS += dpp_supplicant.c
+ifndef CONFIG_AP
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/utils/ip_addr.c
+endif
 NEED_AES_SIV=y
 NEED_HMAC_SHA256_KDF=y
 NEED_HMAC_SHA384_KDF=y
@@ -244,11 +253,16 @@ NEED_HMAC_SHA512_KDF=y
 NEED_SHA256=y
 NEED_SHA384=y
 NEED_SHA512=y
+NEED_ECC=y
 NEED_JSON=y
 NEED_GAS_SERVER=y
 NEED_BASE64=y
+NEED_ASN1=y
 ifdef CONFIG_DPP2
 CFLAGS += -DCONFIG_DPP2
+endif
+ifdef CONFIG_DPP3
+CFLAGS += -DCONFIG_DPP3
 endif
 endif
 
@@ -949,10 +963,14 @@ WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/ap/wps_hostapd.c
 WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/eap_server/eap_server_wsc.c
 endif
 ifdef CONFIG_DPP
-OBJS += ../src/ap/dpp_hostapd.o
-OBJS += ../src/ap/gas_query_ap.o
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/ap/dpp_hostapd.c
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/ap/gas_query_ap.c
+NEED_AP_GAS_SERV=y
 endif
 ifdef CONFIG_INTERWORKING
+NEED_AP_GAS_SERV=y
+endif
+ifdef NEED_AP_GAS_SERV
 WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/ap/gas_serv.c
 endif
 ifdef CONFIG_HS20
@@ -1317,6 +1335,10 @@ ifdef NEED_AES_EAX
 AESWPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/crypto/aes-eax.c
 NEED_AES_CTR=y
 endif
+ifdef NEED_AES_SIV
+AESWPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/crypto/aes-siv.c
+NEED_AES_CTR=y
+endif
 ifdef NEED_AES_CTR
 AESWPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/crypto/aes-ctr.c
 endif
@@ -1330,9 +1352,6 @@ CFLAGS += -DCONFIG_OPENSSL_CMAC
 else
 AESWPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/crypto/aes-omac1.c
 endif
-endif
-ifdef NEED_AES_SIV
-AESWPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/crypto/aes-siv.c
 endif
 ifdef NEED_AES_WRAP
 NEED_AES_ENC=y
@@ -1466,6 +1485,14 @@ ifdef NEED_SHA384
 CFLAGS += -DCONFIG_SHA384
 WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/crypto/sha384-prf.c
 endif
+ifdef NEED_SHA512
+CFLAGS += -DCONFIG_SHA512
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/crypto/sha512-prf.c
+endif
+
+ifdef NEED_ASN1
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/tls/asn1.c
+endif
 
 ifdef NEED_DH_GROUPS
 WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/crypto/dh_groups.c
@@ -1478,8 +1505,6 @@ ifdef NEED_DH_GROUPS
 WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/crypto/dh_group5.c
 endif
 endif
-
-WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/crypto/sha512-prf.c
 
 ifdef NEED_ECC
 CFLAGS += -DCONFIG_ECC
@@ -1712,6 +1737,12 @@ WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/utils/ext_password.c
 CFLAGS += -DCONFIG_EXT_PASSWORD
 endif
 
+ifdef NEED_GAS_SERVER
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/common/gas_server.c
+CFLAGS += -DCONFIG_GAS_SERVER
+NEED_GAS=y
+endif
+
 ifdef NEED_GAS
 WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/common/gas.c
 WPA_SUPP_CSRCS += gas_query.c
@@ -1722,6 +1753,11 @@ endif
 ifdef NEED_OFFCHANNEL
 WPA_SUPP_CSRCS += offchannel.c
 CFLAGS += -DCONFIG_OFFCHANNEL
+endif
+
+ifdef NEED_JSON
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/utils/json.c
+CFLAGS += -DCONFIG_JSON
 endif
 
 ifdef CONFIG_MODULE_TESTS

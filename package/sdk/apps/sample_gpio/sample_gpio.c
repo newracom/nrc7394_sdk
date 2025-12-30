@@ -46,8 +46,8 @@
 #define GPIO_INT0_PIN	GPIO_10
 #define GPIO_INT1_PIN	GPIO_11
 #else
-/* Use GPIO 24 to control Green LED, and GPIO 28 to Red LED */
-#define GPIO_INT0_PIN	GPIO_24
+/* Use GPIO 25 to control Green LED, and GPIO 28 to Red LED */
+#define GPIO_INT0_PIN	GPIO_25
 #define GPIO_INT1_PIN	GPIO_28
 #endif
 

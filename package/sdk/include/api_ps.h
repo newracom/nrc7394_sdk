@@ -329,6 +329,36 @@ nrc_err_t nrc_ps_load_user_data(void* data, uint16_t size);
  ***********************************************/
 uint16_t nrc_ps_get_available_user_data_size(void);
 
+/**********************************************
+ * @fn bool nrc_wifi_ps_send_null_data(bool pm, int mcs)
+ *
+ * @brief Send a null data frame with the specified power management (PM) bit and MCS value.
+ *
+ * This API allows manual transmission of a null data frame with a chosen PM bit (0 or 1)
+ * and MCS index.
+ *
+ * @param pm Power management bit to include in the null data frame (true: PM=1, false: PM=0).
+ * @param mcs MCS value to use for transmission.
+ *
+ * @return If successful, returns NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
+ ***********************************************/
+nrc_err_t nrc_wifi_ps_send_null_data(bool pm, int mcs);
+
+
+/**********************************************
+ * @fn bool nrc_wifi_ps_disable_null_data_pm0(bool disable)
+ *
+ * @brief Enable or disable sending a null data frame with PM=0 when STA wakes from deep sleep.
+ *
+ * By default, the STA sends a null data frame with PM=0 upon waking to notify the AP.
+ * This behavior can be disabled using this API.
+ *
+ * @param disable Set to true to disable sending null data with PM=0 on wake-up.
+ *
+ * @return If successful, returns NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
+ ***********************************************/
+nrc_err_t nrc_wifi_ps_disable_null_data_pm0(bool disable);
+
 
 #ifdef __cplusplus
 }

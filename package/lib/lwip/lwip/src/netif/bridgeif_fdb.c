@@ -213,4 +213,65 @@ bridgeif_fdb_init(u16_t max_fdb_entries)
 
   return fdb;
 }
+
+/**
+ * @ingroup bridgeif_fdb
+ * Flush all dynamic entries that use a given port index
+ */
+void
+bridgeif_fdb_flush_port(void *fdb_ptr, u8_t port_idx)
+{
+	int i;
+	bridgeif_dfdb_t *fdb = (bridgeif_dfdb_t *)fdb_ptr;
+	BRIDGEIF_DECL_PROTECT(lev);
+
+	if (!fdb) {
+		return;
+	}
+
+	BRIDGEIF_READ_PROTECT(lev);
+	for (i = 0; i < fdb->max_fdb_entries; i++) {
+		bridgeif_dfdb_entry_t *e = &fdb->fdb[i];
+
+		if (e->used && e->ts && e->port == port_idx) {
+			BRIDGEIF_WRITE_PROTECT(lev);
+			/* check again while protected */
+			if (e->used && e->ts && e->port == port_idx) {
+				e->used = 0;
+				e->ts   = 0;
+			}
+			BRIDGEIF_WRITE_UNPROTECT(lev);
+		}
+	}
+	BRIDGEIF_READ_UNPROTECT(lev);
+}
+
+/**
+ * @ingroup bridgeif_fdb
+ * flush all dynamic FDB entries
+ */
+void
+bridgeif_fdb_flush_all(void *fdb_ptr)
+{
+	int i;
+	bridgeif_dfdb_t *fdb = (bridgeif_dfdb_t *)fdb_ptr;
+	BRIDGEIF_DECL_PROTECT(lev);
+
+	if (!fdb) {
+		return;
+	}
+
+	BRIDGEIF_READ_PROTECT(lev);
+	for (i = 0; i < fdb->max_fdb_entries; i++) {
+		bridgeif_dfdb_entry_t *e = &fdb->fdb[i];
+		if (e->used || e->ts) {
+			BRIDGEIF_WRITE_PROTECT(lev);
+			e->used = 0;
+			e->ts   = 0;
+			BRIDGEIF_WRITE_UNPROTECT(lev);
+		}
+	}
+	BRIDGEIF_READ_UNPROTECT(lev);
+} 
+
 #endif /* LWIP_BRIDGE */

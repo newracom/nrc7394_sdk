@@ -22,6 +22,185 @@
 #include "nrc_sdk.h"
 #include "util_trace.h"
 
+#if defined(INCLUDE_MQTT_RECOVERY)
+#if !defined(MAX_MQTT_RETENT_TOPICS)
+#define MAX_MQTT_RETENT_TOPICS 5
+#endif
+struct mqtt_ret_info {
+	uint8_t ping_outstanding:1;
+	uint8_t isconnected:1;
+	uint8_t cleansession:1;
+	uint8_t reserved:5;
+	uint16_t next_packetid;
+	uint32_t command_timeout_ms;
+	uint32_t keepAliveInterval;
+	struct rMessageHandlers
+	{
+		char topicFilter[32];                      // MQTT support 65535 but it's too large for retention
+		void *fp;
+	} messageHandlers[MAX_MQTT_RETENT_TOPICS];  // MQTT support 15 but it's too large for retention
+} __attribute__ ((packed));
+ATTR_RETENTION_INFO struct mqtt_ret_info mqtt_ret_info;
+#endif
+
+static int MQTTUpdateSubscription(MQTTClient* c, const char* topicFilter, messageHandler messageHandler)
+{
+    int rc = FAILURE;
+
+#if defined(INCLUDE_MQTT_RECOVERY)
+    int i = 0;
+
+    if (messageHandler == NULL) {
+        for (i = 0; i < MAX_MQTT_RETENT_TOPICS; ++i) {
+            if (topicFilter == NULL ||
+                strncmp(mqtt_ret_info.messageHandlers[i].topicFilter, topicFilter,
+                sizeof(mqtt_ret_info.messageHandlers[i].topicFilter)) == 0) {
+                mqtt_ret_info.messageHandlers[i].topicFilter[0] = '\0';
+                mqtt_ret_info.messageHandlers[i].fp = NULL;
+                if (topicFilter != NULL) {
+                    nrc_usr_print("MQTT SUBS[%s] cleared\n", topicFilter);
+                }
+            }
+        }
+        rc = SUCCESS;
+    } else {
+        for (i = 0; i < MAX_MQTT_RETENT_TOPICS; ++i) {
+            if (strncmp(mqtt_ret_info.messageHandlers[i].topicFilter, topicFilter,
+                sizeof(mqtt_ret_info.messageHandlers[i].topicFilter)) == 0 &&
+                mqtt_ret_info.messageHandlers[i].fp == messageHandler) {
+                return SUCCESS;
+            }
+        }
+
+        for (i = 0; i < MAX_MQTT_RETENT_TOPICS; ++i) {
+            if (mqtt_ret_info.messageHandlers[i].fp == NULL) {
+                strncpy(mqtt_ret_info.messageHandlers[i].topicFilter, topicFilter,
+                    sizeof(mqtt_ret_info.messageHandlers[i].topicFilter));
+                mqtt_ret_info.messageHandlers[i].fp = (void *) messageHandler;
+                nrc_usr_print("MQTT SUBS[%s] retented\n", topicFilter);
+                rc = SUCCESS;
+                break;
+            }
+        }
+        if (i == MAX_MQTT_RETENT_TOPICS) {
+            nrc_usr_print("Failed to retent MQTT SUBS[%s]. Retention Full\n", topicFilter);
+        }
+    }
+#endif /* INCLUDE_MQTT_RECOVERY */
+
+    return rc;
+}
+
+static int MQTTIsSubscribed(MQTTClient* c, const char* topicFilter, messageHandler messageHandler)
+{
+    for (int i = 0; i < MAX_MESSAGE_HANDLERS; ++i)
+    {
+        if (strcmp(c->messageHandlers[i].topicFilter, topicFilter) == 0 &&
+            c->messageHandlers[i].fp == messageHandler) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+static int MQTTRecoverSubscription(MQTTClient* c)
+{
+    int rc = FAILURE;
+
+#if defined(INCLUDE_MQTT_RECOVERY)
+    if (!mqtt_ret_info.isconnected || !c->ipstack->recovered) {
+        return rc;
+    }
+
+    for (int i = 0; i < MAX_MQTT_RETENT_TOPICS; ++i) {
+        if (mqtt_ret_info.messageHandlers[i].fp) {
+            if (!MQTTIsSubscribed(c, mqtt_ret_info.messageHandlers[i].topicFilter,
+                mqtt_ret_info.messageHandlers[i].fp)) {
+                rc = MQTTSetMessageHandler(c, mqtt_ret_info.messageHandlers[i].topicFilter,
+                    mqtt_ret_info.messageHandlers[i].fp);
+                if (rc == SUCCESS) {
+                    nrc_usr_print("MQTT SUBS[%s] recovered\n",
+                        mqtt_ret_info.messageHandlers[i].topicFilter);
+                }
+            } else {
+                rc = SUCCESS;
+            }
+        }
+    }
+#endif /* INCLUDE_MQTT_RECOVERY */
+
+    return rc;
+}
+
+static int MQTTUpdateConnection(MQTTClient* c)
+{
+    int rc = FAILURE;
+
+#if defined(INCLUDE_MQTT_RECOVERY)
+    if (MQTTIsConnected(c)) {
+        if (!mqtt_ret_info.isconnected) {
+            nrc_usr_print("MQTT connection retented\n");
+        }
+        mqtt_ret_info.ping_outstanding = c->ping_outstanding;
+        mqtt_ret_info.isconnected = c->isconnected;
+        mqtt_ret_info.cleansession = c->cleansession;
+        mqtt_ret_info.keepAliveInterval = c->keepAliveInterval;
+        mqtt_ret_info.next_packetid = c->next_packetid;
+        mqtt_ret_info.command_timeout_ms = c->command_timeout_ms;
+		nrc_usr_print("%d %d %d %d %d %d \n",
+			c->ping_outstanding, c->isconnected, c->cleansession,
+			c->keepAliveInterval, c->next_packetid, c->command_timeout_ms);
+    } else {
+        if (mqtt_ret_info.isconnected) {
+            nrc_usr_print("MQTT connection cleared\n");
+        }
+        mqtt_ret_info.ping_outstanding = 0;
+        mqtt_ret_info.isconnected = 0;
+        mqtt_ret_info.cleansession = 0;
+        mqtt_ret_info.keepAliveInterval = 0;
+        mqtt_ret_info.next_packetid = 1;
+        mqtt_ret_info.command_timeout_ms = 0;
+		nrc_usr_print("%d %d %d %d %d %d \n",
+			c->ping_outstanding, c->isconnected, c->cleansession,
+			c->keepAliveInterval, c->next_packetid, c->command_timeout_ms);
+    }
+    rc = SUCCESS;
+#endif /* INCLUDE_MQTT_RECOVERY */
+
+    return rc;
+}
+
+static int MQTTRecoverConnection(MQTTClient* c)
+{
+    int rc = FAILURE;
+
+#if defined(INCLUDE_MQTT_RECOVERY)
+    if (!c->ipstack->recovered) {
+        mqtt_ret_info.isconnected = 0;
+        MQTTUpdateSubscription(c, NULL, NULL);
+    }
+
+    if (mqtt_ret_info.isconnected) {
+        c->ping_outstanding = mqtt_ret_info.ping_outstanding;
+        c->isconnected = mqtt_ret_info.isconnected;
+        c->cleansession = mqtt_ret_info.cleansession;
+        c->keepAliveInterval = mqtt_ret_info.keepAliveInterval;
+        c->next_packetid = mqtt_ret_info.next_packetid;
+        c->command_timeout_ms = mqtt_ret_info.command_timeout_ms;
+        TimerCountdown(&c->last_sent, c->keepAliveInterval);
+        TimerCountdown(&c->last_received, c->keepAliveInterval);
+        rc = SUCCESS;
+        nrc_usr_print("\nMQTT connection recovered\n");
+		nrc_usr_print("%d %d %d %d %d %d \n",
+			c->ping_outstanding, c->isconnected, c->cleansession,
+			c->keepAliveInterval, c->next_packetid,	c->command_timeout_ms);
+    }
+#endif /* INCLUDE_MQTT_RECOVERY */
+
+    return rc;
+}
+
 static void NewMessageData(MessageData* md, MQTTString* aTopicName, MQTTMessage* aMessage) {
     md->topicName = aTopicName;
     md->message = aMessage;
@@ -29,7 +208,9 @@ static void NewMessageData(MessageData* md, MQTTString* aTopicName, MQTTMessage*
 
 
 static int getNextPacketId(MQTTClient *c) {
-    return c->next_packetid = (c->next_packetid == MAX_PACKET_ID) ? 1 : c->next_packetid + 1;
+    c->next_packetid = (c->next_packetid == MAX_PACKET_ID) ? 1 : c->next_packetid + 1;
+    MQTTUpdateConnection(c);
+    return c->next_packetid;
 }
 
 static int sendPacket(MQTTClient* c, int length, Timer* timer)
@@ -234,8 +415,10 @@ int keepalive(MQTTClient* c)
             TimerInit(&timer);
             TimerCountdownMS(&timer, 1000);
             int len = MQTTSerialize_pingreq(c->buf, c->buf_size);
-            if (len > 0 && (rc = sendPacket(c, len, &timer)) == SUCCESS) // send the ping packet
+            if (len > 0 && (rc = sendPacket(c, len, &timer)) == SUCCESS) { // send the ping packet
                 c->ping_outstanding = 1;
+                MQTTUpdateConnection(c);
+            }
         }
     }
 
@@ -250,6 +433,7 @@ void MQTTCleanSession(MQTTClient* c)
 
     for (i = 0; i < MAX_MESSAGE_HANDLERS; ++i)
         c->messageHandlers[i].topicFilter = NULL;
+    MQTTUpdateSubscription(c, NULL, NULL);
 }
 
 
@@ -257,6 +441,7 @@ void MQTTCloseSession(MQTTClient* c)
 {
     c->ping_outstanding = 0;
     c->isconnected = 0;
+    MQTTUpdateConnection(c);
     if (c->cleansession)
         MQTTCleanSession(c);
 }
@@ -330,6 +515,7 @@ int cycle(MQTTClient* c, Timer* timer)
             break;
         case PINGRESP:
             c->ping_outstanding = 0;
+            MQTTUpdateConnection(c);
             break;
     }
 
@@ -373,13 +559,13 @@ int MQTTIsConnected(MQTTClient* client)
     return client->isconnected;
 }
 
-#if defined(INCLUDE_MQTT_FAST_CONN)
+#if defined(INCLUDE_MQTT_FAST_CONN) || defined(INCLUDE_MQTT_RECOVERY)
 extern bool isMQTTRun_flag;
 #endif /* defined(INCLUDE_MQTT_FAST_CONN) */
 
 void MQTTRun(void* parm)
 {
-#if defined(INCLUDE_MQTT_FAST_CONN)
+#if defined(INCLUDE_MQTT_FAST_CONN) || defined(INCLUDE_MQTT_RECOVERY)
 	isMQTTRun_flag = true;
 #endif /* defined(INCLUDE_MQTT_FAST_CONN) */
 	Timer timer;
@@ -408,6 +594,11 @@ void MQTTRun(void* parm)
 #if defined(MQTT_TASK)
 int MQTTStartTask(MQTTClient* client)
 {
+	if (MQTTRecoverConnection(client) == SUCCESS) {
+		MQTTRecoverSubscription(client);
+	} else
+		nrc_usr_print("[%s] MQTTRecoverConnection fail\n", __func__);
+
 	return ThreadStart(&client->thread, &MQTTRun, client);
 }
 #endif
@@ -440,8 +631,10 @@ int MQTTConnectWithResults(MQTTClient* c, MQTTPacket_connectData* options, MQTTC
     MutexLock(&c->mutex);
 #endif
 
-	if (c->isconnected) /* don't send connect packet again if we are already connected */
-        goto exit;    
+    if (c->isconnected) {/* don't send connect packet again if we are already connected */
+        rc = SUCCESS;
+        goto exit;
+    }
 
     TimerInit(&connect_timer);    
 #if !defined(INCLUDE_MQTT_FAST_CONN)
@@ -502,7 +695,12 @@ exit:
 int MQTTConnect(MQTTClient* c, MQTTPacket_connectData* options)
 {
     MQTTConnackData data;
-    return MQTTConnectWithResults(c, options, &data);
+    int rc = FAILURE;
+
+    rc = MQTTConnectWithResults(c, options, &data);
+    MQTTUpdateConnection(c);
+
+    return rc;
 }
 
 
@@ -565,6 +763,11 @@ int MQTTSubscribeWithResults(MQTTClient* c, const char* topicFilter, int qos,
 	if (!c->isconnected)
 	    goto exit;
 
+    if (MQTTIsSubscribed(c, topicFilter, messageHandler)) {
+        rc = SUCCESS;
+        goto exit;
+    }
+
     TimerInit(&timer);
 #if !defined(INCLUDE_MQTT_FAST_CONN)
     TimerCountdownMS(&timer, c->command_timeout_ms);
@@ -620,7 +823,14 @@ int MQTTSubscribe(MQTTClient* c, const char* topicFilter, enum QoS qos,
        messageHandler messageHandler)
 {
     MQTTSubackData data;
-    return MQTTSubscribeWithResults(c, topicFilter, qos, messageHandler, &data);
+    int rc = FAILURE;
+
+    rc = MQTTSubscribeWithResults(c, topicFilter, qos, messageHandler, &data);
+    if (rc == SUCCESS) {
+        MQTTUpdateSubscription(c, topicFilter, messageHandler);
+    }
+
+    return rc;
 }
 
 
@@ -654,6 +864,7 @@ int MQTTUnsubscribe(MQTTClient* c, const char* topicFilter)
         {
             /* remove the subscription message handler associated with this topic, if there is one */
             MQTTSetMessageHandler(c, topicFilter, NULL);
+            MQTTUpdateSubscription(c, topicFilter, NULL);
         }
     }
     else

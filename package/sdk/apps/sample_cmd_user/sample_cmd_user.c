@@ -47,9 +47,15 @@ static struct
 const char *str_country[WIFI_CC_MAX] =
 {
 	[WIFI_CC_US] = "US", [WIFI_CC_JP] = "JP", [WIFI_CC_K1] = "K1",
-	[WIFI_CC_T8] = "T8", [WIFI_CC_EU] = "EU", [WIFI_CC_CN] = "CN",
-	[WIFI_CC_NZ] = "NZ", [WIFI_CC_AU] = "AU", [WIFI_CC_K2] = "K2",
-	[WIFI_CC_S8] = "S8", [WIFI_CC_S9] = "S9", [WIFI_CC_T9] = "T9",
+	[WIFI_CC_T8] = "T8", // Deprecated. Don't use this.
+	[WIFI_CC_EU] = "EU",
+	[WIFI_CC_CN] = "CN", // Deprecated. Don't use this.
+	[WIFI_CC_NZ] = "NZ",
+	[WIFI_CC_AU] = "AU", [WIFI_CC_K2] = "K2",
+	[WIFI_CC_S8] = "S8", // Deprecated. Don't use this.
+	[WIFI_CC_S9] = "S9", // Deprecated. Don't use this.
+	[WIFI_CC_T9] = "T9", // Deprecated. Don't use this.
+	[WIFI_CC_TW] = "TW", [WIFI_CC_SG] = "SG",
 };
 
 const char *str_security[WIFI_SEC_MAX] =

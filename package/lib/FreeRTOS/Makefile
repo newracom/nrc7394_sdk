@@ -17,5 +17,6 @@ CSRCS += timers.c
 CSRCS += event_groups.c
 CSRCS += port.c
 CSRCS += heap_4.c
+CSRCS += stream_buffer.c
 
 include $(TOPDIR)/make/build-lib.mk

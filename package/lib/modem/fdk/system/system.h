@@ -24,8 +24,8 @@ extern "C"{
 #include "system_eeprom.h"
 
 #if defined(EXCLUDE_FDK_MAC)
-#if defined(UCODE)
-#define system_printf	hal_uart_printf
+#if defined(UCODE) && defined(INCLUDE_UCODE_DEBUG)
+#define system_printf	ucode_printf
 #else
 #define system_printf	hal_uart_printf
 #endif

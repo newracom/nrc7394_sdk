@@ -325,6 +325,24 @@ uint8_t nrc_get_xtal_status(void);
  * @return None
  ***********************************************/
 void nrc_set_jtag(bool enable);
+
+#ifdef NRC7394
+/**********************************************
+ * @fn		uint16_t nrc_get_battery_gauge_mv(void)
+ *
+ * @brief	Get the current battery voltage in millivolts.
+ *			This function reads the value from the modem’s
+ *			internal battery gauge (ADC channel 1).
+ *
+ * @param	void
+ *
+ * @return	Battery voltage (in millivolts)
+ *			  0 	 : Read failed or ADC not ready
+ *			  >0	 : Battery voltage value in mV
+ **********************************************/
+uint16_t nrc_get_battery_gauge_mv(void);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

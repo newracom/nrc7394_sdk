@@ -110,9 +110,14 @@ uint8_t         hal_modem_get_compensated_rxgain(uint8_t rxgain);
 void            hal_modem_apply_rf_cal_data();
 int16_t         hal_modem_temp_sensor_get_temp_celcius(void);
 int16_t         hal_modem_temp_sensor_get_power_offset(bool recovery);
+void            hal_modem_update_temperature_compensated_xt_dcxo();
+uint8_t         hal_modem_get_temperature_compensated_xt_dcxo();
 void            hal_modem_find_txpwr_optimal_gains(int16_t txpwr, uint8_t *optimal_txgain, uint16_t *optimal_dig_lpf_gain , bool doppler, int16_t temp_power_offset);
-uint32_t        hal_modem_get_auxadc_raw(void);
+uint32_t        hal_modem_get_auxadc_raw(uint8_t ch);
+uint32_t        hal_modem_get_auxadc_comp(uint8_t ch);
 int32_t         hal_modem_get_clock_count(char* clock_type);
+uint16_t        hal_modem_battery_gauge_get_mv(void);
+
 #if !defined(EXCLUDE_FDK_MAC)
 uint8_t hal_modem_set_txpwr(int16_t txpwr);
 #else

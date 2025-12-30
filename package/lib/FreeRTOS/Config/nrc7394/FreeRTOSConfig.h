@@ -205,4 +205,6 @@ received packets. */
 #endif //#if defined (INCLUDE_NEW_TASK_ARCH)
 #define WLAN_MANAGER_STACK_SIZE	( 4096 )
 
+#define configUSE_STREAM_BUFFERS 1
+
 #endif /* FREERTOS_CONFIG_H */

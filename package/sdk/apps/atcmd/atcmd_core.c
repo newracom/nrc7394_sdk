@@ -120,6 +120,42 @@ int atcmd_log (const char *fmt, ...)
 	return ret;
 }
 
+void atcmd_log_hex_dump (void *data, int len)
+{
+	const int line_bytes = 16;
+	char buf[((3 * 16) + 1) + (16 + 1)];
+	char *hex = &buf[0];
+	char *ascii = &buf[(3 * 16) + 1];
+	char *_data = (char *)data;
+	int i;
+
+	memset(buf, 0, sizeof(buf));
+
+	for (i = 0 ; i < len ; i++)
+	{
+		sprintf(hex + (3 * (i % line_bytes)), "%02X ", _data[i]);
+
+		if (_data[i] >= 0x20 && _data[i] <= 0x7E)
+			sprintf(ascii + (i % line_bytes), "%c", _data[i]);
+		else
+			sprintf(ascii + (i % line_bytes), ".");
+
+		if ((i % line_bytes) == (line_bytes - 1))
+		{
+			atcmd_log("%s %s", hex, ascii);
+			memset(buf, 0, sizeof(buf));
+		}
+	}
+
+	if (((i - 1) % line_bytes) < (line_bytes - 1))
+	{
+		for (i %= line_bytes ; i < line_bytes ; i++)
+			sprintf(hex + (3 * (i % line_bytes)), "   ");
+
+		atcmd_log("%s %s", hex, ascii);
+	}
+}
+
 /*******************************************************************************************/
 
 static uint32_t g_atcmd_config = 0;
@@ -1972,6 +2008,89 @@ int atcmd_transmit (char *buf, int len)
 
 /*******************************************************************************************/
 
+#include "nrc_ps_api.h"
+
+extern uint8_t drv_get_boot_reason (void);
+
+uint8_t atcmd_boot_reason (void)
+{
+	return drv_get_boot_reason();
+}
+
+char *atcmd_boot_reason_string (void)
+{
+	static char str_br[24];
+	uint8_t br = atcmd_boot_reason();
+	int len = 0;
+
+	if (br & BR_POR)
+		len += sprintf(str_br, "POR");
+
+	if (br & BR_WDOG)
+		len += sprintf(str_br + len, "%sWDT", len > 0 ? "|" : "");
+
+	if (br & BR_PMC)
+		len += sprintf(str_br + len, "%sPMC", len > 0 ? "|" : "");
+
+	if (br & BR_HOSTINF)
+		len += sprintf(str_br + len, "%sHSPI", len > 0 ? "|" : "");
+
+#if defined(NRC7292) && defined(CPU_CM0)
+	if (br & BR_SYSRST_CM0)
+		len += sprintf(str_br + len, "%sCPU", len > 0 ? "|" : "");
+#else
+	if (br & BR_SYSRST_CM3)
+		len += sprintf(str_br + len, "%sCPU", len > 0 ? "|" : "");
+#endif
+
+	str_br[len] = '\0';
+
+	return str_br;
+}
+
+bool atcmd_boot_is_recovered (void)
+{
+	return !!(atcmd_boot_reason() & BR_PMC);
+}
+
+static void _atcmd_boot_reason_event (void)
+{
+	char *str_br = atcmd_boot_reason_string();
+
+	_atcmd_info("boot_event: %s", str_br);
+
+	ATCMD_MSG_EVENT("BOOT", "\"%s\"", str_br);
+}
+
+static void _atcmd_boot_wake_up (int wake_reason)
+{
+
+}
+
+static void _atcmd_boot_done (void)
+{
+	uint8_t boot_reason = atcmd_boot_reason();
+	bool deepsleep_wakeup = (boot_reason & BR_PMC) && wifi_api_wakeup_done();
+
+	_atcmd_boot_reason_event();
+#if defined(CONFIG_ATCMD_HSPI)
+	_hfi_hspi_eirq_boot_done(true);
+#endif
+
+	if (deepsleep_wakeup)
+	{
+		struct retention_info *ret_info = nrc_ps_get_retention_info();
+		int wake_reason = ret_info->ucode_info.wake_reason;
+				
+		if (atcmd_wifi_deep_sleep_send_event(wake_reason) == 0)
+		{
+			//TODO: call handler
+		}
+	}
+}
+
+/*******************************************************************************************/
+
 int atcmd_enable (_hif_info_t *info)
 {
 #ifdef CONFIG_ATCMD_TRXBUF_STATIC
@@ -1979,6 +2098,7 @@ int atcmd_enable (_hif_info_t *info)
 #else
 	char *hif_rx_buf = NULL;
 #endif
+	uint8_t boot_reason;
 	int ret;
 
 	if (!info)
@@ -2030,8 +2150,7 @@ int atcmd_enable (_hif_info_t *info)
 	if (ret == 0)
 		atcmd_prompt_enter();
 
-	atcmd_boot_reason();
-	atcmd_wifi_deep_sleep_send_event();
+	_atcmd_boot_done();
 
 	return ret;
 }

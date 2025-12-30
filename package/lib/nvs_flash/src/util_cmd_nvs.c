@@ -489,11 +489,13 @@ static void	nvs_cli_reset(char *key, char *value)
 {
 	(void)key;
 	(void)value;
-
+	int reboot_time = 5; // reboot after 5 sec.
 	if (nvs_flash_erase_partition(NVS_DEFAULT_PART_NAME) != NVS_OK) {
 		CPA("nvs reset config partition failed.\n");
 	} else {
-		CPA("nvs config partition reset, restart system...\n");
+		CPA("nvs config partition reset, restarting system in %d sec...\n", reboot_time);
+		vTaskDelay(pdMS_TO_TICKS(reboot_time * 1000));
+		nrc_sw_reset();
 	}
 }
 

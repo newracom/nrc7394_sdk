@@ -1021,7 +1021,7 @@ int mbedtls_ecp_mul_restartable(mbedtls_ecp_group *grp, mbedtls_ecp_point *R,
  */
 static inline int mbedtls_ecp_group_a_is_minus_3(const mbedtls_ecp_group *grp)
 {
-    return grp->A.MBEDTLS_PRIVATE(p) == NULL;
+    return grp->A.MBEDTLS_PRIVATE(p) == NULL || mbedtls_mpi_cmp_int(&grp->A, -3) == 0;
 }
 
 /**

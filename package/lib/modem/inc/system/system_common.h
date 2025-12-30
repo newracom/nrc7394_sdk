@@ -170,7 +170,6 @@ bw_t str_to_bw(const char *str);
 #include     "hal_ssp.h"
 #include     "hal_gdma.h"
 #include     "hal_wdt.h"
-#include    "hal_nadc.h"
 #include    "hal_cspi.h"
 #if defined(NRC_ROMLIB)
 #include "hal_adc_sfc.h"
@@ -205,15 +204,18 @@ typedef enum _COUNTRY_CODE_INDEX {
 	COUNTRY_CODE_US,
 	COUNTRY_CODE_JP,
 	COUNTRY_CODE_K1,
-	COUNTRY_CODE_T8,
-	COUNTRY_CODE_EU,
-	COUNTRY_CODE_CN, //5
+	COUNTRY_CODE_T8, // Deprecated. Don't use this.
+	COUNTRY_CODE_EU, //4
+	COUNTRY_CODE_CN, // Deprecated. Don't use this.
 	COUNTRY_CODE_NZ, //6
 	COUNTRY_CODE_AU, //7
 	COUNTRY_CODE_K2, //8
-	COUNTRY_CODE_S8,
-	COUNTRY_CODE_S9, //10
-	COUNTRY_CODE_T9,
+	COUNTRY_CODE_S8, // Deprecated. Don't use this.
+	COUNTRY_CODE_S9, // Deprecated. Don't use this.
+	COUNTRY_CODE_T9, // Deprecated. Don't use this.
+	COUNTRY_CODE_TW, //12
+	COUNTRY_CODE_SG,
+	COUNTRY_CODE_T2, //14, Taiwan NCC Band
 	COUNTRY_CODE_MAX,
 } COUNTRY_CODE_INDEX;
 

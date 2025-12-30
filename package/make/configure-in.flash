@@ -34,3 +34,4 @@ endif
 
 # Change flash len in ld file
 $(shell sed -i "/^FLASH_SIZE =/c\FLASH_SIZE = $(FLASH_LEN);" $(LD_FILE))
+

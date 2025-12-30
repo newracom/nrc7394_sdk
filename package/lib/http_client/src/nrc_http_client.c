@@ -150,7 +150,7 @@ static int httpc_parse_url(const char *url, http_info_t *info)
 
 			if (info->uri != NULL) {
 				memcpy(info->uri, uri, uri_len);
-				*(info->uri + uri_len + 1) = 0;
+				info->uri[uri_len] = '\0';
 			} else {
 				goto alloc_fail;
 			}
@@ -199,8 +199,8 @@ static int httpc_parse_url(const char *url, http_info_t *info)
 			memset(info->uri, 0x0, sizeof(info->uri));
 
 			if (info->uri != NULL) {
-				strncpy(info->uri, uri, uri_len);
-				*(info->uri + uri_len + 1) = 0;
+				memcpy(info->uri, uri, uri_len);
+				info->uri[uri_len] = '\0';
 			} else {
 				goto alloc_fail;
 			}
@@ -246,7 +246,7 @@ static int httpc_conn(con_handle_t *handle, char *host, char *port)
 {
 	struct addrinfo hints, *addr_list, *cur;
 	int ret = 0;
-	int socket = -1;
+	int sockfd = -1;
 
 	memset( &hints, 0, sizeof(hints) );
 	hints.ai_family = AF_UNSPEC;
@@ -261,24 +261,24 @@ static int httpc_conn(con_handle_t *handle, char *host, char *port)
 	/* Try the sockaddrs until a connection succeeds */
 	ret = HTTPC_RET_ERROR_RESOLVING_DNS;
 	for (cur = addr_list; cur != NULL; cur = cur->ai_next) {
-		socket = (int)socket(cur->ai_family, cur->ai_socktype, cur->ai_protocol);
-		if (socket < 0) {
+		sockfd = (int)socket(cur->ai_family, cur->ai_socktype, cur->ai_protocol);
+		if (sockfd < 0) {
 			ret = HTTPC_RET_ERROR_SOCKET_FAIL;
 			continue;
 		}
 
-		if (connect(socket, cur->ai_addr, (int)cur->ai_addrlen) == 0) {
+		if (connect(sockfd, cur->ai_addr, (int)cur->ai_addrlen) == 0) {
 			ret = HTTPC_RET_OK;
 			break;
 		}
 
-		close(socket);
+		close(sockfd);
 		ret = HTTPC_RET_ERROR_CONNECTION;
 	}
 
 	freeaddrinfo(addr_list);
 
-	*handle = (con_handle_t)socket;
+	*handle = (con_handle_t)sockfd ;
 	return ret;
 }
 
@@ -358,9 +358,14 @@ static int httpc_ssl_conn(con_handle_t *handle, http_info_t *info, ssl_certs_t *
 
 	HTTPC_LOGD( "  . Loading the Client private key ..." );
 
+#if defined(NRC_MBEDTLS_V3)
 	ret = mbedtls_pk_parse_key( &http_ssl->pkey, (const unsigned char *) certs->client_pk,
 								certs->client_pk_length, NULL, 0,
 								mbedtls_ctr_drbg_random, &http_ssl->ctr_drbg );
+#else
+	ret = mbedtls_pk_parse_key( &http_ssl->pkey, (const unsigned char *) certs->client_pk,
+								certs->client_pk_length, NULL, 0);
+#endif
 	if( ret < 0 ) {
 		HTTPC_LOGE(" failed\n  !  mbedtls_pk_parse_key returned -0x%x while parsing private key\n\n", -ret);
 		goto exit;
@@ -490,20 +495,23 @@ static int httpc_ssl_close(con_handle_t *ssl_handle)
 static int httpc_ssl_write(con_handle_t *ssl_handle, const unsigned char *buf, size_t len)
 {
 	http_ssl_t *http_ssl = (http_ssl_t *)(*ssl_handle);
-	mbedtls_ssl_context *ssl = (mbedtls_ssl_context*)(*ssl_handle);
+	mbedtls_ssl_context *ssl = &http_ssl->ssl_ctx;
+
 	size_t bytesSent = 0;
-	int frags = 0, ret = 0;
+	int ret = 0;
 
-	for(bytesSent = 0, frags = 0; bytesSent < len; bytesSent += ret, frags++) {
-		while((ret = mbedtls_ssl_write(ssl, buf + bytesSent, len - bytesSent)) <= 0) {
-			if(ret != MBEDTLS_ERR_SSL_WANT_READ && ret != MBEDTLS_ERR_SSL_WANT_WRITE) {
-				HTTPC_LOGE("failed\n  ! mbedtls_ssl_write returned -0x%x", -ret);
-				return HTTPC_RET_ERROR_TLS_SEND_FAIL;
-			}
+	while (bytesSent < len) {
+		ret = mbedtls_ssl_write(ssl, buf + bytesSent, len - bytesSent);
+		if (ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_WANT_WRITE) {
+			continue;
 		}
+		if (ret < 0) {
+			HTTPC_LOGE("failed\n  ! mbedtls_ssl_write returned -0x%x", -ret);
+			return HTTPC_RET_ERROR_TLS_SEND_FAIL;
+		}
+		bytesSent += (size_t)ret;
 	}
-	HTTPC_LOGI("[%s] bytesSent %d", __func__, bytesSent);
-
+	HTTPC_LOGI("[%s] bytesSent %u", __func__, (unsigned)bytesSent);
 	return HTTPC_RET_OK;
 }
 #endif
@@ -705,10 +713,15 @@ static httpc_ret_e httpc_common(con_handle_t *handle, const char *url, int metho
 	info.header = header;
 	info.data = data;
 	ret = httpc_send_req(handle, method, &info);
-	if (ret != HTTPC_RET_OK)
+	if (ret != HTTPC_RET_OK) {
+		HTTPC_LOGE("httpc_send_req() failed, ret=%d", ret);
 		goto exit;
+	}
 
 	ret = nrc_httpc_recv_response(handle, data);
+	if (ret != HTTPC_RET_OK) {
+		HTTPC_LOGE("nrc_httpc_recv_response() failed, ret=%d", ret);
+	}
 
 exit:
 	return ret;

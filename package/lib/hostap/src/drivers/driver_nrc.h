@@ -22,6 +22,7 @@
 #include "driver.h"
 #include "driver_nrc_tx.h"
 #include "nrc-wim-types.h"
+#include "config_ssid.h"
 
 struct wpa_supplicant;
 struct nrc_wpa;
@@ -32,7 +33,6 @@ struct nrc_wpa;
 #define NRC_WPA_INTERFACE_NAME_0		("wlan0")
 #define NRC_WPA_INTERFACE_NAME_1		("wlan1")
 
-#define NRC_WPA_ROUTE_TIMEOUT_SEC		60*5
 #define NRC_WPA_ROUTE_MAX				255
 
 #if defined(MAX_STA)
@@ -81,6 +81,8 @@ extern uint8_t g_standalone_addr[6];
 
 #define NRC_WPA_BUFFER_ALLOC_TRY (30)
 
+#define NRC_BCMC_LOOP_DROP_TIME (3) // 3 seconds
+
 enum ccmp_key_index {
 	WLAN_KEY_PTK =0,
 	WLAN_KEY_GTK_1 =1,
@@ -102,6 +104,7 @@ enum {
 	VEVENT_VENDOR_IE_CMD_2 = 0x2,
 	VEVENT_VENDOR_IE_CMD_3 = 0x3,
 	VEVENT_VENDOR_IE_CMD_4 = 0x4,
+	VEVENT_VENDOR_IE_REMOTE_CMD = 0x5,
 	VEVENT_VENDOR_IE_BCAST_FOTA_INFO = 0x7,
 	VEVENT_VENDOR_IE_BCAST_FOTA_1 = 0x8,
 	VEVENT_VENDOR_IE_BCAST_FOTA_2 = 0x9,
@@ -196,7 +199,7 @@ struct nrc_wpa_key {
 
 struct nrc_wpa_route {
 	uint8_t                 addr[ETH_ALEN];
-	uint16_t                ts;
+	uint32_t                ts;
 	struct dl_list          list;
 } __attribute__ ((packed));
 
@@ -299,6 +302,7 @@ struct nrc_wpa_bss {
 	uint8_t					ssid_len;
 	struct nrc_wpa_key		broadcast_key[2];
 	uint16_t 				beacon_int;
+	uint16_t 				freq;
 	struct os_time 			last_beacon_update;
 	bool 					authorized_1x;
 	struct os_time 			last_tx_time;
@@ -326,6 +330,8 @@ struct nrc_wpa_if {
 	uint32_t bss_max_idle;
 	uint8_t	num_route_list;
 	uint32_t key_mgmt;
+	struct dl_list roc_list;
+	TimerHandle_t roc_timer;
 };
 
 struct nrc_wpa {
@@ -371,6 +377,13 @@ struct nrc_wpa_rx_event {
 	void* pv;
 	uint16_t subtype;
 	uint32_t ref_time;
+};
+
+struct nrc_wpa_roc {
+	struct dl_list node;
+	uint32_t freq;
+	uint32_t duration;
+	uint32_t start_time;
 };
 
 struct nrc_wpa_log_event {
@@ -439,11 +452,10 @@ struct nrc_wpa_key *nrc_wpa_get_key_by_key_idx(struct nrc_wpa_if *intf,
 						int key_idx);
 struct nrc_wpa_key *nrc_wpa_get_key_by_addr(struct nrc_wpa_if *intf,
 						const uint8_t *addr);
+uint16_t nrc_wpa_find_aid(int vif_id, const uint8_t* addr, bool enabled);
+bool nrc_update_route_by_aid(int vif_id, uint16_t aid, uint8_t* addr);
 void wpa_driver_sta_sta_add(struct nrc_wpa_if* intf);
 bool wpa_driver_get_associate_status(uint8_t vif);
-void wpa_driver_notify_event_to_app(int vif, int event_id, uint32_t data_len, uint8_t* data);
-void wpa_driver_notify_vevent_to_app(int event_id, uint32_t data_len, uint8_t* data, uint8_t* bssid, int8_t rssi, char* ssid, uint8_t ssid_len);
-
 void wpa_driver_sta_sta_remove(struct nrc_wpa_if* intf);
 int wpas_l2_packet_filter(uint8_t *buffer, int len);
 void wpa_driver_clear_key_all(struct nrc_wpa_if *intf);
@@ -493,21 +505,32 @@ static inline bool is_pmf(struct nrc_wpa_if *intf, struct ieee80211_hdr *hdr)
 }
 
 bool nrc_cleanup_old_route(struct nrc_wpa_if* intf, uint8_t* addr);
+void nrc_print_route(int vif_id);
 bool nrc_update_route(struct nrc_wpa_if* intf, struct nrc_wpa_sta* sta, uint8_t* addr);
-uint8_t* nrc_sta_find_route(struct nrc_wpa_sta* sta, const uint8_t addr[ETH_ALEN]);
+struct nrc_wpa_route* nrc_sta_find_route(struct nrc_wpa_sta* sta, const uint8_t addr[ETH_ALEN]);
+uint16_t nrc_get_child_num(uint8_t vif_id);
+uint16_t nrc_get_child_list(uint8_t vif_id, uint8_t (*bssid_list)[6], uint16_t len);
 void nrc_set_use_4address(bool value);
 bool nrc_get_use_4address(void);
 void nrc_set_4address_bcmc_as_uni(bool value);
 bool nrc_get_4address_bcmc_as_uni(void);
+void nrc_set_route_timeout(uint32_t value);
+uint32_t nrc_get_route_timeout(void);
+void nrc_set_ap_dhcp_forward_block(bool value);
+bool nrc_get_ap_dhcp_forward_block(void);
 void nrc_set_scan_max_interval(uint32_t interval);
 uint32_t nrc_get_scan_max_interval();
 void nrc_set_backoff_start_count(uint32_t count);
 uint32_t nrc_get_backoff_start_count();
 int generateRandomBackoff(int retry_count) ;
+int nrc_driver_ap_retent(int vif_id);
+int nrc_driver_ap_recovery(int vif_id);
 
+#if !defined(INCLUDE_NRC_DRIVER_EVENT)
 void nrc_add_app_event(uint8_t vif_id, uint8_t e_id, uint8_t *addr);
 struct nrc_app_event* nrc_get_app_event();
 void nrc_init_app_event();
+#endif
 void nrc_driver_event(struct nrc_wpa_if *intf, struct nrc_driver_event *event, uint32_t delay_us);
 
 #endif // _DRIVER_NRC_H_

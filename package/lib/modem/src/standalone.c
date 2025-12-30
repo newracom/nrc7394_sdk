@@ -13,6 +13,7 @@
 #include "nvs_flash.h"
 #endif
 #include "system_modem_api.h"
+#include "nrc_ps_api.h"
 #include "util_version.h"
 
 #define DECLARE_TASK(NAME, STACK_SIZE)									\
@@ -70,11 +71,19 @@ int standalone_main()
 {
 	bool net_init = true;
 	bool ps_callback = false;
+	struct retention_info* ret_info = nrc_ps_get_retention_info();
 	initVersion();
-    
+
 #if defined (INCLUDE_PS_SCHEDULE)
 	system_modem_api_ps_check_network_init(&net_init, &ps_callback);
 #endif /* INCLUDE_PS_SCHEDULE */
+
+#if defined (INCLUDE_SUB_XTAL_BYPASS)
+	ret_info->sub_xtal_bypass =  true;
+#else
+	ret_info->sub_xtal_bypass =  false;
+#endif /* INCLUDE_PS_SCHEDULE */
+	system_api_set_sub_xtal_bypass_check(true);
 
 	if (net_init) {
 		//get_standalone_macaddr(g_standalone_addr);
@@ -90,8 +99,10 @@ int standalone_main()
 	/* setting priority to NRC_TASK_PRIORITY - 1. */
 	if (ps_callback) {
 		extern void nrc_wifi_init (void);
+		extern void nrc_event_mgr_init(void);
 		if (net_init) {
 			A("[%s] nrc_wifi_init = %d\n", __func__, net_init);
+			nrc_event_mgr_init();
 			nrc_wifi_init();
 		}
 		TaskHandle_t callback_task_handle;
@@ -235,6 +246,13 @@ int set_standalone_hook_static(int vif_id)
 	WPA_DRIVER_PS_HOOK(WPA_PS_HOOK_TYPE_STATIC, &vif_id, NULL, 0);
 	return -1;
 }
+
+#ifdef INCLUDE_EXT_RAM
+bool check_support_ext_ram_on(void)
+{
+	return true;
+}
+#endif
 
 #ifdef USE_EEPROM
 #include "nrc_config.h"

@@ -14,6 +14,10 @@ extern struct netif br_netif;
 
 nrc_err_t relay_start_softap(WIFI_CONFIG *param)
 {
+	if (nrc_wifi_get_recovered_by_fast_connect(AP_INTERFACE)) {
+		return NRC_SUCCESS;
+	}
+
 	nrc_usr_print("[%s] Trying to start Soft AP (SSID:%s, S1G_CH:%d , BW:%d)\n", \
 			 __func__, (char *)param->ssid,  (int)param->channel,  (int)param->bw);
 
@@ -78,12 +82,14 @@ nrc_err_t relay_connect_to_ap(WIFI_CONFIG* param)
 	count = 10;
 	dhcp_server = param->dhcp_server;
 
+	if (nrc_wifi_get_recovered_by_fast_connect(STA_INTERFACE)) {
+		return NRC_SUCCESS;
+	}
+
 	if (wifi_init_with_vif(STA_INTERFACE, param)!= WIFI_SUCCESS) {
 		nrc_usr_print ("[%s] ASSERT! Fail for init\n", __func__);
 		return NRC_FAIL;
 	}
-
-	netif_set_default(nrc_netif[STA_INTERFACE]);
 
 	/* Try to connect */
 	if (wifi_connect_with_vif(STA_INTERFACE, param)!= WIFI_SUCCESS) {
@@ -108,7 +114,7 @@ nrc_err_t nrc_add_bridge()
 {
 	if (netif_is_up(&br_netif)) {
 		nrc_usr_print("bridge interface already exists.\n");
-		return NRC_FAIL;
+		return NRC_SUCCESS;
 	}
 
 	if (!setup_wifi_bridge_interface()) {

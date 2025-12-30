@@ -1,0 +1,28 @@
+*********************************************************************************
+*                                                                               *
+* Supported Flash Memory List                                                   *
+*                                                                               *
+*********************************************************************************
+
+                                                             (Updated 12-26-2025)
++---------------+-----------+---------------------------------+---------+----------+
+| NAME          | JEDEC ID  | Manufacturer                    | Size    | IO Range |
++---------------+-----------+---------------------------------+---------+----------+
+|W25Q32JVIQ     |0xEF4016   |WinBOND inc                      |4 MB     | 2.7-3.6V |
+|W25Q32JWIQ     |0xEF6016   |WinBOND inc                      |4 MB     | 1.7-1.95V|
+|W25Q32JWIM     |0xEF8016   |WinBOND inc                      |4 MB     | 1.7-1.95V|
+|IS25WP016D     |0x9D7015   |Integrated Silicon Solution Inc  |4 MB     |1.65-1.95V|
+|GD25WQ32E      |0xC86516   |GigaDevice                       |4 MB     |1.65-3.6V |
+|GD25Q32E       |0xC84016   |GigaDevice                       |4 MB     | 2.7-3.6V |
+|MX25R3235F     |0xC22816   |Macronix                         |4 MB     |1.65-3.6V |
+|MX25U3232F     |0xC22536   |Macronix                         |4 MB     |1.65-2.0V |
+|EN25S32A       |0x1C3816   |EON Silicon Devices              |4 MB     |1.65-1.95V|
+|EN25SE32A      |0x1C4816   |EON Silicon Devices              |4 MB     |1.65-1.95V|
+|XT25Q32F       |0x0B6016   |XTX Technology Limited           |4 MB     |1.65-1.95V|
+|XT25F32F       |0x0B4016   |XTX Technology Limited           |4 MB     | 2.7~3.6V |
+|P25Q32SU       |0x856016   |Puya Semiconductor               |4 MB     |1.65-3.6V |
+|GT25Q32A       |0xC46016   |Giantec Semiconductor Corp       |4 MB     |1.65-3.6V |
+|FM25W32A       |0xA12816   |Shanghai Fudan Microelectronics  |4 MB     |1.65-3.6V |
+|BY25Q32ES      |0x684016   |BYTe Semiconductor               |4 MB     |2.70~3.6V |
+|ZD25WQ32C      |0xBA6016   |Zetta                            |4 MB     |1.65~3.6V |
++---------------+-----------+---------------------------------+---------+----------+

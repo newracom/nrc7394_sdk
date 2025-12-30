@@ -32,6 +32,9 @@
 #include "pmksa_cache_auth.h"
 #include "wpa_auth_i.h"
 #include "wpa_auth_ie.h"
+#if defined(NRC_WPA_SUPP)
+#include "system_recovery.h"
+#endif
 
 #define STATE_MACHINE_DATA struct wpa_state_machine
 #define STATE_MACHINE_DEBUG_PREFIX "WPA"
@@ -4003,6 +4006,13 @@ SM_STATE(WPA_PTK_GROUP, REKEYESTABLISHED)
 			 "group key handshake completed (%s)",
 			 sm->wpa == WPA_VERSION_WPA ? "WPA" : "RSN");
 	sm->has_GTK = true;
+#if defined(NRC_WPA_SUPP)
+	if (system_recovery_wifi_ap_set_replay_counter(sm->addr,
+		sm->key_replay[0].counter)) {
+		wpa_printf(MSG_DEBUG, "WPA: replay counter saved ("MACSTR")",
+			MAC2STR(sm->addr));
+	}
+#endif
 }
 
 
@@ -4699,6 +4709,14 @@ const u8 * wpa_auth_get_pmk(struct wpa_state_machine *sm, int *len)
 }
 
 
+const u8 *wpa_auth_get_dpp_pkhash(struct wpa_state_machine *sm)
+{
+	if (!sm || !sm->pmksa)
+		return NULL;
+	return sm->pmksa->dpp_pkhash;
+}
+
+
 int wpa_auth_sta_key_mgmt(struct wpa_state_machine *sm)
 {
 	if (!sm)
@@ -4857,6 +4875,29 @@ int wpa_auth_pmksa_add2(struct wpa_authenticator *wpa_auth, const u8 *addr,
 		return 0;
 
 	return -1;
+}
+
+
+int wpa_auth_pmksa_add3(struct wpa_authenticator *wpa_auth, const u8 *addr,
+			const u8 *pmk, size_t pmk_len, const u8 *pmkid,
+			int session_timeout, int akmp, const u8 *dpp_pkhash)
+{
+	struct rsn_pmksa_cache_entry *entry;
+
+	if (wpa_auth->conf.disable_pmksa_caching)
+		return -1;
+
+	wpa_hexdump_key(MSG_DEBUG, "RSN: Cache PMK (3)", pmk, PMK_LEN);
+	entry = pmksa_cache_auth_add(wpa_auth->pmksa, pmk, pmk_len, pmkid,
+				 NULL, 0, wpa_auth->addr, addr, session_timeout,
+				 NULL, akmp);
+	if (!entry)
+		return -1;
+
+	if (dpp_pkhash)
+		entry->dpp_pkhash = os_memdup(dpp_pkhash, SHA256_MAC_LEN);
+
+	return 0;
 }
 
 
@@ -5364,6 +5405,17 @@ void wpa_auth_set_transition_disable(struct wpa_authenticator *wpa_auth,
 }
 
 
+#if defined(NRC_WPA_SUPP)
+int wpa_auth_rekey_gtk(struct wpa_authenticator *wpa_auth)
+{
+	if (!wpa_auth)
+		return -1;
+	eloop_cancel_timeout(wpa_rekey_gtk, wpa_auth, NULL);
+	return eloop_register_timeout(0, 0, wpa_rekey_gtk, wpa_auth, NULL);
+}
+#endif
+
+
 #ifdef CONFIG_TESTING_OPTIONS
 
 int wpa_auth_resend_m1(struct wpa_state_machine *sm, int change_anonce,
@@ -5636,6 +5688,7 @@ int wpa_auth_resend_group_m1(struct wpa_state_machine *sm,
 }
 
 
+#if !defined(NRC_WPA_SUPP)
 int wpa_auth_rekey_gtk(struct wpa_authenticator *wpa_auth)
 {
 	if (!wpa_auth)
@@ -5643,6 +5696,7 @@ int wpa_auth_rekey_gtk(struct wpa_authenticator *wpa_auth)
 	eloop_cancel_timeout(wpa_rekey_gtk, wpa_auth, NULL);
 	return eloop_register_timeout(0, 0, wpa_rekey_gtk, wpa_auth, NULL);
 }
+#endif
 
 
 int wpa_auth_rekey_ptk(struct wpa_authenticator *wpa_auth,

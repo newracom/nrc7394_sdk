@@ -154,7 +154,7 @@ int mbedtls_internal_ecp_randomize_jac(const mbedtls_ecp_group *grp,
  */
 int mbedtls_internal_ecp_add_mixed(const mbedtls_ecp_group *grp,
                                    mbedtls_ecp_point *R, const mbedtls_ecp_point *P,
-                                   const mbedtls_ecp_point *Q);
+                                   const mbedtls_ecp_point *Q, mbedtls_mpi tmp[4]);
 #endif
 
 /**
@@ -178,7 +178,8 @@ int mbedtls_internal_ecp_add_mixed(const mbedtls_ecp_group *grp,
  */
 #if defined(MBEDTLS_ECP_DOUBLE_JAC_ALT)
 int mbedtls_internal_ecp_double_jac(const mbedtls_ecp_group *grp,
-                                    mbedtls_ecp_point *R, const mbedtls_ecp_point *P);
+                                    mbedtls_ecp_point *R, const mbedtls_ecp_point *P,
+                                    mbedtls_mpi tmp[4]);
 #endif
 
 /**

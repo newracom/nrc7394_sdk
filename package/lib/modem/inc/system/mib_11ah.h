@@ -77,7 +77,7 @@
 #endif /* dot11S1GCentralizedAuthenticationControlActivated */
 
 #if !defined(dot11S1GDistributedAuthenticationControlActivated)
-#define dot11S1GDistributedAuthenticationControlActivated	1
+#define dot11S1GDistributedAuthenticationControlActivated	0
 #endif
 
 // values, but not defined in MIB

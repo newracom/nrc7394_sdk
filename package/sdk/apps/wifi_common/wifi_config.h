@@ -70,6 +70,7 @@
  *     WIFI_SEC_WPA2: Wi-Fi Protected Access II (WPA2)
  *     WIFI_SEC_WPA3_SAE: Wi-Fi Protected Access III (WPA3) Simultaneous Authentication of Equals (SAE)
  *     WIFI_SEC_WPA3_OWE: Wi-Fi Protected Access III (WPA3) Opportunistic Wireless Encryption (OWE)
+ *     WIFI_SEC_DPP: Wi-Fi Easy Connect (DPP)
  *     Note that SoftAP mode may not support WIFI_SEC_WPA3_SAE and WIFI_SEC_WPA3_OWE security options.
  */
 #ifndef NRC_WIFI_SECURE
@@ -119,6 +120,26 @@
  */
 #ifndef NRC_REMOTE_PORT
 #define NRC_REMOTE_PORT		8099
+#endif /* NRC_REMOTE_PORT */
+
+
+ /**
+  * When establishing a network connection, a MQTT broker's IP address needs to be specified.
+  * This is the IP address of the MQTT broker device or server that the local device will
+  * be connecting to.
+  */
+#ifndef NRC_BROKER_ADDRESS
+#define NRC_BROKER_ADDRESS "192.168.200.1"
+#endif /* NRC_REMOTE_ADDRESS */
+
+
+/**
+ * When establishing a network connection, a broker's port number needs to be specified.
+ * This is the port number on the MQTT broker device or server that the local device will
+ * be connecting to.
+ */
+#ifndef NRC_BROKER_PORT
+#define NRC_BROKER_PORT		1883
 #endif /* NRC_REMOTE_PORT */
 
 
@@ -288,7 +309,6 @@
 #define NRC_WIFI_CHANNEL 0
 #endif /* NRC_WIFI_CHANNEL */
 
-
 /**
  * This code sets the default channel bandwidth for an access point (AP).
  * The channel bandwidth determines the amount of frequency spectrum that will be
@@ -299,6 +319,19 @@
 #ifndef NRC_AP_SET_CHANNEL_BW
 #define NRC_AP_SET_CHANNEL_BW 0
 #endif /* NRC_AP_SET_CHANNEL_BW */
+
+/**
+ * Controls whether the system attempts to automatically find
+ * the best SoftAP operating channel when no fixed channel is set.
+ *
+ * 1 = Use optimal channel scan when NRC_WIFI_CHANNEL == 0
+ * 0 = Disable auto scan (fallback/default channel is used)
+ *
+ * Default: 1
+ */
+#ifndef WIFI_AP_OPTIMAL_CHANNEL_ENABLE
+#define WIFI_AP_OPTIMAL_CHANNEL_ENABLE 1
+#endif /* WIFI_AP_OPTIMAL_CHANNEL_ENABLE */
 
 /**
  * This code block defines the timeout period for WiFi connection attempts. The value of
@@ -510,7 +543,7 @@
  */
 #ifndef NRC_WIFI_SOFTAP_MAX_NUM_STA_DEFAULT
 #ifdef NRC7394
-#define NRC_WIFI_SOFTAP_MAX_NUM_STA_DEFAULT 70
+#define NRC_WIFI_SOFTAP_MAX_NUM_STA_DEFAULT 30
 #else
 #define NRC_WIFI_SOFTAP_MAX_NUM_STA_DEFAULT 10
 #endif
@@ -589,6 +622,12 @@
 #define NRC_WIFI_BGSCAN_LONG_INTERVAL 300
 #endif /* NRC_WIFI_BGSCAN_LONG_INTERVAL */
 
+/**
+ * Wi-Fi Fast Connect
+ */
+#ifndef NRC_WIFI_FAST_CONNECT
+#define NRC_WIFI_FAST_CONNECT 0
+#endif /* NRC_WIFI_RATE_CONTROL */
 
 #ifndef NRC_WIFI_SCAN_PERIOD
 #define NRC_WIFI_SCAN_PERIOD 100
@@ -637,6 +676,17 @@
 #ifndef NRC_WIFI_AUTH_CONTROL
 #define NRC_WIFI_AUTH_CONTROL WIFI_DISABLE_AUTH_CONTROL
 #endif /* NRC_WIFI_AUTH_CONTROL */
+
+#ifndef NRC_WIFI_AUTH_CONTROL_PS_THRESHOLD
+#define NRC_WIFI_AUTH_CONTROL_PS_THRESHOLD 0
+#endif /* NRC_WIFI_AUTH_CONTROL_PS_THRESHOLD */
+
+/**
+ * Wi-Fi Easy Connect
+ */
+#ifndef NRC_WIFI_DPP_CONFIGURATOR
+#define NRC_WIFI_DPP_CONFIGURATOR 0
+#endif /* NRC_WIFI_DPP_CONFIGURATOR */
 
 /*************************************************************
  * VIF1 configurations

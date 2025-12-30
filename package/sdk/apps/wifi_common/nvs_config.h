@@ -53,6 +53,12 @@
 /* CLI : nvs set_u16 wifi_channel <channel> */
 #define NVS_WIFI_CHANNEL "wifi_channel"
 
+/* Wifi AP optimal channel */
+/* (type u8) */
+/* CLI : nvs set_u8 ap_opt_ch <0-1> */
+#define NVS_WIFI_AP_OPT_CHANNEL "ap_opt_ch"
+
+
 /* Wifi Channel bandwidth to be used in AP mode, set_u8 value */
 /* (type u8) */
 /* CLI : nvs set_u8 wifi_channel_bw <bandwidth> */
@@ -278,6 +284,17 @@
 /* (type u32) */
 /* CLI : nvs set_u32 ps_sleep [sleep_ms] */
 #define NVS_PS_SLEEP_TIME "ps_sleep"
+
+/* FAST CONNECT */
+/* CLI : nvs set_u8 fast_connect [fast_connect_mode] */
+/* [fast_connect_mode] WIFI_DISABLE_FAST_CONNECT = 0, WIFI_ENABLE_FAST_CONNECT = 1 */
+/* (type u8) */
+#define NVS_WIFI_FAST_CONNECT "fast_connect"
+
+/* DPP Configurator */
+/* CLI : nvs set_u8 dpp_configurator [dpp_configurator] */
+/* (type u8) */
+#define NVS_DPP_CONFIGURATOR "dpp_conf"
 
 #ifdef INCLUDE_SCAN_BACKOFF
 

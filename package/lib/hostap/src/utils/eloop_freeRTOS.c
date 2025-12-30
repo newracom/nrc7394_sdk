@@ -90,14 +90,14 @@ int eloop_init(void)
 
 	eloop.task = xTaskGetHandle("wpa_supplicant");
 
-	eloop_message_queue_req = xQueueCreate(ELOOP_MESSAGE_COUNT, sizeof(char*));
+	eloop_message_queue_req = xQueueCreate(ELOOP_MESSAGE_COUNT, sizeof(eloop_msg_t));
 	if (eloop_message_queue_req == NULL)
 	{
 		/* fail to create message queue for eloop */
 		return -1;
 	}
 
-	eloop_message_queue_rsp = xQueueCreate(ELOOP_MESSAGE_COUNT, sizeof(char*));
+	eloop_message_queue_rsp = xQueueCreate(ELOOP_MESSAGE_COUNT, sizeof(ctrl_iface_resp_t));
 	if (eloop_message_queue_rsp == NULL)
 	{
 		/* fail to create message queue for eloop */
@@ -567,7 +567,7 @@ int eloop_register_signal_reconfig(eloop_signal_handler handler,
 void eloop_run(void)
 {
 	TickType_t next;
-	eloop_msg_t* eloop_msg;
+	eloop_msg_t eloop_msg;
 
 	while (!eloop.terminate && !eloop.pending_terminate) {
 		eloop_trigger_timeout();
@@ -592,19 +592,23 @@ void eloop_run(void)
 		//   - wpa_cli_send_and_resp() @api_wifi.c
 		//---------------------------------------------------------------------//
 		if (xQueueReceive(eloop_message_queue_req, &eloop_msg, 0) != pdPASS) {
-			wpa_printf(MSG_ERROR, "eloop: %s, xQueueReceive() failed", __func__);
+			wpa_printf(MSG_DEBUG, "eloop: %s, xQueueReceive() failed", __func__);
 		} else {
-			if (eloop_msg->wait_rsp) {
-				ctrl_iface_resp_t *resp = ctrl_iface_receive_response(eloop_msg->vif_id, eloop_msg->buf);
-				if (xQueueSend(eloop_message_queue_rsp, &resp, 0) != pdPASS) {
-					wpa_printf(MSG_ERROR, "eloop: %s, xQueueSend() failed", __func__);
-					CTRL_IFACE_RESP_FREE(resp);
-				}
+			if (eloop_msg.wait_rsp) {
+				ctrl_iface_resp_t *resp = ctrl_iface_receive_response(eloop_msg.vif_id, eloop_msg.buf);
+				if (resp) {
+					if (xQueueSend(eloop_message_queue_rsp, resp, 0) == pdPASS) {
+						os_free(resp);
+					} else {
+						wpa_printf(MSG_ERROR, "eloop: %s, xQueueSend() failed", __func__);
+						CTRL_IFACE_RESP_FREE(resp);
+					}
+				} 
 			} else {
-				ctrl_iface_receive(eloop_msg->vif_id, eloop_msg->buf);
+				ctrl_iface_receive(eloop_msg.vif_id, eloop_msg.buf);
 			}
-			os_free(eloop_msg->buf);
-			os_free(eloop_msg);
+			os_free(eloop_msg.buf);
+			os_memset(&eloop_msg, 0, sizeof(eloop_msg_t));
 		}
 	}
 	eloop.terminate = 0;

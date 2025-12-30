@@ -79,4 +79,9 @@ bool get_no_backoff();
 void set_lpf_gain_control(bool v);
 bool get_lpf_gain_control();
 void esl_default_freq(uint32_t channel_freq, int bw);
+#if defined(INCLUDE_MANUAL_CONT_TX_SUPPORT)
+uint32_t get_interval();
+#else
+int32_t get_interval();
+#endif
 #endif /* LMAC_TEST_H */

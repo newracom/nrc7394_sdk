@@ -55,6 +55,7 @@ static inline bool umac_beacon_is_dtim(uint8_t dtim_count) {return true;}
 static inline bool umac_beacon_is_hidden(uint8_t vif_id) {return false;}
 static inline ie_csa* umac_beacon_get_csa_info(uint8_t vif_id){return NULL;}
 static inline uint8_t umac_beacon_get_dtim_period(int8_t vif_id) {return 0;};
+static void umac_beacon_ap_enable_short_beacon(int8_t vif_id, bool enable, bool fota) {};
 #endif //#if defined(INCLUDE_BEACON_AP_BEACON) || defined(CUNIT)
 
 #endif /* UMAC_BEACON_11AH_H */

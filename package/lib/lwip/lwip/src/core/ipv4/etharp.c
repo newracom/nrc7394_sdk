@@ -54,6 +54,8 @@
 #include "lwip/autoip.h"
 #include "lwip/prot/iana.h"
 #include "netif/ethernet.h"
+#include "netif/bridgeif.h"
+#include "nrc_lwip.h"
 
 #include <string.h>
 
@@ -163,6 +165,62 @@ free_etharp_q(struct etharp_q_entry *q)
 
 #endif /* ARP_QUEUEING */
 
+#if defined(NRC_LWIP)
+static err_t
+etharp_retention_update(struct netif *netif, const ip4_addr_t *ipaddr, struct eth_addr *ethaddr)
+{
+  u8_t net_id;
+
+#if defined(INCLUDE_FAST_CONNECT)
+  if (!system_modem_api_get_fc()) {
+    return ERR_OK;
+  }
+#endif
+
+  if (system_recovery_wifi_ip_get_in_recovery()) {
+    return ERR_OK;
+  }
+
+  if (netif == NULL || ipaddr == NULL) {
+    return ERR_ARG;
+  }
+
+  /* Remove a entry */
+  if (ethaddr == NULL) {
+    system_recovery_wifi_ip_free_peer(ipaddr->addr);
+    return ERR_OK;
+  }
+
+  /* Find ported netif id from bridge interface.
+   * Please fix me if you find a better way
+   */
+  if (netif->num == BRIDGE_INTERFACE) {
+    net_id = bridgeif_get_dst_port(netif, ethaddr);
+    if (net_id == BR_FLOOD) {
+      return ERR_IF;
+    }
+  } else {
+    net_id = netif->num;
+  }
+
+  /* Add a new entry */
+  if (system_recovery_wifi_ip_alloc_peer(net_id, ethaddr->addr, ipaddr->addr)) {
+    I(TT_NET, "%d ARP(%s) updated\n", net_id, ip4addr_ntoa(ipaddr));
+  } else {
+    return ERR_MEM;
+  }
+
+#if defined(INCLUDE_FAST_CONNECT)
+  if (!system_modem_api_write_fc_ip(false)) {
+    E(TT_NET, "Failed to flash ARP entries");
+    return ERR_MEM;
+  }
+#endif
+
+	return ERR_OK;
+}
+#endif /* defined(NRC_LWIP) */
+
 /** Clean up ARP table entries */
 static void
 etharp_free_entry(int i)
@@ -178,6 +236,9 @@ etharp_free_entry(int i)
   }
   /* recycle entry for re-use */
   arp_table[i].state = ETHARP_STATE_EMPTY;
+#if defined(NRC_LWIP)
+  etharp_retention_update(arp_table[i].netif, &arp_table[i].ipaddr, NULL);
+#endif /* defined(NRC_LWIP) */
 #ifdef LWIP_DEBUG
   /* for debugging, clean out the complete entry */
   arp_table[i].ctime = 0;
@@ -487,6 +548,9 @@ etharp_update_arp_entry(struct netif *netif, const ip4_addr_t *ipaddr, struct et
     /* free the queued IP packet */
     pbuf_free(p);
   }
+#if defined(NRC_LWIP)
+  etharp_retention_update(netif, ipaddr, ethaddr);
+#endif /* defined(NRC_LWIP) */
   return ERR_OK;
 }
 

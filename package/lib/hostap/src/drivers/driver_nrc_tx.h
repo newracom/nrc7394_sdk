@@ -52,8 +52,10 @@ int nrc_transmit_pmf(struct nrc_wpa_if* intf, uint8_t *frm, const uint16_t len,
 int nrc_transmit_from_8023_mb(uint8_t vif_id, uint8_t **frames, uint16_t len[], int n_frames);
 int nrc_raw_transmit(struct nrc_wpa_if* intf, uint8_t *frm, const uint16_t len,
 				const int ac);
-int nrc_send_deauth(struct nrc_wpa_if *intf, const uint8_t *addr, uint16_t reason_code);
+int nrc_send_deauth(struct nrc_wpa_if *intf, const uint8_t *addr, uint16_t reason_code, bool report_status);
 int nrc_send_action(int vif, uint8_t *addr, uint8_t *payload, uint16_t payload_len);
+int nrc_send_action_tx_status(int vif, const uint8_t *dst, const uint8_t *src,
+		const uint8_t *bssid, const uint8_t *payload, uint16_t payload_len, uint32_t wait);
 int nrc_add_sec_hdr(struct nrc_wpa_key *key, uint8_t *pos);
 int nrc_send_addba_req(int vif, int tid, uint8_t* addr);
 int nrc_send_delba_req(int vif, int tid, uint8_t* addr);

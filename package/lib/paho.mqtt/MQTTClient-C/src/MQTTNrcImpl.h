@@ -45,6 +45,9 @@ struct Network
 	int (*mqttread) (Network*, unsigned char*, int, int);
 	int (*mqttwrite) (Network*, unsigned char*, int, int);
 	void (*disconnect) (Network*);
+#if defined(INCLUDE_MQTT_RECOVERY)
+	int recovered;
+#endif
 };
 
 void TimerInit(Timer*);

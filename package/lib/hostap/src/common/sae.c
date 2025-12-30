@@ -717,8 +717,8 @@ static struct crypto_ec_point * sswu(struct crypto_ec *ec, int group,
 				     const struct crypto_bignum *u)
 {
 	int z_int;
-	const struct crypto_bignum *b, *prime;
-	struct crypto_bignum *a, *u2, *t1, *t2, *z, *t, *zero, *one, *two, *three,
+	const struct crypto_bignum *a, *b, *prime;
+	struct crypto_bignum *u2, *t1, *t2, *z, *t, *zero, *one, *two, *three,
 		*x1a, *x1b, *y = NULL;
 	struct crypto_bignum *x1 = NULL, *x2, *gx1, *gx2, *v = NULL;
 	struct crypto_bignum *tmp = NULL;
@@ -735,7 +735,7 @@ static struct crypto_ec_point * sswu(struct crypto_ec *ec, int group,
 
 	prime = crypto_ec_get_prime(ec);
 	prime_len = crypto_ec_prime_len(ec);
-#if 0	
+#if 1
 	a = crypto_ec_get_a(ec);
 #else
 	/* Value of 'a' defined for curve secp256r1, 'y^2 = x^3 + ax + b' */
@@ -847,7 +847,7 @@ static struct crypto_ec_point * sswu(struct crypto_ec *ec, int group,
 	    crypto_bignum_rshift(t1, 1, t1) < 0 ||
 		crypto_bignum_exptmod(gx1, t1, prime, tmp) < 0)
 		goto fail;
-	debug_print_bignum("SSWU: gx1^((p-1)/2) modulo p", t1, prime_len);
+	debug_print_bignum("SSWU: gx1^((p-1)/2) modulo p", tmp, prime_len);
 	is_qr = const_time_eq(crypto_bignum_is_zero(tmp) |
 			      crypto_bignum_is_one(tmp), 1);
 
@@ -896,7 +896,6 @@ static struct crypto_ec_point * sswu(struct crypto_ec *ec, int group,
 	p = crypto_ec_point_from_bin(ec, x_y);
 
 fail:
-	crypto_bignum_deinit(a, 0);	
 	crypto_bignum_deinit(tmp, 0);
 	crypto_bignum_deinit(u2, 1);
 	crypto_bignum_deinit(t1, 1);

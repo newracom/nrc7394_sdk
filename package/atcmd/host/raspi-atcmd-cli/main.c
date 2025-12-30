@@ -120,6 +120,8 @@ typedef struct
 	} script;
 } raspi_cli_opt_t;
 
+static raspi_cli_opt_t g_raspi_cli_opt;
+
 static int raspi_cli_option (int argc, char *argv[], raspi_cli_opt_t *opt)
 {
 	struct option opt_info[] =
@@ -288,11 +290,41 @@ static pthread_t g_raspi_cli_thread;
 
 static void *raspi_cli_recv_thread (void *arg)
 {
+	raspi_cli_hif_t *hif = (raspi_cli_hif_t *)arg;
+	bool eirq_poll = !!((hif->type == RASPI_HIF_SPI) && (hif->flags & RASPI_HIF_EIRQ_MASK));
 	char buf[128 * 1024];
 	int ret;
 
 	while (1)
 	{
+		if (eirq_poll)
+		{
+			ret = raspi_eirq_poll(-1);
+
+			if (ret < 0 && ret != -ETIME)
+				break;
+			else if (ret == 1)
+			{
+				switch (raspi_hif_hspi_eirq_status())
+				{
+					case HSPI_EIRQ_BOOT_DONE:
+						ret = raspi_hif_reopen(hif->type, hif->device, hif->speed, hif->flags);
+						if (ret < 0)
+							log_error("raspi_hif_reopen(), %s\n", strerror(-ret));
+
+					case HSPI_EIRQ_READ_READY:
+						nrc_atcmd_set_ready(true);
+						break;
+
+					case HSPI_EIRQ_DEEP_SLEEP:
+						nrc_atcmd_set_ready(false);
+
+					default:
+						continue;
+				}
+			}
+		}
+
 		ret = raspi_hif_read(buf, sizeof(buf));
 
 		if (ret > 0)
@@ -302,19 +334,13 @@ static void *raspi_cli_recv_thread (void *arg)
 		}
 		else if (ret < 0 && ret != -EAGAIN)
 		{
-			if (nrc_atcmd_is_ready())
+			if (nrc_atcmd_get_ready())
 				log_error("raspi_hif_read(), %s\n", strerror(-ret));
 
 			sleep(1);
 		}
-
-		ret = raspi_eirq_poll(-1);
-		if (ret == 0)
-			usleep(1 * 1000);
-		else if (ret < 0 && ret != -ETIME)
-			break;
-/*		else
-			log_debug("eirq_poll=%d\n", ret); */
+		else if (!eirq_poll)
+			usleep(1000);
 	}
 
 	pthread_exit(0);
@@ -331,7 +357,7 @@ static int raspi_cli_open (raspi_cli_hif_t *hif)
 		return -1;
 	}
 
-	ret = pthread_create(&g_raspi_cli_thread, NULL, raspi_cli_recv_thread, NULL);
+	ret = pthread_create(&g_raspi_cli_thread, NULL, raspi_cli_recv_thread, hif);
 	if (ret < 0)
 	{
 		log_error("pthread_create(), %s\n", strerror(errno));
@@ -572,8 +598,19 @@ static int raspi_cli_run_script (raspi_cli_hif_t *hif, char *script, bool atcmd_
 			continue;
 		else if (memcmp(cmd, "AT", 2) == 0)
 		{
-			if (nrc_atcmd_send_cmd(cmd) == ATCMD_RET_ERROR && atcmd_error_exit)
-				goto error_exit;
+			switch (nrc_atcmd_send_cmd(cmd))
+			{
+				case ATCMD_RET_TIMEOUT:
+					if (strcmp(cmd, "ATZ") == 0)
+					{
+						log_info("ATZ: HIF_REOPEN\n");
+					}
+					break;
+
+				case ATCMD_RET_ERROR:
+				   if (atcmd_error_exit)
+						goto error_exit;
+			}
 		}
 		else if (memcmp(cmd, "UART", 4) == 0) /* UART <baudrate> */
 		{
@@ -1490,13 +1527,13 @@ void signal_handler (int signum)
 int main (int argc, char *argv[])
 {
 	int signum[] = { SIGINT, SIGTERM };
-	raspi_cli_opt_t opt;
+	raspi_cli_opt_t *opt = &g_raspi_cli_opt;
 	int i;
 
-	if (raspi_cli_option(argc, argv, &opt) != 0)
+	if (raspi_cli_option(argc, argv, opt) != 0)
 		return -1;
 
-	if (raspi_cli_open(&opt.hif) != 0)
+	if (raspi_cli_open(&opt->hif) != 0)
 		return -1;
 
 	for (i = 0 ; i < sizeof(signum) / sizeof(int) ; i++)
@@ -1511,8 +1548,8 @@ int main (int argc, char *argv[])
 
 	log_info("\n");
 
-	if (raspi_cli_run_script(&opt.hif, opt.script.file, opt.script.atcmd_error_exit) == 0)
-		raspi_cli_run_loop(&opt.hif);
+	if (raspi_cli_run_script(&opt->hif, opt->script.file, opt->script.atcmd_error_exit) == 0)
+		raspi_cli_run_loop(&opt->hif);
 
 	raspi_cli_close();
 

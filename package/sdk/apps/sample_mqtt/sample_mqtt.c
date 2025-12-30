@@ -43,6 +43,7 @@
 #if defined( USE_MQTTS )
 #define BROKER_PORT 8883
 #else
+//#define TEST_PS
 #define BROKER_PORT 1883
 #endif
 
@@ -353,6 +354,35 @@ nrc_err_t run_sample_mqtt(WIFI_CONFIG *param)
 
 		_delay_ms(interval);
 	}
+
+#if defined(TEST_PS) && !defined(USE_MQTTS)
+	uint8_t ps_mode = 1;
+	uint32_t ps_idle_timeout_ms = 1000;
+	uint32_t ps_sleep_time_ms = 5000;
+
+#if defined(NVS_USE) && (NVS_USE == 1)
+	get_nvs_ps_setting(&ps_mode, &ps_idle_timeout_ms, &ps_sleep_time_ms);
+#endif
+	if (ps_mode) {
+		if (nrc_ps_wifi_tim_deep_sleep(ps_idle_timeout_ms, ps_sleep_time_ms) == NRC_SUCCESS) {
+			while (nrc_addr_get_state(0) == NET_ADDR_SET &&
+				nrc_wifi_get_state(0) == WIFI_STATE_CONNECTED) {
+				_delay_ms(100);
+			}
+		} else {
+			nrc_usr_print("Failed to enter TIM deepsleep\n");
+		}
+	} else {
+		if (nrc_ps_deep_sleep(ps_sleep_time_ms) == NRC_SUCCESS) {
+			while (nrc_addr_get_state(0) == NET_ADDR_SET &&
+				nrc_wifi_get_state(0) == WIFI_STATE_CONNECTED) {
+				_delay_ms(100);
+			}
+		} else {
+			nrc_usr_print("Failed to enter nonTIM deepsleep\n");
+		}
+	}
+#endif
 
 	if ((rc = MQTTUnsubscribe(mqtt_client, "halow/11ah/mqtt/sample/mytopic")) != 0){
 		nrc_usr_print("Return code from MQTT unsubscribe is %d\n", rc);

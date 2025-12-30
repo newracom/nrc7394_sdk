@@ -74,8 +74,10 @@ typedef enum {
 
 /** @brief Flow control	*/
 typedef enum  {
-	NRC_UART_HFC_DISABLE,	/**< Disable of flow control	*/
-	NRC_UART_HFC_ENABLE,	/**< Enable of flow control	*/
+	NRC_UART_HFC_DISABLE = 0,	/**< Disable of flow control	*/
+	NRC_UART_HFC_CTS_ENABLE = (1 << 0), /**< Enable of flow control	(CTS only)*/
+	NRC_UART_HFC_RTS_ENABLE = (1 << 1), /**< Enable of flow control	(RTS only)*/
+	NRC_UART_HFC_ENABLE = (NRC_UART_HFC_CTS_ENABLE | NRC_UART_HFC_RTS_ENABLE)	/**< Enable of flow control	*/
 } NRC_UART_HW_FLOW_CTRL;
 
 /** @brief FIFO	*/

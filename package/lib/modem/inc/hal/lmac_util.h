@@ -94,20 +94,35 @@ typedef struct _lmac_auth_ctrl_t{
 	uint8_t T_SLOT;
 	uint8_t TI_MIN;
 	uint8_t TI_MAX;
-	uint8_t CUR_TI;
+	uint8_t TI_CUR;
+	uint32_t ps_threshold_ms;
+	uint32_t precomputed_delay_ms;
 } lmac_auth_ctrl_t;
 
 lmac_auth_ctrl_t* lmac_get_auth_control_param(void);
-void lmac_add_task_delay(uint8_t vif_id);
+uint32_t lmac_get_auth_delay(uint8_t vif_id);
+void lmac_add_task_delay(uint8_t vif_id, uint32_t delay_ms);
 bool lmac_reset_auth_current_ti(void);
 void lmac_set_auth_control_bi(uint16_t bi);
 uint16_t lmac_get_auth_control_bi();
 void lmac_set_auth_control_scale(uint8_t scale);
 uint8_t lmac_get_auth_control_scale();
 bool lmac_set_auth_current_ti(void);
-bool lmac_get_auth_current_ti(int *ti);
-uint16_t lmac_get_auth_control_bo_cnt();
-bool lmac_set_auth_control_param(uint8_t slot, uint8_t ti_min, uint8_t ti_max);
+bool lmac_get_auth_current_ti(uint8_t *ti);
+uint8_t lmac_get_auth_control_bo_cnt();
+void lmac_set_auth_control_bo_cnt(uint8_t count);
+uint8_t lmac_get_auth_control_retry_cnt();
+void lmac_set_auth_control_retry_cnt(uint8_t count);
+bool lmac_set_auth_control_param(uint8_t slot, uint8_t ti_min, uint8_t ti_max, uint8_t ti_curr);
+bool lmac_set_auth_control_ps(uint32_t threshold_ms);
+uint32_t lmac_get_auth_control_ps_threshold(void);
+bool lmac_get_auth_control_start_auth_rtc(uint64_t *time);
+bool lmac_set_auth_control_start_auth_rtc(uint64_t time);
+uint32_t lmac_get_auth_control_msg_cnt();
+void lmac_set_auth_control_msg_cnt(uint32_t count);
+bool lmac_set_auth_control_precomputed_delay(uint32_t delay_ms);
+uint32_t lmac_get_auth_control_precomputed_delay(void);
+void lmac_check_and_do_auth_control_delay(uint8_t vif_id, GenericMacHeader* gmh);
 #endif /* defined(INCLUDE_AUTH_CONTROL) */
 
 /* Sync to AP about PM */

@@ -31,10 +31,14 @@ extern int hal_led_off(int id);
 extern int hal_led_trx_init (int tx_gpio, int rx_gpio, int timer_period, bool invert);
 extern int hal_led_trx_deinit (void);
 
+#if 0
 #define hal_led_info(fmt, ...)		I(TT_LED, fmt, ##__VA_ARGS__)
+#else
+#define hal_led_info(fmt, ...)		CPA(fmt, ##__VA_ARGS__)
+#endif
 #define hal_led_error(fmt, ...)		E(TT_LED, fmt, ##__VA_ARGS__)
 #if 0
-#define hal_led_debug(fmt, ...)		A(fmt, ##__VA_ARGS__)
+#define hal_led_debug(fmt, ...)		CPA(fmt, ##__VA_ARGS__)
 #else
 #define hal_led_debug(fmt, ...)
 #endif

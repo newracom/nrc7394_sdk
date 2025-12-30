@@ -32,7 +32,7 @@
 /**********************************************************************************************/
 
 #define ATCMD_MSG_LEN_MIN		4			/* 'AT\r\n' */
-#define ATCMD_MSG_LEN_MAX		128
+#define ATCMD_MSG_LEN_MAX		(1 * 128)
 
 #define ATCMD_DATA_LEN_MAX		(4 * 1024) 	/* f/w atcmd.h ATCMD_DATA_LEN_MAX */
 
@@ -51,18 +51,10 @@ enum ATCMD_BOOT_REASON
 
 enum ATCMD_RET_TYPE
 {
+	ATCMD_RET_TIMEOUT = -2,
 	ATCMD_RET_ERROR = -1,
 	ATCMD_RET_OK = 0,
 	ATCMD_RET_NONE
-};
-
-enum ATCMD_INFO
-{
-	ATCMD_INFO_START = 0,
-
-	ATCMD_INFO_END,
-
-	ATCMD_INFO_NUM = ATCMD_INFO_END
 };
 
 enum ATCMD_EVENT
@@ -151,7 +143,7 @@ typedef struct
 } atcmd_rxd_t;
 
 typedef int (*atcmd_boot_cb_t) (int reason);
-typedef int (*atcmd_info_cb_t) (enum ATCMD_INFO info, int argc, char *argv[]);
+typedef int (*atcmd_info_cb_t) (const char *cmd, int argc, char *argv[]);
 typedef int (*atcmd_event_cb_t) (enum ATCMD_EVENT event, int argc, char *argv[]);
 typedef void (*atcmd_rxd_cb_t) (atcmd_rxd_t *rxd, char *data);
 
@@ -159,7 +151,8 @@ typedef void (*atcmd_rxd_cb_t) (atcmd_rxd_t *rxd, char *data);
 
 extern char *nrc_atcmd_param_to_str (const char *param, char *str, int len);
 
-extern bool nrc_atcmd_is_ready (void);
+extern bool nrc_atcmd_get_ready (void);
+extern void nrc_atcmd_set_ready (bool ready);
 
 extern int nrc_atcmd_send (char *buf, int len);
 extern int nrc_atcmd_send_cmd (const char *fmt, ...);

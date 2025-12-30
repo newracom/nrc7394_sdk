@@ -29,8 +29,15 @@ int os_get_time(struct os_time *t)
 {
     int unit = 1000/configTICK_RATE_HZ;
 	TickType_t cur = xTaskGetTickCount()*unit;
+#if 1
+	// At cur = 998 -> sec = 0, usec = 998000
+	t->sec = cur / (unit*configTICK_RATE_HZ);
+	t->usec = (cur % (unit*configTICK_RATE_HZ)) * 1000;
+#else
+	// At cur = 998 -> sec = 0, usec = 0 Why?
 	t->sec = (cur + 1) / (unit*configTICK_RATE_HZ);
 	t->usec = (cur % unit*configTICK_RATE_HZ)*1000;
+#endif
 
 	return 0;
 }

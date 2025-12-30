@@ -392,6 +392,7 @@ void API 	nrc_config_load_sysconfig(void);
 bool API 	nrc_config_rf_cal_select_first_filtered_data(rf_cal_data_header_filter_func data_header_filter);
 void API 	nrc_config_rf_cal_select_first_valid_data();
 bool API 	nrc_config_rf_cal_select_data_by_country_code(char *country_code, uint8_t id);
+bool API 	nrc_config_rf_cal_select_data_by_worldwide_code(uint8_t id);
 
 void API 	nrc_config_load_rf_cal_block(uint8_t* rf_cal_block_data);
 void API 	nrc_config_erase_rf_cal_block(void);
@@ -405,6 +406,8 @@ bool API 	nrc_config_set_macaddr(uint8_t *macaddr, uint8_t vif_id);
 
 extern bool sysconfig_valid;
 extern bool rf_cal_valid;
+extern bool ww_valid;
+extern int8_t ww_id;
 
 #define ALL_CC_ID 0xFF
 
@@ -414,6 +417,14 @@ typedef struct {
 	uint8_t  reserved;
 } cc_id_t;
 
+static const cc_id_t ww8_ww9_cc_ids[] =
+{
+	{"EU",   ALL_CC_ID},
+	{"TW",   2},
+	{"SG",   2},
+	{{0, 0}, 0, 0} //END MARKER
+};
+
 static const cc_id_t ww7_cc_ids[] =
 {
 	{"CN",   ALL_CC_ID},
@@ -422,7 +433,6 @@ static const cc_id_t ww7_cc_ids[] =
 
 static const cc_id_t ww8_cc_ids[] =
 {
-	{"EU",   ALL_CC_ID},
 	{"SG",   8},
 	{"TW",   1},
 	{{0, 0}, 0, 0} //END MARKER
@@ -437,6 +447,7 @@ static const cc_id_t ww9_cc_ids[] =
 	{"AU",   ALL_CC_ID},
 	{"NZ",   ALL_CC_ID},
 	{"TW",   9},
+	{"TW",   3}, //Taiwan-NCC
 	{{0, 0}, 0, 0} //END MARKER
 };
 

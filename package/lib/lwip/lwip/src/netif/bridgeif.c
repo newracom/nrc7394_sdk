@@ -91,6 +91,8 @@
 #include "lwip/snmp.h"
 #include "lwip/timeouts.h"
 #include <string.h>
+#include "system_recovery.h"
+#include "system_modem_api.h"
 
 #if LWIP_NUM_NETIF_CLIENT_DATA
 
@@ -466,7 +468,8 @@ bridgeif_init(struct netif *netif)
 
 #if LWIP_NETIF_HOSTNAME
   /* Initialize interface hostname */
-  netif->hostname = "lwip";
+  if (!netif->hostname)
+	  netif->hostname = "lwip";
 #endif /* LWIP_NETIF_HOSTNAME */
 
   /*
@@ -561,7 +564,101 @@ bridgeif_add_port(struct netif *bridgeif, struct netif *portif)
   /* remove ETHARP flag to prevent sending report events on netif-up */
   netif_clear_flags(portif, NETIF_FLAG_ETHARP);
 
+#if defined(NRC_LWIP)
+#if defined(INCLUDE_FAST_CONNECT)
+  if (system_modem_api_get_fc()) {
+    if (!system_recovery_wifi_ap_get_in_recovery()) {
+      /* Save bridge port number */
+      system_recovery_wifi_ap_set_bridge(portif->num);
+      if (system_modem_api_is_ap(portif->num)) {
+        /* Save retention for bridged & associated STA */
+        if (system_recovery_wifi_ap_get_active_bridgeif(portif->num) >= 0) {
+          system_recovery_wifi_ap_set_valid(true);
+        }
+        system_modem_api_write_fc_ap(false);
+      } else if (system_modem_api_is_sta(portif->num)) {
+        /* Save retention for bridged & associated AP */
+        if (system_recovery_wifi_ap_get_active_bridgeif(portif->num) >= 0) {
+            system_modem_api_write_fc_sta(false);
+        }
+      }
+    } else {
+      /* Restore bridge fdb for this port */
+      if (system_recovery_wifi_ip_is_valid()) {
+        for (int i = 0; i < MAX_RECOVERY_STA; i++) {
+          recovery_peer_config_t *peer = system_recovery_wifi_ip_get_peer(i);
+          if (peer == NULL || peer->ipaddr == 0 || peer->ipaddr == UINT32_MAX)
+            continue;
+          if (peer->net_id == portif->num) {
+            struct eth_addr src;
+            memcpy(src.addr, peer->mac, ETH_ALEN);
+            bridgeif_fdb_update_src(port->bridge->fdbd, &src, portif->num);
+            I(TT_NET, "%d Bridge FDB("MACSTR") recovered\n",
+              portif->num, MAC2STR(peer->mac));
+          }
+        }
+      }
+    }
+  }
+#endif /* INCLUDE_FAST_CONNECT */
+#endif /* NRC_LWIP */
   return ERR_OK;
+}
+
+u8_t
+bridgeif_get_dst_port(struct netif *bridgeif, struct eth_addr *dst_addr)
+{
+  bridgeif_private_t *br = (bridgeif_private_t *)bridgeif->state;
+  bridgeif_portmask_t dstports = bridgeif_find_dst_ports(br, dst_addr);
+  bridgeif_portmask_t mask = 1;
+  u8_t i;
+  struct netif *portif = NULL;
+
+  for (i = 0; i < BRIDGEIF_MAX_PORTS; i++, mask = (bridgeif_portmask_t)(mask << 1)) {
+    if (dstports & mask) {
+      if (i < br->max_ports) {
+        portif = br->ports[i].port_netif;
+        break;
+      }
+    }
+  }
+
+  return portif ? portif->num : BR_FLOOD;
+}
+
+void bridgeif_flush_port(struct netif *bridgeif, struct netif *portif)
+{
+	bridgeif_private_t *br;
+	u8_t i;
+
+	LWIP_ASSERT("bridgeif != NULL", bridgeif != NULL);
+	LWIP_ASSERT("bridgeif->state != NULL", bridgeif->state != NULL);
+	LWIP_ASSERT("portif != NULL", portif != NULL);
+
+	br = (bridgeif_private_t *)bridgeif->state;
+
+	for (i = 0; i < br->num_ports; i++) {
+		bridgeif_port_t *port = &br->ports[i];
+		if (port->port_netif == portif) {
+			/* i (or port->port_num) is the bridge port index used in the FDB */
+			bridgeif_fdb_flush_port(br->fdbd, port->port_num);
+			break;
+		}
+	}
+}
+
+/* global FDB flush */
+void
+bridgeif_flush_all(struct netif *bridgeif)
+{
+	bridgeif_private_t *br;
+	LWIP_ASSERT("bridgeif != NULL", bridgeif != NULL);
+	LWIP_ASSERT("bridgeif->state != NULL", bridgeif->state != NULL);
+
+	br = (bridgeif_private_t *)bridgeif->state;
+
+	/* Clear dynamic table */
+	bridgeif_fdb_flush_all(br->fdbd);
 }
 
 #endif /* LWIP_NUM_NETIF_CLIENT_DATA */

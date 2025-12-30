@@ -28,5 +28,6 @@ SRCS_OS	+= port.c
 SRCS_OS	+= heap_4.c
 SRCS_OS	+= timers.c
 SRCS_OS	+= event_groups.c
+SRCS_OS += stream_buffer.c
 CSRCS	+= $(SRCS_OS)
 endif #CONFIG_FREERTOS

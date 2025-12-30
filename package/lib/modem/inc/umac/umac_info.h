@@ -116,7 +116,7 @@ typedef struct _S1G_CAPA {
 /* Security Info */
 typedef struct _SECURITY_INFO {
 	uint8_t security:1;
-	uint8_t akm_type:7; //1:wpa2-ent, 2:wpa2-psk, 8:wpa3-sae, 18:wpa3-owe
+	uint8_t akm_type:7; //1:wpa2-ent, 2:wpa2-psk, 8:wpa3-sae, 18:wpa3-owe, 22:dpp
 } SECURITY_INFO;
 
 /*Cipher Info */
@@ -241,6 +241,9 @@ typedef struct _APINFO{
 	//PER_NODE m_rc_node;
 	//PER_NODE *m_rc_node_p;
 #endif
+#if defined(INCLUDE_BOOT_NONCE_IE)
+	int32_t boot_nonce;
+#endif
 } __attribute__((packed)) APINFO;
 
 /**************************************************************
@@ -319,6 +322,9 @@ void clear_keyinfo(int8_t vif_id, uint16_t aid, enum key_type key_type, uint8_t 
 /* (COMMON) Clear KEY(PTK/GTK) INFO in stainfo or apinfo */
 void clear_keyinfo(int8_t vif_id, uint16_t aid, enum key_type key_type, uint8_t key_id);
 #endif
+
+/* (COMMON) Clear All KEY INFO in stainfo or apinfo */
+void flush_keyinfo(int vif_id);
 
 bool get_keyinfo_by_addr(int8_t vif_id, uint8_t *addr, uint8_t key_id, struct cipher_def *lmc, enum key_type key_type, bool is_tx_gtk);
 

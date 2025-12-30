@@ -21,7 +21,8 @@
     n##_old = reg;
 
 void lmac_report();
-
+int lmac_get_rx_count();
+bool lmac_clear_rx_count();
 #if defined(INCLUDE_LMAC_DEBUG)
 void lmac_print_vector(LMAC_TXBUF* buf);
 void lmac_print_macheader(LMAC_TXBUF *buf);

@@ -211,20 +211,21 @@ static void iperf_socket_init (iperf_socket_t *socket)
 	strcpy(socket->remote_addr, IPERF_IPADDR_ANY);
 }
 
-static void iperf_socket_info_callback (enum ATCMD_INFO info, int argc, char *argv[])
+static void iperf_socket_info_callback (const char *cmd, int argc, char *argv[])
 {
-	int id;
-
-	if (argc == 1 && memcmp(argv[0], "+SOPEN:", 7) == 0)
+	if (memcmp(cmd, "SOPEN", 5) == 0 && argc == 1)
 	{
-		sscanf(argv[0], "+SOPEN:%u", &id);
-		s_socket_id = id;
+		int id = atoi(argv[0]);
+
+		if (id >= 0)
+			s_socket_id = id;
 	}
 }
 
 static int iperf_socket_open_udp (iperf_socket_t *socket, bool ipv6)
 {
 	int i;
+
 	s_socket_id = -1;
 	nrc_atcmd_register_callback(ATCMD_CB_INFO, iperf_socket_info_callback);
 
@@ -336,7 +337,7 @@ static int iperf_socket_close (iperf_socket_t *socket)
 {
 	if (g_iperf_socket_send_passthrough)
 	{
-		uint32_t timeout = (5 * 1000);
+		uint32_t timeout = (20 * 1000);
 		int i;
 
 		for (i = 0 ; i < timeout ; i++)

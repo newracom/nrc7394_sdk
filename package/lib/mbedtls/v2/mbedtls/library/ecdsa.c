@@ -360,12 +360,23 @@ modn:
          * Step 6: compute s = (e + r * d) / k = t (e + rd) / (kt) mod n
          */
 #if defined(INCLUDE_HW_SECURITY_ACC_BN)
-        MBEDTLS_MPI_CHK(mbedtls_mpi_mul_mpi(s, pr, d));
-        MBEDTLS_MPI_CHK(mbedtls_mpi_add_mpi(&e, &e, s));
-        MBEDTLS_MPI_CHK(mbedtls_mpi_mul_mpi_mod_mpi(&e, &e, &t, &grp->N));
-        MBEDTLS_MPI_CHK(mbedtls_mpi_mul_mpi_mod_mpi(pk, pk, &t, &grp->N));
-        MBEDTLS_MPI_CHK(mbedtls_mpi_inv_mod(s, pk, &grp->N));
-        MBEDTLS_MPI_CHK(mbedtls_mpi_mul_mpi_mod_mpi(s, s, &e, &grp->N));
+        if (grp->nbits / 8 / sizeof(mbedtls_mpi_uint) >= 16) {
+            MBEDTLS_MPI_CHK( mbedtls_mpi_mul_mpi( s, pr, d ) );
+            MBEDTLS_MPI_CHK( mbedtls_mpi_add_mpi( &e, &e, s ) );
+            MBEDTLS_MPI_CHK( mbedtls_mpi_mul_mpi( &e, &e, &t ) );
+            MBEDTLS_MPI_CHK( mbedtls_mpi_mul_mpi( pk, pk, &t ) );
+            MBEDTLS_MPI_CHK( mbedtls_mpi_mod_mpi( pk, pk, &grp->N ) );
+            MBEDTLS_MPI_CHK( mbedtls_mpi_inv_mod( s, pk, &grp->N ) );
+            MBEDTLS_MPI_CHK( mbedtls_mpi_mul_mpi( s, s, &e ) );
+            MBEDTLS_MPI_CHK( mbedtls_mpi_mod_mpi( s, s, &grp->N ) );
+        } else {
+            MBEDTLS_MPI_CHK(mbedtls_mpi_mul_mpi(s, pr, d));
+            MBEDTLS_MPI_CHK(mbedtls_mpi_add_mpi(&e, &e, s));
+            MBEDTLS_MPI_CHK(mbedtls_mpi_mul_mpi_mod_mpi(&e, &e, &t, &grp->N));
+            MBEDTLS_MPI_CHK(mbedtls_mpi_mul_mpi_mod_mpi(pk, pk, &t, &grp->N));
+            MBEDTLS_MPI_CHK(mbedtls_mpi_inv_mod(s, pk, &grp->N));
+            MBEDTLS_MPI_CHK(mbedtls_mpi_mul_mpi_mod_mpi(s, s, &e, &grp->N));
+        }
 #else
         MBEDTLS_MPI_CHK( mbedtls_mpi_mul_mpi( s, pr, d ) );
         MBEDTLS_MPI_CHK( mbedtls_mpi_add_mpi( &e, &e, s ) );
@@ -644,8 +655,16 @@ static int ecdsa_verify_restartable( mbedtls_ecp_group *grp,
     MBEDTLS_MPI_CHK( mbedtls_mpi_inv_mod( &s_inv, s, &grp->N ) );
 
 #if defined(INCLUDE_HW_SECURITY_ACC_BN)
-    MBEDTLS_MPI_CHK(mbedtls_mpi_mul_mpi_mod_mpi(pu1, &e, &s_inv, &grp->N));
-    MBEDTLS_MPI_CHK(mbedtls_mpi_mul_mpi_mod_mpi(pu2, r, &s_inv, &grp->N));
+    if (grp->nbits / 8 / sizeof(mbedtls_mpi_uint) >= 16) {
+        MBEDTLS_MPI_CHK( mbedtls_mpi_mul_mpi( pu1, &e, &s_inv ) );
+        MBEDTLS_MPI_CHK( mbedtls_mpi_mod_mpi( pu1, pu1, &grp->N ) );
+
+        MBEDTLS_MPI_CHK( mbedtls_mpi_mul_mpi( pu2, r, &s_inv ) );
+        MBEDTLS_MPI_CHK( mbedtls_mpi_mod_mpi( pu2, pu2, &grp->N ) );
+    } else {
+        MBEDTLS_MPI_CHK(mbedtls_mpi_mul_mpi_mod_mpi(pu1, &e, &s_inv, &grp->N));
+        MBEDTLS_MPI_CHK(mbedtls_mpi_mul_mpi_mod_mpi(pu2, r, &s_inv, &grp->N));
+    }
 #else
     MBEDTLS_MPI_CHK( mbedtls_mpi_mul_mpi( pu1, &e, &s_inv ) );
     MBEDTLS_MPI_CHK( mbedtls_mpi_mod_mpi( pu1, pu1, &grp->N ) );

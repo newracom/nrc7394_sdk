@@ -4605,12 +4605,15 @@ struct wpa_driver_ops {
 	int (*set_frequency)(void *priv, u16 freqeuncy);
 
 	int (*set_bss_max_idle)(void *priv, int period, int retry);
+
+	int (*set_device_mode)(void *priv, int mode);
 };
 
 /**
  * enum wpa_event_type - Event type for wpa_supplicant_event() calls
  */
-enum wpa_event_type {
+enum wpa_event_type
+{
 	/**
 	 * EVENT_ASSOC - Association completed
 	 *
@@ -5152,8 +5155,8 @@ enum wpa_event_type {
 	EVENT_WDS_STA_INTERFACE_STATUS,
 
 	/**
-	  * EVENT_UPDATE_DH - Notification of updated DH information
-	  */
+	 * EVENT_UPDATE_DH - Notification of updated DH information
+	 */
 	EVENT_UPDATE_DH,
 
 	/**
@@ -5164,8 +5167,16 @@ enum wpa_event_type {
 	 * is required to provide more details of the frame.
 	 */
 	EVENT_UNPROT_BEACON,
-};
 
+	/**
+	 * EVENT_TX_WAIT_EXPIRE - TX wait timed out
+	 *
+	 * This event is used to indicate when the driver has completed
+	 * wait for a response frame based on a TX request that specified a
+	 * non-zero wait time and that has not been explicitly cancelled.
+	 */
+	EVENT_TX_WAIT_EXPIRE,
+};
 
 /**
  * struct freq_survey - Channel survey info

@@ -1,0 +1,1580 @@
+{
+  "descriptor": {
+    "configuration": {
+      "add-cpes-if-none": false,
+      "by-cve": false,
+      "check-for-app-update": true,
+      "db": {
+        "auto-update": true,
+        "ca-cert": "",
+        "cache-dir": "/home/wlan/.cache/grype/db",
+        "max-allowed-built-age": 432000000000000,
+        "max-update-check-frequency": 7200000000000,
+        "require-update-check": false,
+        "update-available-timeout": 30000000000,
+        "update-download-timeout": 300000000000,
+        "update-url": "https://grype.anchore.io/databases",
+        "validate-age": true,
+        "validate-by-hash-on-start": true
+      },
+      "default-image-pull-source": "",
+      "dev": {
+        "db": {
+          "debug": false
+        }
+      },
+      "distro": "",
+      "exclude": [],
+      "exp": {},
+      "externalSources": {
+        "enable": false,
+        "maven": {
+          "baseUrl": "https://search.maven.org/solrsearch/select",
+          "rateLimit": 300000000,
+          "searchUpstreamBySha1": true
+        }
+      },
+      "fail-on-severity": "",
+      "file": "",
+      "ignore": [
+        {
+          "fix-state": "",
+          "match-type": "exact-indirect-match",
+          "namespace": "",
+          "package": {
+            "language": "",
+            "location": "",
+            "name": "kernel-headers",
+            "type": "rpm",
+            "upstream-name": "kernel",
+            "version": ""
+          },
+          "reason": "",
+          "vex-justification": "",
+          "vex-status": "",
+          "vulnerability": ""
+        },
+        {
+          "fix-state": "",
+          "match-type": "exact-indirect-match",
+          "namespace": "",
+          "package": {
+            "language": "",
+            "location": "",
+            "name": "linux(-.*)?-headers-.*",
+            "type": "deb",
+            "upstream-name": "linux.*",
+            "version": ""
+          },
+          "reason": "",
+          "vex-justification": "",
+          "vex-status": "",
+          "vulnerability": ""
+        },
+        {
+          "fix-state": "",
+          "match-type": "exact-indirect-match",
+          "namespace": "",
+          "package": {
+            "language": "",
+            "location": "",
+            "name": "linux-libc-dev",
+            "type": "deb",
+            "upstream-name": "linux",
+            "version": ""
+          },
+          "reason": "",
+          "vex-justification": "",
+          "vex-status": "",
+          "vulnerability": ""
+        }
+      ],
+      "ignore-wontfix": "",
+      "match": {
+        "dotnet": {
+          "using-cpes": false
+        },
+        "golang": {
+          "allow-main-module-pseudo-version-comparison": false,
+          "always-use-cpe-for-stdlib": true,
+          "using-cpes": false
+        },
+        "java": {
+          "using-cpes": false
+        },
+        "javascript": {
+          "using-cpes": false
+        },
+        "jvm": {
+          "using-cpes": true
+        },
+        "python": {
+          "using-cpes": false
+        },
+        "ruby": {
+          "using-cpes": false
+        },
+        "rust": {
+          "using-cpes": false
+        },
+        "stock": {
+          "using-cpes": true
+        }
+      },
+      "match-upstream-kernel-headers": false,
+      "name": "",
+      "only-fixed": false,
+      "only-notfixed": false,
+      "output": [
+        "json"
+      ],
+      "output-template-file": "",
+      "platform": "",
+      "pretty": false,
+      "registry": {
+        "auth": null,
+        "ca-cert": "",
+        "insecure-skip-tls-verify": false,
+        "insecure-use-http": false
+      },
+      "search": {
+        "indexed-archives": true,
+        "scope": "squashed",
+        "unindexed-archives": false
+      },
+      "show-suppressed": false,
+      "vex-add": [],
+      "vex-documents": []
+    },
+    "db": {
+      "providers": {
+        "alma": {
+          "captured": "2025-12-30T00:24:24Z",
+          "input": "xxh64:4eae1d77b8a0f455"
+        },
+        "alpine": {
+          "captured": "2025-12-30T00:24:29Z",
+          "input": "xxh64:3514f3349b6a52b5"
+        },
+        "amazon": {
+          "captured": "2025-12-30T00:24:29Z",
+          "input": "xxh64:08b17c8cf9010196"
+        },
+        "bitnami": {
+          "captured": "2025-12-30T00:24:23Z",
+          "input": "xxh64:1a6ece132d4c7e44"
+        },
+        "chainguard": {
+          "captured": "2025-12-30T00:24:22Z",
+          "input": "xxh64:31b41034920c8d41"
+        },
+        "chainguard-libraries": {
+          "captured": "2025-12-30T00:24:31Z",
+          "input": "xxh64:9e624fa6df19b8bc"
+        },
+        "debian": {
+          "captured": "2025-12-30T00:24:30Z",
+          "input": "xxh64:729a6781b9045236"
+        },
+        "echo": {
+          "captured": "2025-12-30T00:24:20Z",
+          "input": "xxh64:870d87918c884e4d"
+        },
+        "epss": {
+          "captured": "2025-12-30T00:24:28Z",
+          "input": "xxh64:fb3a52b689131e22"
+        },
+        "github": {
+          "captured": "2025-12-30T00:24:37Z",
+          "input": "xxh64:cb47cc4046a2a59c"
+        },
+        "kev": {
+          "captured": "2025-12-30T00:24:29Z",
+          "input": "xxh64:8e5322bd5e207e22"
+        },
+        "mariner": {
+          "captured": "2025-12-30T00:24:27Z",
+          "input": "xxh64:2512d639be335970"
+        },
+        "minimos": {
+          "captured": "2025-12-30T00:24:23Z",
+          "input": "xxh64:11571e52bf4b6f4a"
+        },
+        "nvd": {
+          "captured": "2025-12-30T00:28:10Z",
+          "input": "xxh64:a659061af0a8234f"
+        },
+        "oracle": {
+          "captured": "2025-12-30T00:24:26Z",
+          "input": "xxh64:db8bad48abc57985"
+        },
+        "rhel": {
+          "captured": "2025-12-30T00:25:36Z",
+          "input": "xxh64:fc92a75533595ec3"
+        },
+        "sles": {
+          "captured": "2025-12-30T00:24:43Z",
+          "input": "xxh64:729c1014618e77f3"
+        },
+        "ubuntu": {
+          "captured": "2025-12-30T00:26:13Z",
+          "input": "xxh64:070ce6e7df0b1bbd"
+        },
+        "wolfi": {
+          "captured": "2025-12-30T00:24:34Z",
+          "input": "xxh64:90864d2fe0e7321f"
+        }
+      },
+      "status": {
+        "built": "2025-12-30T08:19:52Z",
+        "from": "https://grype.anchore.io/databases/v6/vulnerability-db_v6.1.3_2025-12-30T00:24:20Z_1767082792.tar.zst?checksum=sha256%3Ad106f975f2defe66ae3cd89e9d412c118700ff845b1d4eb6f1dca6239a1fb10f",
+        "path": "/home/wlan/.cache/grype/db/6/vulnerability.db",
+        "schemaVersion": "v6.1.3",
+        "valid": true
+      }
+    },
+    "name": "grype",
+    "timestamp": "2025-12-30T13:12:48.970157609-08:00",
+    "version": "0.91.2"
+  },
+  "distro": {
+    "idLike": null,
+    "name": "",
+    "version": ""
+  },
+  "matches": [
+    {
+      "artifact": {
+        "cpes": [
+          "cpe:2.3:a:dawidd6/action-download-artifact:dawidd6/action-download-artifact:v2:*:*:*:*:*:*:*",
+          "cpe:2.3:a:dawidd6/action-download-artifact:dawidd6/action_download_artifact:v2:*:*:*:*:*:*:*",
+          "cpe:2.3:a:dawidd6/action_download_artifact:dawidd6/action-download-artifact:v2:*:*:*:*:*:*:*",
+          "cpe:2.3:a:dawidd6/action_download_artifact:dawidd6/action_download_artifact:v2:*:*:*:*:*:*:*",
+          "cpe:2.3:a:dawidd6/action-download:dawidd6/action-download-artifact:v2:*:*:*:*:*:*:*",
+          "cpe:2.3:a:dawidd6/action-download:dawidd6/action_download_artifact:v2:*:*:*:*:*:*:*",
+          "cpe:2.3:a:dawidd6/action_download:dawidd6/action-download-artifact:v2:*:*:*:*:*:*:*",
+          "cpe:2.3:a:dawidd6/action_download:dawidd6/action_download_artifact:v2:*:*:*:*:*:*:*",
+          "cpe:2.3:a:dawidd6/action:dawidd6/action-download-artifact:v2:*:*:*:*:*:*:*",
+          "cpe:2.3:a:dawidd6/action:dawidd6/action_download_artifact:v2:*:*:*:*:*:*:*"
+        ],
+        "id": "a1a8693375eee458",
+        "language": "",
+        "licenses": [],
+        "locations": [
+          {
+            "accessPath": "/package/lib/FreeRTOS-core/.github/workflows/upload-release.yml",
+            "annotations": {
+              "evidence": "primary"
+            },
+            "path": "/package/lib/FreeRTOS-core/.github/workflows/upload-release.yml"
+          }
+        ],
+        "name": "dawidd6/action-download-artifact",
+        "purl": "pkg:github/dawidd6/action-download-artifact@v2",
+        "type": "github-action",
+        "upstreams": [],
+        "version": "v2"
+      },
+      "matchDetails": [
+        {
+          "fix": {
+            "suggestedVersion": "6"
+          },
+          "found": {
+            "versionConstraint": "<6 (unknown)",
+            "vulnerabilityID": "GHSA-5xr6-xhww-33m4"
+          },
+          "matcher": "stock-matcher",
+          "searchedBy": {
+            "language": "",
+            "namespace": "github:language:github-action",
+            "package": {
+              "name": "dawidd6/action-download-artifact",
+              "version": "v2"
+            }
+          },
+          "type": "exact-direct-match"
+        }
+      ],
+      "relatedVulnerabilities": [],
+      "vulnerability": {
+        "advisories": [],
+        "cvss": [],
+        "dataSource": "https://github.com/advisories/GHSA-5xr6-xhww-33m4",
+        "description": "Artifact poisoning vulnerability in action-download-artifact v5 and earlier",
+        "fix": {
+          "state": "fixed",
+          "versions": [
+            "6"
+          ]
+        },
+        "id": "GHSA-5xr6-xhww-33m4",
+        "namespace": "github:language:github-action",
+        "severity": "High",
+        "urls": []
+      }
+    },
+    {
+      "artifact": {
+        "cpes": [
+          "cpe:2.3:a:python-jinja2:python-jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:python-jinja2:python_jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:python_jinja2:python-jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:python_jinja2:python_jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:jinja2:python-jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:jinja2:python_jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:python-jinja2:jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:python:python-jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:python:python_jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:python_jinja2:jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:jinja2:jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:python:jinja2:3.1.4:*:*:*:*:*:*:*"
+        ],
+        "id": "3af602ff97f56215",
+        "language": "python",
+        "licenses": [],
+        "locations": [
+          {
+            "accessPath": "/package/lib/mbedtls/v3/mbedtls/docs/requirements.txt",
+            "annotations": {
+              "evidence": "primary"
+            },
+            "path": "/package/lib/mbedtls/v3/mbedtls/docs/requirements.txt"
+          }
+        ],
+        "name": "jinja2",
+        "purl": "pkg:pypi/jinja2@3.1.4",
+        "type": "python",
+        "upstreams": [],
+        "version": "3.1.4"
+      },
+      "matchDetails": [
+        {
+          "fix": {
+            "suggestedVersion": "3.1.6"
+          },
+          "found": {
+            "versionConstraint": "<=3.1.5 (python)",
+            "vulnerabilityID": "GHSA-cpwx-vrp4-4pq7"
+          },
+          "matcher": "python-matcher",
+          "searchedBy": {
+            "language": "python",
+            "namespace": "github:language:python",
+            "package": {
+              "name": "jinja2",
+              "version": "3.1.4"
+            }
+          },
+          "type": "exact-direct-match"
+        }
+      ],
+      "relatedVulnerabilities": [
+        {
+          "cvss": [
+            {
+              "metrics": {
+                "baseScore": 8.8,
+                "exploitabilityScore": 2.1,
+                "impactScore": 6.1
+              },
+              "source": "nvd@nist.gov",
+              "type": "Primary",
+              "vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:C/C:H/I:H/A:H",
+              "vendorMetadata": {},
+              "version": "3.1"
+            },
+            {
+              "metrics": {
+                "baseScore": 5.4
+              },
+              "source": "security-advisories@github.com",
+              "type": "Secondary",
+              "vector": "CVSS:4.0/AV:L/AC:L/AT:P/PR:L/UI:P/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N/E:X/CR:X/IR:X/AR:X/MAV:X/MAC:X/MAT:X/MPR:X/MUI:X/MVC:X/MVI:X/MVA:X/MSC:X/MSI:X/MSA:X/S:X/AU:X/R:X/V:X/RE:X/U:X",
+              "vendorMetadata": {},
+              "version": "4.0"
+            }
+          ],
+          "dataSource": "https://nvd.nist.gov/vuln/detail/CVE-2025-27516",
+          "description": "Jinja is an extensible templating engine. Prior to 3.1.6, an oversight in how the Jinja sandboxed environment interacts with the |attr filter allows an attacker that controls the content of a template to execute arbitrary Python code. To exploit the vulnerability, an attacker needs to control the content of a template. Whether that is the case depends on the type of application using Jinja. This vulnerability impacts users of applications which execute untrusted templates. Jinja's sandbox does catch calls to str.format and ensures they don't escape the sandbox. However, it's possible to use the |attr filter to get a reference to a string's plain format method, bypassing the sandbox. After the fix, the |attr filter no longer bypasses the environment's attribute lookup. This vulnerability is fixed in 3.1.6.",
+          "epss": [
+            {
+              "cve": "CVE-2025-27516",
+              "date": "2025-12-29",
+              "epss": 0.00258,
+              "percentile": 0.48969
+            }
+          ],
+          "id": "CVE-2025-27516",
+          "namespace": "nvd:cpe",
+          "severity": "High",
+          "urls": [
+            "https://github.com/pallets/jinja/commit/90457bbf33b8662926ae65cdde4c4c32e756e403",
+            "https://github.com/pallets/jinja/security/advisories/GHSA-cpwx-vrp4-4pq7",
+            "https://lists.debian.org/debian-lts-announce/2025/04/msg00022.html",
+            "https://lists.debian.org/debian-lts-announce/2025/04/msg00045.html"
+          ]
+        }
+      ],
+      "vulnerability": {
+        "advisories": [],
+        "cvss": [],
+        "dataSource": "https://github.com/advisories/GHSA-cpwx-vrp4-4pq7",
+        "description": "Jinja2 vulnerable to sandbox breakout through attr filter selecting format method",
+        "epss": [
+          {
+            "cve": "CVE-2025-27516",
+            "date": "2025-12-29",
+            "epss": 0.00258,
+            "percentile": 0.48969
+          }
+        ],
+        "fix": {
+          "state": "fixed",
+          "versions": [
+            "3.1.6"
+          ]
+        },
+        "id": "GHSA-cpwx-vrp4-4pq7",
+        "namespace": "github:language:python",
+        "severity": "Medium",
+        "urls": []
+      }
+    },
+    {
+      "artifact": {
+        "cpes": [
+          "cpe:2.3:a:python-jinja2:python-jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:python-jinja2:python_jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:python_jinja2:python-jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:python_jinja2:python_jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:jinja2:python-jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:jinja2:python_jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:python-jinja2:jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:python:python-jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:python:python_jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:python_jinja2:jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:jinja2:jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:python:jinja2:3.1.4:*:*:*:*:*:*:*"
+        ],
+        "id": "3af602ff97f56215",
+        "language": "python",
+        "licenses": [],
+        "locations": [
+          {
+            "accessPath": "/package/lib/mbedtls/v3/mbedtls/docs/requirements.txt",
+            "annotations": {
+              "evidence": "primary"
+            },
+            "path": "/package/lib/mbedtls/v3/mbedtls/docs/requirements.txt"
+          }
+        ],
+        "name": "jinja2",
+        "purl": "pkg:pypi/jinja2@3.1.4",
+        "type": "python",
+        "upstreams": [],
+        "version": "3.1.4"
+      },
+      "matchDetails": [
+        {
+          "fix": {
+            "suggestedVersion": "3.1.5"
+          },
+          "found": {
+            "versionConstraint": ">=3.0.0,<=3.1.4 (python)",
+            "vulnerabilityID": "GHSA-gmj6-6f8f-6699"
+          },
+          "matcher": "python-matcher",
+          "searchedBy": {
+            "language": "python",
+            "namespace": "github:language:python",
+            "package": {
+              "name": "jinja2",
+              "version": "3.1.4"
+            }
+          },
+          "type": "exact-direct-match"
+        }
+      ],
+      "relatedVulnerabilities": [
+        {
+          "cvss": [
+            {
+              "metrics": {
+                "baseScore": 8.8,
+                "exploitabilityScore": 2.1,
+                "impactScore": 6.1
+              },
+              "source": "nvd@nist.gov",
+              "type": "Primary",
+              "vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:C/C:H/I:H/A:H",
+              "vendorMetadata": {},
+              "version": "3.1"
+            },
+            {
+              "metrics": {
+                "baseScore": 5.4
+              },
+              "source": "security-advisories@github.com",
+              "type": "Secondary",
+              "vector": "CVSS:4.0/AV:L/AC:L/AT:P/PR:L/UI:P/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N/E:X/CR:X/IR:X/AR:X/MAV:X/MAC:X/MAT:X/MPR:X/MUI:X/MVC:X/MVI:X/MVA:X/MSC:X/MSI:X/MSA:X/S:X/AU:X/R:X/V:X/RE:X/U:X",
+              "vendorMetadata": {},
+              "version": "4.0"
+            }
+          ],
+          "dataSource": "https://nvd.nist.gov/vuln/detail/CVE-2024-56201",
+          "description": "Jinja is an extensible templating engine. In versions on the 3.x branch prior to 3.1.5, a bug in the Jinja compiler allows an attacker that controls both the content and filename of a template to execute arbitrary Python code, regardless of if Jinja's sandbox is used. To exploit the vulnerability, an attacker needs to control both the filename and the contents of a template. Whether that is the case depends on the type of application using Jinja. This vulnerability impacts users of applications which execute untrusted templates where the template author can also choose the template filename. This vulnerability is fixed in 3.1.5.",
+          "epss": [
+            {
+              "cve": "CVE-2024-56201",
+              "date": "2025-12-29",
+              "epss": 0.00031,
+              "percentile": 0.0861
+            }
+          ],
+          "id": "CVE-2024-56201",
+          "namespace": "nvd:cpe",
+          "severity": "High",
+          "urls": [
+            "https://github.com/pallets/jinja/commit/767b23617628419ae3709ccfb02f9602ae9fe51f",
+            "https://github.com/pallets/jinja/issues/1792",
+            "https://github.com/pallets/jinja/releases/tag/3.1.5",
+            "https://github.com/pallets/jinja/security/advisories/GHSA-gmj6-6f8f-6699"
+          ]
+        }
+      ],
+      "vulnerability": {
+        "advisories": [],
+        "cvss": [
+          {
+            "metrics": {
+              "baseScore": 8.8,
+              "exploitabilityScore": 2.9,
+              "impactScore": 5.9
+            },
+            "type": "Secondary",
+            "vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H",
+            "vendorMetadata": {},
+            "version": "3.1"
+          }
+        ],
+        "dataSource": "https://github.com/advisories/GHSA-gmj6-6f8f-6699",
+        "description": "Jinja has a sandbox breakout through malicious filenames",
+        "epss": [
+          {
+            "cve": "CVE-2024-56201",
+            "date": "2025-12-29",
+            "epss": 0.00031,
+            "percentile": 0.0861
+          }
+        ],
+        "fix": {
+          "state": "fixed",
+          "versions": [
+            "3.1.5"
+          ]
+        },
+        "id": "GHSA-gmj6-6f8f-6699",
+        "namespace": "github:language:python",
+        "severity": "Medium",
+        "urls": []
+      }
+    },
+    {
+      "artifact": {
+        "cpes": [
+          "cpe:2.3:a:python-jinja2:python-jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:python-jinja2:python_jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:python_jinja2:python-jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:python_jinja2:python_jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:jinja2:python-jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:jinja2:python_jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:python-jinja2:jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:python:python-jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:python:python_jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:python_jinja2:jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:jinja2:jinja2:3.1.4:*:*:*:*:*:*:*",
+          "cpe:2.3:a:python:jinja2:3.1.4:*:*:*:*:*:*:*"
+        ],
+        "id": "3af602ff97f56215",
+        "language": "python",
+        "licenses": [],
+        "locations": [
+          {
+            "accessPath": "/package/lib/mbedtls/v3/mbedtls/docs/requirements.txt",
+            "annotations": {
+              "evidence": "primary"
+            },
+            "path": "/package/lib/mbedtls/v3/mbedtls/docs/requirements.txt"
+          }
+        ],
+        "name": "jinja2",
+        "purl": "pkg:pypi/jinja2@3.1.4",
+        "type": "python",
+        "upstreams": [],
+        "version": "3.1.4"
+      },
+      "matchDetails": [
+        {
+          "fix": {
+            "suggestedVersion": "3.1.5"
+          },
+          "found": {
+            "versionConstraint": "<=3.1.4 (python)",
+            "vulnerabilityID": "GHSA-q2x7-8rv6-6q7h"
+          },
+          "matcher": "python-matcher",
+          "searchedBy": {
+            "language": "python",
+            "namespace": "github:language:python",
+            "package": {
+              "name": "jinja2",
+              "version": "3.1.4"
+            }
+          },
+          "type": "exact-direct-match"
+        }
+      ],
+      "relatedVulnerabilities": [
+        {
+          "cvss": [
+            {
+              "metrics": {
+                "baseScore": 7.8,
+                "exploitabilityScore": 1.9,
+                "impactScore": 5.9
+              },
+              "source": "134c704f-9b21-4f2e-91b3-4a467353bcc0",
+              "type": "Secondary",
+              "vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H",
+              "vendorMetadata": {},
+              "version": "3.1"
+            },
+            {
+              "metrics": {
+                "baseScore": 5.4
+              },
+              "source": "security-advisories@github.com",
+              "type": "Secondary",
+              "vector": "CVSS:4.0/AV:L/AC:L/AT:P/PR:L/UI:P/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N/E:X/CR:X/IR:X/AR:X/MAV:X/MAC:X/MAT:X/MPR:X/MUI:X/MVC:X/MVI:X/MVA:X/MSC:X/MSI:X/MSA:X/S:X/AU:X/R:X/V:X/RE:X/U:X",
+              "vendorMetadata": {},
+              "version": "4.0"
+            }
+          ],
+          "dataSource": "https://nvd.nist.gov/vuln/detail/CVE-2024-56326",
+          "description": "Jinja is an extensible templating engine. Prior to 3.1.5, An oversight in how the Jinja sandboxed environment detects calls to str.format allows an attacker that controls the content of a template to execute arbitrary Python code. To exploit the vulnerability, an attacker needs to control the content of a template. Whether that is the case depends on the type of application using Jinja. This vulnerability impacts users of applications which execute untrusted templates. Jinja's sandbox does catch calls to str.format and ensures they don't escape the sandbox. However, it's possible to store a reference to a malicious string's format method, then pass that to a filter that calls it. No such filters are built-in to Jinja, but could be present through custom filters in an application. After the fix, such indirect calls are also handled by the sandbox. This vulnerability is fixed in 3.1.5.",
+          "epss": [
+            {
+              "cve": "CVE-2024-56326",
+              "date": "2025-12-29",
+              "epss": 0.00094,
+              "percentile": 0.26885
+            }
+          ],
+          "id": "CVE-2024-56326",
+          "namespace": "nvd:cpe",
+          "severity": "High",
+          "urls": [
+            "https://github.com/pallets/jinja/commit/48b0687e05a5466a91cd5812d604fa37ad0943b4",
+            "https://github.com/pallets/jinja/releases/tag/3.1.5",
+            "https://github.com/pallets/jinja/security/advisories/GHSA-q2x7-8rv6-6q7h",
+            "https://lists.debian.org/debian-lts-announce/2025/04/msg00022.html"
+          ]
+        }
+      ],
+      "vulnerability": {
+        "advisories": [],
+        "cvss": [
+          {
+            "metrics": {
+              "baseScore": 7.8,
+              "exploitabilityScore": 1.9,
+              "impactScore": 5.9
+            },
+            "type": "Secondary",
+            "vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H",
+            "vendorMetadata": {},
+            "version": "3.1"
+          }
+        ],
+        "dataSource": "https://github.com/advisories/GHSA-q2x7-8rv6-6q7h",
+        "description": "Jinja has a sandbox breakout through indirect reference to format method",
+        "epss": [
+          {
+            "cve": "CVE-2024-56326",
+            "date": "2025-12-29",
+            "epss": 0.00094,
+            "percentile": 0.26885
+          }
+        ],
+        "fix": {
+          "state": "fixed",
+          "versions": [
+            "3.1.5"
+          ]
+        },
+        "id": "GHSA-q2x7-8rv6-6q7h",
+        "namespace": "github:language:python",
+        "severity": "Medium",
+        "urls": []
+      }
+    },
+    {
+      "artifact": {
+        "cpes": [
+          "cpe:2.3:a:python:requests:2.31.0:*:*:*:*:*:*:*"
+        ],
+        "id": "8357b54d17d4530f",
+        "language": "python",
+        "licenses": [],
+        "locations": [
+          {
+            "accessPath": "/package/lib/FreeRTOS-core/tools/release/requirements.txt",
+            "annotations": {
+              "evidence": "primary"
+            },
+            "path": "/package/lib/FreeRTOS-core/tools/release/requirements.txt"
+          }
+        ],
+        "name": "requests",
+        "purl": "pkg:pypi/requests@2.31.0",
+        "type": "python",
+        "upstreams": [],
+        "version": "2.31.0"
+      },
+      "matchDetails": [
+        {
+          "fix": {
+            "suggestedVersion": "2.32.4"
+          },
+          "found": {
+            "versionConstraint": "<2.32.4 (python)",
+            "vulnerabilityID": "GHSA-9hjg-9r4m-mvj7"
+          },
+          "matcher": "python-matcher",
+          "searchedBy": {
+            "language": "python",
+            "namespace": "github:language:python",
+            "package": {
+              "name": "requests",
+              "version": "2.31.0"
+            }
+          },
+          "type": "exact-direct-match"
+        }
+      ],
+      "relatedVulnerabilities": [
+        {
+          "cvss": [
+            {
+              "metrics": {
+                "baseScore": 5.3,
+                "exploitabilityScore": 1.7,
+                "impactScore": 3.6
+              },
+              "source": "security-advisories@github.com",
+              "type": "Secondary",
+              "vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:H/I:N/A:N",
+              "vendorMetadata": {},
+              "version": "3.1"
+            }
+          ],
+          "dataSource": "https://nvd.nist.gov/vuln/detail/CVE-2024-47081",
+          "description": "Requests is a HTTP library. Due to a URL parsing issue, Requests releases prior to 2.32.4 may leak .netrc credentials to third parties for specific maliciously-crafted URLs. Users should upgrade to version 2.32.4 to receive a fix. For older versions of Requests, use of the .netrc file can be disabled with `trust_env=False` on one's Requests Session.",
+          "epss": [
+            {
+              "cve": "CVE-2024-47081",
+              "date": "2025-12-29",
+              "epss": 0.0009,
+              "percentile": 0.25894
+            }
+          ],
+          "id": "CVE-2024-47081",
+          "namespace": "nvd:cpe",
+          "severity": "Medium",
+          "urls": [
+            "https://github.com/psf/requests/commit/96ba401c1296ab1dda74a2365ef36d88f7d144ef",
+            "https://github.com/psf/requests/pull/6965",
+            "https://github.com/psf/requests/security/advisories/GHSA-9hjg-9r4m-mvj7",
+            "https://requests.readthedocs.io/en/latest/api/#requests.Session.trust_env",
+            "https://seclists.org/fulldisclosure/2025/Jun/2",
+            "http://seclists.org/fulldisclosure/2025/Jun/2",
+            "http://www.openwall.com/lists/oss-security/2025/06/03/11",
+            "http://www.openwall.com/lists/oss-security/2025/06/03/9",
+            "http://www.openwall.com/lists/oss-security/2025/06/04/1",
+            "http://www.openwall.com/lists/oss-security/2025/06/04/6"
+          ]
+        }
+      ],
+      "vulnerability": {
+        "advisories": [],
+        "cvss": [
+          {
+            "metrics": {
+              "baseScore": 5.3,
+              "exploitabilityScore": 1.7,
+              "impactScore": 3.6
+            },
+            "type": "Secondary",
+            "vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:H/I:N/A:N",
+            "vendorMetadata": {},
+            "version": "3.1"
+          }
+        ],
+        "dataSource": "https://github.com/advisories/GHSA-9hjg-9r4m-mvj7",
+        "description": "Requests vulnerable to .netrc credentials leak via malicious URLs",
+        "epss": [
+          {
+            "cve": "CVE-2024-47081",
+            "date": "2025-12-29",
+            "epss": 0.0009,
+            "percentile": 0.25894
+          }
+        ],
+        "fix": {
+          "state": "fixed",
+          "versions": [
+            "2.32.4"
+          ]
+        },
+        "id": "GHSA-9hjg-9r4m-mvj7",
+        "namespace": "github:language:python",
+        "severity": "Medium",
+        "urls": []
+      }
+    },
+    {
+      "artifact": {
+        "cpes": [
+          "cpe:2.3:a:python:requests:2.31.0:*:*:*:*:*:*:*"
+        ],
+        "id": "8357b54d17d4530f",
+        "language": "python",
+        "licenses": [],
+        "locations": [
+          {
+            "accessPath": "/package/lib/FreeRTOS-core/tools/release/requirements.txt",
+            "annotations": {
+              "evidence": "primary"
+            },
+            "path": "/package/lib/FreeRTOS-core/tools/release/requirements.txt"
+          }
+        ],
+        "name": "requests",
+        "purl": "pkg:pypi/requests@2.31.0",
+        "type": "python",
+        "upstreams": [],
+        "version": "2.31.0"
+      },
+      "matchDetails": [
+        {
+          "fix": {
+            "suggestedVersion": "2.32.0"
+          },
+          "found": {
+            "versionConstraint": "<2.32.0 (python)",
+            "vulnerabilityID": "GHSA-9wx4-h78v-vm56"
+          },
+          "matcher": "python-matcher",
+          "searchedBy": {
+            "language": "python",
+            "namespace": "github:language:python",
+            "package": {
+              "name": "requests",
+              "version": "2.31.0"
+            }
+          },
+          "type": "exact-direct-match"
+        }
+      ],
+      "relatedVulnerabilities": [
+        {
+          "cvss": [
+            {
+              "metrics": {
+                "baseScore": 5.6,
+                "exploitabilityScore": 0.4,
+                "impactScore": 5.2
+              },
+              "source": "security-advisories@github.com",
+              "type": "Secondary",
+              "vector": "CVSS:3.1/AV:L/AC:H/PR:H/UI:R/S:U/C:H/I:H/A:N",
+              "vendorMetadata": {},
+              "version": "3.1"
+            }
+          ],
+          "dataSource": "https://nvd.nist.gov/vuln/detail/CVE-2024-35195",
+          "description": "Requests is a HTTP library. Prior to 2.32.0, when making requests through a Requests `Session`, if the first request is made with `verify=False` to disable cert verification, all subsequent requests to the same host will continue to ignore cert verification regardless of changes to the value of `verify`. This behavior will continue for the lifecycle of the connection in the connection pool. This vulnerability is fixed in 2.32.0.",
+          "epss": [
+            {
+              "cve": "CVE-2024-35195",
+              "date": "2025-12-29",
+              "epss": 0.00046,
+              "percentile": 0.14037
+            }
+          ],
+          "id": "CVE-2024-35195",
+          "namespace": "nvd:cpe",
+          "severity": "Medium",
+          "urls": [
+            "https://github.com/psf/requests/commit/a58d7f2ffb4d00b46dca2d70a3932a0b37e22fac",
+            "https://github.com/psf/requests/pull/6655",
+            "https://github.com/psf/requests/security/advisories/GHSA-9wx4-h78v-vm56",
+            "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/IYLSNK5TL46Q6XPRVMHVWS63MVJQOK4Q/",
+            "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/N7WP6EYDSUOCOJYHDK5NX43PYZ4SNHGZ/"
+          ]
+        }
+      ],
+      "vulnerability": {
+        "advisories": [],
+        "cvss": [
+          {
+            "metrics": {
+              "baseScore": 5.6,
+              "exploitabilityScore": 0.4,
+              "impactScore": 5.2
+            },
+            "type": "Secondary",
+            "vector": "CVSS:3.1/AV:L/AC:H/PR:H/UI:R/S:U/C:H/I:H/A:N",
+            "vendorMetadata": {},
+            "version": "3.1"
+          }
+        ],
+        "dataSource": "https://github.com/advisories/GHSA-9wx4-h78v-vm56",
+        "description": "Requests `Session` object does not verify requests after making first request with verify=False",
+        "epss": [
+          {
+            "cve": "CVE-2024-35195",
+            "date": "2025-12-29",
+            "epss": 0.00046,
+            "percentile": 0.14037
+          }
+        ],
+        "fix": {
+          "state": "fixed",
+          "versions": [
+            "2.32.0"
+          ]
+        },
+        "id": "GHSA-9wx4-h78v-vm56",
+        "namespace": "github:language:python",
+        "severity": "Medium",
+        "urls": []
+      }
+    },
+    {
+      "artifact": {
+        "cpes": [
+          "cpe:2.3:a:python:requests:2.32.3:*:*:*:*:*:*:*"
+        ],
+        "id": "3481c8a5da1f9d8b",
+        "language": "python",
+        "licenses": [],
+        "locations": [
+          {
+            "accessPath": "/package/lib/mbedtls/v3/mbedtls/docs/requirements.txt",
+            "annotations": {
+              "evidence": "primary"
+            },
+            "path": "/package/lib/mbedtls/v3/mbedtls/docs/requirements.txt"
+          }
+        ],
+        "name": "requests",
+        "purl": "pkg:pypi/requests@2.32.3",
+        "type": "python",
+        "upstreams": [],
+        "version": "2.32.3"
+      },
+      "matchDetails": [
+        {
+          "fix": {
+            "suggestedVersion": "2.32.4"
+          },
+          "found": {
+            "versionConstraint": "<2.32.4 (python)",
+            "vulnerabilityID": "GHSA-9hjg-9r4m-mvj7"
+          },
+          "matcher": "python-matcher",
+          "searchedBy": {
+            "language": "python",
+            "namespace": "github:language:python",
+            "package": {
+              "name": "requests",
+              "version": "2.32.3"
+            }
+          },
+          "type": "exact-direct-match"
+        }
+      ],
+      "relatedVulnerabilities": [
+        {
+          "cvss": [
+            {
+              "metrics": {
+                "baseScore": 5.3,
+                "exploitabilityScore": 1.7,
+                "impactScore": 3.6
+              },
+              "source": "security-advisories@github.com",
+              "type": "Secondary",
+              "vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:H/I:N/A:N",
+              "vendorMetadata": {},
+              "version": "3.1"
+            }
+          ],
+          "dataSource": "https://nvd.nist.gov/vuln/detail/CVE-2024-47081",
+          "description": "Requests is a HTTP library. Due to a URL parsing issue, Requests releases prior to 2.32.4 may leak .netrc credentials to third parties for specific maliciously-crafted URLs. Users should upgrade to version 2.32.4 to receive a fix. For older versions of Requests, use of the .netrc file can be disabled with `trust_env=False` on one's Requests Session.",
+          "epss": [
+            {
+              "cve": "CVE-2024-47081",
+              "date": "2025-12-29",
+              "epss": 0.0009,
+              "percentile": 0.25894
+            }
+          ],
+          "id": "CVE-2024-47081",
+          "namespace": "nvd:cpe",
+          "severity": "Medium",
+          "urls": [
+            "https://github.com/psf/requests/commit/96ba401c1296ab1dda74a2365ef36d88f7d144ef",
+            "https://github.com/psf/requests/pull/6965",
+            "https://github.com/psf/requests/security/advisories/GHSA-9hjg-9r4m-mvj7",
+            "https://requests.readthedocs.io/en/latest/api/#requests.Session.trust_env",
+            "https://seclists.org/fulldisclosure/2025/Jun/2",
+            "http://seclists.org/fulldisclosure/2025/Jun/2",
+            "http://www.openwall.com/lists/oss-security/2025/06/03/11",
+            "http://www.openwall.com/lists/oss-security/2025/06/03/9",
+            "http://www.openwall.com/lists/oss-security/2025/06/04/1",
+            "http://www.openwall.com/lists/oss-security/2025/06/04/6"
+          ]
+        }
+      ],
+      "vulnerability": {
+        "advisories": [],
+        "cvss": [
+          {
+            "metrics": {
+              "baseScore": 5.3,
+              "exploitabilityScore": 1.7,
+              "impactScore": 3.6
+            },
+            "type": "Secondary",
+            "vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:H/I:N/A:N",
+            "vendorMetadata": {},
+            "version": "3.1"
+          }
+        ],
+        "dataSource": "https://github.com/advisories/GHSA-9hjg-9r4m-mvj7",
+        "description": "Requests vulnerable to .netrc credentials leak via malicious URLs",
+        "epss": [
+          {
+            "cve": "CVE-2024-47081",
+            "date": "2025-12-29",
+            "epss": 0.0009,
+            "percentile": 0.25894
+          }
+        ],
+        "fix": {
+          "state": "fixed",
+          "versions": [
+            "2.32.4"
+          ]
+        },
+        "id": "GHSA-9hjg-9r4m-mvj7",
+        "namespace": "github:language:python",
+        "severity": "Medium",
+        "urls": []
+      }
+    },
+    {
+      "artifact": {
+        "cpes": [
+          "cpe:2.3:a:python:urllib3:2.2.2:*:*:*:*:*:*:*"
+        ],
+        "id": "8afb1280fb1a8f1c",
+        "language": "python",
+        "licenses": [],
+        "locations": [
+          {
+            "accessPath": "/package/lib/mbedtls/v3/mbedtls/docs/requirements.txt",
+            "annotations": {
+              "evidence": "primary"
+            },
+            "path": "/package/lib/mbedtls/v3/mbedtls/docs/requirements.txt"
+          }
+        ],
+        "name": "urllib3",
+        "purl": "pkg:pypi/urllib3@2.2.2",
+        "type": "python",
+        "upstreams": [],
+        "version": "2.2.2"
+      },
+      "matchDetails": [
+        {
+          "fix": {
+            "suggestedVersion": "2.6.0"
+          },
+          "found": {
+            "versionConstraint": ">=1.0,<2.6.0 (python)",
+            "vulnerabilityID": "GHSA-2xpw-w6gg-jr37"
+          },
+          "matcher": "python-matcher",
+          "searchedBy": {
+            "language": "python",
+            "namespace": "github:language:python",
+            "package": {
+              "name": "urllib3",
+              "version": "2.2.2"
+            }
+          },
+          "type": "exact-direct-match"
+        }
+      ],
+      "relatedVulnerabilities": [
+        {
+          "cvss": [
+            {
+              "metrics": {
+                "baseScore": 7.5,
+                "exploitabilityScore": 3.9,
+                "impactScore": 3.6
+              },
+              "source": "nvd@nist.gov",
+              "type": "Primary",
+              "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "vendorMetadata": {},
+              "version": "3.1"
+            },
+            {
+              "metrics": {
+                "baseScore": 8.9
+              },
+              "source": "security-advisories@github.com",
+              "type": "Secondary",
+              "vector": "CVSS:4.0/AV:N/AC:L/AT:P/PR:N/UI:N/VC:N/VI:N/VA:H/SC:N/SI:N/SA:H/E:X/CR:X/IR:X/AR:X/MAV:X/MAC:X/MAT:X/MPR:X/MUI:X/MVC:X/MVI:X/MVA:X/MSC:X/MSI:X/MSA:X/S:X/AU:X/R:X/V:X/RE:X/U:X",
+              "vendorMetadata": {},
+              "version": "4.0"
+            }
+          ],
+          "dataSource": "https://nvd.nist.gov/vuln/detail/CVE-2025-66471",
+          "description": "urllib3 is a user-friendly HTTP client library for Python. Starting in version 1.0 and prior to 2.6.0, the Streaming API improperly handles highly compressed data. urllib3's streaming API is designed for the efficient handling of large HTTP responses by reading the content in chunks, rather than loading the entire response body into memory at once. When streaming a compressed response, urllib3 can perform decoding or decompression based on the HTTP Content-Encoding header (e.g., gzip, deflate, br, or zstd). The library must read compressed data from the network and decompress it until the requested chunk size is met. Any resulting decompressed data that exceeds the requested amount is held in an internal buffer for the next read operation. The decompression logic could cause urllib3 to fully decode a small amount of highly compressed data in a single operation. This can result in excessive resource consumption (high CPU usage and massive memory allocation for the decompressed data.",
+          "epss": [
+            {
+              "cve": "CVE-2025-66471",
+              "date": "2025-12-29",
+              "epss": 0.00018,
+              "percentile": 0.03773
+            }
+          ],
+          "id": "CVE-2025-66471",
+          "namespace": "nvd:cpe",
+          "severity": "High",
+          "urls": [
+            "https://github.com/urllib3/urllib3/commit/c19571de34c47de3a766541b041637ba5f716ed7",
+            "https://github.com/urllib3/urllib3/security/advisories/GHSA-2xpw-w6gg-jr37"
+          ]
+        }
+      ],
+      "vulnerability": {
+        "advisories": [],
+        "cvss": [],
+        "dataSource": "https://github.com/advisories/GHSA-2xpw-w6gg-jr37",
+        "description": "urllib3 streaming API improperly handles highly compressed data",
+        "epss": [
+          {
+            "cve": "CVE-2025-66471",
+            "date": "2025-12-29",
+            "epss": 0.00018,
+            "percentile": 0.03773
+          }
+        ],
+        "fix": {
+          "state": "fixed",
+          "versions": [
+            "2.6.0"
+          ]
+        },
+        "id": "GHSA-2xpw-w6gg-jr37",
+        "namespace": "github:language:python",
+        "severity": "High",
+        "urls": []
+      }
+    },
+    {
+      "artifact": {
+        "cpes": [
+          "cpe:2.3:a:python:urllib3:2.2.2:*:*:*:*:*:*:*"
+        ],
+        "id": "8afb1280fb1a8f1c",
+        "language": "python",
+        "licenses": [],
+        "locations": [
+          {
+            "accessPath": "/package/lib/mbedtls/v3/mbedtls/docs/requirements.txt",
+            "annotations": {
+              "evidence": "primary"
+            },
+            "path": "/package/lib/mbedtls/v3/mbedtls/docs/requirements.txt"
+          }
+        ],
+        "name": "urllib3",
+        "purl": "pkg:pypi/urllib3@2.2.2",
+        "type": "python",
+        "upstreams": [],
+        "version": "2.2.2"
+      },
+      "matchDetails": [
+        {
+          "fix": {
+            "suggestedVersion": "2.6.0"
+          },
+          "found": {
+            "versionConstraint": ">=1.24,<2.6.0 (python)",
+            "vulnerabilityID": "GHSA-gm62-xv2j-4w53"
+          },
+          "matcher": "python-matcher",
+          "searchedBy": {
+            "language": "python",
+            "namespace": "github:language:python",
+            "package": {
+              "name": "urllib3",
+              "version": "2.2.2"
+            }
+          },
+          "type": "exact-direct-match"
+        }
+      ],
+      "relatedVulnerabilities": [
+        {
+          "cvss": [
+            {
+              "metrics": {
+                "baseScore": 7.5,
+                "exploitabilityScore": 3.9,
+                "impactScore": 3.6
+              },
+              "source": "nvd@nist.gov",
+              "type": "Primary",
+              "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "vendorMetadata": {},
+              "version": "3.1"
+            },
+            {
+              "metrics": {
+                "baseScore": 8.9
+              },
+              "source": "security-advisories@github.com",
+              "type": "Secondary",
+              "vector": "CVSS:4.0/AV:N/AC:L/AT:P/PR:N/UI:N/VC:N/VI:N/VA:H/SC:N/SI:N/SA:H/E:X/CR:X/IR:X/AR:X/MAV:X/MAC:X/MAT:X/MPR:X/MUI:X/MVC:X/MVI:X/MVA:X/MSC:X/MSI:X/MSA:X/S:X/AU:X/R:X/V:X/RE:X/U:X",
+              "vendorMetadata": {},
+              "version": "4.0"
+            }
+          ],
+          "dataSource": "https://nvd.nist.gov/vuln/detail/CVE-2025-66418",
+          "description": "urllib3 is a user-friendly HTTP client library for Python. Starting in version 1.24 and prior to 2.6.0, the number of links in the decompression chain was unbounded allowing a malicious server to insert a virtually unlimited number of compression steps leading to high CPU usage and massive memory allocation for the decompressed data. This vulnerability is fixed in 2.6.0.",
+          "epss": [
+            {
+              "cve": "CVE-2025-66418",
+              "date": "2025-12-29",
+              "epss": 0.00018,
+              "percentile": 0.03773
+            }
+          ],
+          "id": "CVE-2025-66418",
+          "namespace": "nvd:cpe",
+          "severity": "High",
+          "urls": [
+            "https://github.com/urllib3/urllib3/commit/24d7b67eac89f94e11003424bcf0d8f7b72222a8",
+            "https://github.com/urllib3/urllib3/security/advisories/GHSA-gm62-xv2j-4w53"
+          ]
+        }
+      ],
+      "vulnerability": {
+        "advisories": [],
+        "cvss": [],
+        "dataSource": "https://github.com/advisories/GHSA-gm62-xv2j-4w53",
+        "description": "urllib3 allows an unbounded number of links in the decompression chain",
+        "epss": [
+          {
+            "cve": "CVE-2025-66418",
+            "date": "2025-12-29",
+            "epss": 0.00018,
+            "percentile": 0.03773
+          }
+        ],
+        "fix": {
+          "state": "fixed",
+          "versions": [
+            "2.6.0"
+          ]
+        },
+        "id": "GHSA-gm62-xv2j-4w53",
+        "namespace": "github:language:python",
+        "severity": "High",
+        "urls": []
+      }
+    },
+    {
+      "artifact": {
+        "cpes": [
+          "cpe:2.3:a:python:urllib3:2.2.2:*:*:*:*:*:*:*"
+        ],
+        "id": "8afb1280fb1a8f1c",
+        "language": "python",
+        "licenses": [],
+        "locations": [
+          {
+            "accessPath": "/package/lib/mbedtls/v3/mbedtls/docs/requirements.txt",
+            "annotations": {
+              "evidence": "primary"
+            },
+            "path": "/package/lib/mbedtls/v3/mbedtls/docs/requirements.txt"
+          }
+        ],
+        "name": "urllib3",
+        "purl": "pkg:pypi/urllib3@2.2.2",
+        "type": "python",
+        "upstreams": [],
+        "version": "2.2.2"
+      },
+      "matchDetails": [
+        {
+          "fix": {
+            "suggestedVersion": "2.5.0"
+          },
+          "found": {
+            "versionConstraint": ">=2.2.0,<2.5.0 (python)",
+            "vulnerabilityID": "GHSA-48p4-8xcf-vxj5"
+          },
+          "matcher": "python-matcher",
+          "searchedBy": {
+            "language": "python",
+            "namespace": "github:language:python",
+            "package": {
+              "name": "urllib3",
+              "version": "2.2.2"
+            }
+          },
+          "type": "exact-direct-match"
+        }
+      ],
+      "relatedVulnerabilities": [
+        {
+          "cvss": [
+            {
+              "metrics": {
+                "baseScore": 6.1,
+                "exploitabilityScore": 2.9,
+                "impactScore": 2.8
+              },
+              "source": "nvd@nist.gov",
+              "type": "Primary",
+              "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N",
+              "vendorMetadata": {},
+              "version": "3.1"
+            },
+            {
+              "metrics": {
+                "baseScore": 5.3,
+                "exploitabilityScore": 1.7,
+                "impactScore": 3.6
+              },
+              "source": "security-advisories@github.com",
+              "type": "Secondary",
+              "vector": "CVSS:3.1/AV:N/AC:H/PR:L/UI:N/S:U/C:H/I:N/A:N",
+              "vendorMetadata": {},
+              "version": "3.1"
+            }
+          ],
+          "dataSource": "https://nvd.nist.gov/vuln/detail/CVE-2025-50182",
+          "description": "urllib3 is a user-friendly HTTP client library for Python. Starting in version 2.2.0 and prior to 2.5.0, urllib3 does not control redirects in browsers and Node.js. urllib3 supports being used in a Pyodide runtime utilizing the JavaScript Fetch API or falling back on XMLHttpRequest. This means Python libraries can be used to make HTTP requests from a browser or Node.js. Additionally, urllib3 provides a mechanism to control redirects, but the retries and redirect parameters are ignored with Pyodide; the runtime itself determines redirect behavior. This issue has been patched in version 2.5.0.",
+          "epss": [
+            {
+              "cve": "CVE-2025-50182",
+              "date": "2025-12-29",
+              "epss": 0.00013,
+              "percentile": 0.01724
+            }
+          ],
+          "id": "CVE-2025-50182",
+          "namespace": "nvd:cpe",
+          "severity": "Medium",
+          "urls": [
+            "https://github.com/urllib3/urllib3/commit/7eb4a2aafe49a279c29b6d1f0ed0f42e9736194f",
+            "https://github.com/urllib3/urllib3/releases/tag/2.5.0",
+            "https://github.com/urllib3/urllib3/security/advisories/GHSA-48p4-8xcf-vxj5"
+          ]
+        }
+      ],
+      "vulnerability": {
+        "advisories": [],
+        "cvss": [
+          {
+            "metrics": {
+              "baseScore": 5.3,
+              "exploitabilityScore": 1.7,
+              "impactScore": 3.6
+            },
+            "type": "Secondary",
+            "vector": "CVSS:3.1/AV:N/AC:H/PR:L/UI:N/S:U/C:H/I:N/A:N",
+            "vendorMetadata": {},
+            "version": "3.1"
+          }
+        ],
+        "dataSource": "https://github.com/advisories/GHSA-48p4-8xcf-vxj5",
+        "description": "urllib3 does not control redirects in browsers and Node.js",
+        "epss": [
+          {
+            "cve": "CVE-2025-50182",
+            "date": "2025-12-29",
+            "epss": 0.00013,
+            "percentile": 0.01724
+          }
+        ],
+        "fix": {
+          "state": "fixed",
+          "versions": [
+            "2.5.0"
+          ]
+        },
+        "id": "GHSA-48p4-8xcf-vxj5",
+        "namespace": "github:language:python",
+        "severity": "Medium",
+        "urls": []
+      }
+    },
+    {
+      "artifact": {
+        "cpes": [
+          "cpe:2.3:a:python:urllib3:2.2.2:*:*:*:*:*:*:*"
+        ],
+        "id": "8afb1280fb1a8f1c",
+        "language": "python",
+        "licenses": [],
+        "locations": [
+          {
+            "accessPath": "/package/lib/mbedtls/v3/mbedtls/docs/requirements.txt",
+            "annotations": {
+              "evidence": "primary"
+            },
+            "path": "/package/lib/mbedtls/v3/mbedtls/docs/requirements.txt"
+          }
+        ],
+        "name": "urllib3",
+        "purl": "pkg:pypi/urllib3@2.2.2",
+        "type": "python",
+        "upstreams": [],
+        "version": "2.2.2"
+      },
+      "matchDetails": [
+        {
+          "fix": {
+            "suggestedVersion": "2.5.0"
+          },
+          "found": {
+            "versionConstraint": "<2.5.0 (python)",
+            "vulnerabilityID": "GHSA-pq67-6m6q-mj2v"
+          },
+          "matcher": "python-matcher",
+          "searchedBy": {
+            "language": "python",
+            "namespace": "github:language:python",
+            "package": {
+              "name": "urllib3",
+              "version": "2.2.2"
+            }
+          },
+          "type": "exact-direct-match"
+        }
+      ],
+      "relatedVulnerabilities": [
+        {
+          "cvss": [
+            {
+              "metrics": {
+                "baseScore": 6.1,
+                "exploitabilityScore": 2.9,
+                "impactScore": 2.8
+              },
+              "source": "nvd@nist.gov",
+              "type": "Primary",
+              "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N",
+              "vendorMetadata": {},
+              "version": "3.1"
+            },
+            {
+              "metrics": {
+                "baseScore": 5.3,
+                "exploitabilityScore": 1.7,
+                "impactScore": 3.6
+              },
+              "source": "security-advisories@github.com",
+              "type": "Secondary",
+              "vector": "CVSS:3.1/AV:N/AC:H/PR:L/UI:N/S:U/C:H/I:N/A:N",
+              "vendorMetadata": {},
+              "version": "3.1"
+            }
+          ],
+          "dataSource": "https://nvd.nist.gov/vuln/detail/CVE-2025-50181",
+          "description": "urllib3 is a user-friendly HTTP client library for Python. Prior to 2.5.0, it is possible to disable redirects for all requests by instantiating a PoolManager and specifying retries in a way that disable redirects. By default, requests and botocore users are not affected. An application attempting to mitigate SSRF or open redirect vulnerabilities by disabling redirects at the PoolManager level will remain vulnerable. This issue has been patched in version 2.5.0.",
+          "epss": [
+            {
+              "cve": "CVE-2025-50181",
+              "date": "2025-12-29",
+              "epss": 0.00017,
+              "percentile": 0.03371
+            }
+          ],
+          "id": "CVE-2025-50181",
+          "namespace": "nvd:cpe",
+          "severity": "Medium",
+          "urls": [
+            "https://github.com/urllib3/urllib3/commit/f05b1329126d5be6de501f9d1e3e36738bc08857",
+            "https://github.com/urllib3/urllib3/releases/tag/2.5.0",
+            "https://github.com/urllib3/urllib3/security/advisories/GHSA-pq67-6m6q-mj2v"
+          ]
+        }
+      ],
+      "vulnerability": {
+        "advisories": [],
+        "cvss": [
+          {
+            "metrics": {
+              "baseScore": 5.3,
+              "exploitabilityScore": 1.7,
+              "impactScore": 3.6
+            },
+            "type": "Secondary",
+            "vector": "CVSS:3.1/AV:N/AC:H/PR:L/UI:N/S:U/C:H/I:N/A:N",
+            "vendorMetadata": {},
+            "version": "3.1"
+          }
+        ],
+        "dataSource": "https://github.com/advisories/GHSA-pq67-6m6q-mj2v",
+        "description": "urllib3 redirects are not disabled when retries are disabled on PoolManager instantiation",
+        "epss": [
+          {
+            "cve": "CVE-2025-50181",
+            "date": "2025-12-29",
+            "epss": 0.00017,
+            "percentile": 0.03371
+          }
+        ],
+        "fix": {
+          "state": "fixed",
+          "versions": [
+            "2.5.0"
+          ]
+        },
+        "id": "GHSA-pq67-6m6q-mj2v",
+        "namespace": "github:language:python",
+        "severity": "Medium",
+        "urls": []
+      }
+    }
+  ],
+  "source": {
+    "target": ".",
+    "type": "directory"
+  }
+}

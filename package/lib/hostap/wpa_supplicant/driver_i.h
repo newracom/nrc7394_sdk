@@ -66,6 +66,15 @@ static inline int wpa_drv_set_bss_max_idle(struct wpa_supplicant *wpa_s,
 	return -1;
 }
 
+static inline int wpa_drv_set_fragm_threshold(struct wpa_supplicant *wpa_s,
+							int threshold)
+{
+	if (wpa_s->driver->set_frag) {
+		return wpa_s->driver->set_frag(wpa_s->drv_priv, threshold);
+	}
+	return -1;
+}
+
 static inline int wpa_drv_set_ssid(struct wpa_supplicant *wpa_s,
 							const char *ssid, size_t len)
 {
@@ -89,6 +98,15 @@ static inline int wpa_drv_set_frequency(struct wpa_supplicant *wpa_s,
 {
 	if (wpa_s->driver->set_frequency) {
 		return wpa_s->driver->set_frequency(wpa_s->drv_priv, freq);
+	}
+	return -1;
+}
+
+static inline int wpa_drv_set_device_mode(struct wpa_supplicant *wpa_s,
+					   int mode)
+{
+	if (wpa_s->driver->set_device_mode) {
+		return wpa_s->driver->set_device_mode(wpa_s->drv_priv, mode);
 	}
 	return -1;
 }

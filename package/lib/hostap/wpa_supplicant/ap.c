@@ -653,6 +653,7 @@ static int wpa_supplicant_conf_ap(struct wpa_supplicant *wpa_s,
 	}
 #endif /* CONFIG_P2P */
 
+#if defined(NRC_WPA_SUPP)
 #ifdef INCLUDE_SOFTAP_OWE
 	if (wpa_key_mgmt_owe(ssid->key_mgmt)) {
 		bss->wpa = ssid->proto;
@@ -663,6 +664,16 @@ static int wpa_supplicant_conf_ap(struct wpa_supplicant *wpa_s,
 		*/
 	}
 #endif /* INCLUDE_SOFTAP_OWE */
+#ifdef CONFIG_DPP
+	if (!!(ssid->key_mgmt & WPA_KEY_MGMT_DPP)) {
+		bss->wpa = ssid->proto;
+#ifdef CONFIG_DPP2
+		bss->dpp_configurator_connectivity = 1;
+#endif /* CONFIG_DPP2 */
+		wpa_s->conf->dpp_config_processing = 1;
+	}
+#endif /* CONFIG_DPP */
+#endif /* NRC_WPA_SUPP */
 
 	if ((bss->wpa & 2) && bss->rsn_pairwise == 0)
 		bss->rsn_pairwise = bss->wpa_pairwise;

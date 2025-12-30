@@ -26,6 +26,8 @@
 
 #include "hif.h"
 
+extern void atcmd_log_hex_dump (void *data, int len);
+
 /**********************************************************************************************/
 
 #if !defined(CONFIG_HIF_HSPI_SLOT_NUM)
@@ -54,7 +56,20 @@ typedef struct
 	uint32_t device_ready; /* start to download firmware, write 0x1ACCE551 */
 	uint32_t device_sleep; /* write 0x1ACCE551 */
 
+#if defined(NRC7292)
 	uint32_t reserved1[2];
+#else
+	union
+	{
+		uint32_t val[2];
+
+		uint32_t txq:1;
+		uint32_t rxq:1;
+		uint32_t ready:1;
+		uint32_t sleep:1;
+		uint32_t reserved:28;
+	} host_eirq;
+#endif
 
 	uint32_t device_message[4];
 
@@ -369,7 +384,7 @@ static void _hif_hspi_queue_event_to_host (int idx)
 
 	reg->set.eirq_event = 1; /* auto clear */
 #else
-	g_hspi_sys_reg->device_sleep = 0x1ACCE551;
+	_hif_hspi_ready();
 #endif
 }
 
@@ -435,8 +450,8 @@ static int __hif_hspi_read (char *buf, int len)
 		ret = _hif_fifo_read(g_hif_hspi_rx_fifo, (char *)&hdr, _HSPI_SLOT_HDR_SIZE);
 		if (ret == 0)
 		{
-			if (i == 0)
-				_hspi_read_info("empty\n");
+/*			if (i > 0)
+				_hif_info("empty, len=%d/%d", i, len); */
 			break;
 		}
 		else if (ret != _HSPI_SLOT_HDR_SIZE)
@@ -447,12 +462,28 @@ static int __hif_hspi_read (char *buf, int len)
 
 		if (memcmp(hdr.start, _HSPI_SLOT_START_CHAR, _HSPI_SLOT_START_SIZE) != 0 || hdr.len > _HSPI_RX_SLOT_DATA_LEN_MAX)
 		{
-			hdr.len = 0;
-
-			_hif_error("slot: addr=%p start=%02X,%02X len=%u",
+			_hif_error("slot: addr=%p start=%02X,%02X seq=%u len=%u",
 							_hif_fifo_pop_addr(g_hif_hspi_rx_fifo, 0) - _HSPI_SLOT_HDR_SIZE,
 							hdr.start[0], hdr.start[1], 
-							hdr.len);
+							hdr.seq, hdr.len);
+
+			hdr.len = 0;
+
+			if (1)
+			{
+				char dump[_HSPI_RX_SLOT_DATA_LEN_MAX];
+
+				ret = _hif_fifo_read(g_hif_hspi_rx_fifo, dump, _HSPI_RX_SLOT_DATA_LEN_MAX);
+				if (ret != _HSPI_RX_SLOT_DATA_LEN_MAX)
+					_hif_error("slot_data: %d/%d", ret, _HSPI_RX_SLOT_DATA_LEN_MAX);
+				else
+					atcmd_log_hex_dump(dump, _HSPI_RX_SLOT_DATA_LEN_MAX);
+				
+				_hif_info("System Reset");
+				_delay_ms(100);
+				system_modem_api_sw_reset();
+				continue;
+			}
 		}
 		else
 		{
@@ -460,7 +491,8 @@ static int __hif_hspi_read (char *buf, int len)
 
 			if (hdr.seq != seq)
 			{
-				_hif_error("slot_seq: %u -> %u", seq, hdr.seq);
+				if (hdr.seq > 0 && seq > 0)
+					_hif_error("slot_seq: %u -> %u", seq, hdr.seq);
 
 				seq = hdr.seq;
 			}
@@ -644,7 +676,7 @@ static void _hif_hspi_pin_enable (void)
 	/*
 	 * NOTE: Only 56 pin package is supported.
 	 */
-	_hif_hspi_pin_info("PKG_OPT: 0x%08X\n", RegSCFG_PKG_OPT);
+	_hif_hspi_pin_info("PKG_OPT_get: 0x%08X", RegSCFG_PKG_OPT);
 
 	if (!(RegSCFG_PKG_OPT & 0x1))
 	{
@@ -653,12 +685,12 @@ static void _hif_hspi_pin_enable (void)
 		 */
 		RegSCFG_PKG_OPT = (0xCA78 << 16) | 0x1;
 
-		_hif_hspi_pin_info("PKG_OPT: 0x%08X\n", RegSCFG_PKG_OPT);
+		_hif_hspi_pin_info("PKG_OPT_set: 0x%08X", RegSCFG_PKG_OPT);
 	}
 
 	/* GPIO_DIR */
 	nrc_gpio_get_dir(&gpio);
-	_hif_hspi_pin_info("GPIO_DIR: 0x%08X\n", gpio.word);
+	_hif_hspi_pin_info("GPIO_DIR_get: 0x%08X", gpio.word);
 
 	gpio.word &= ~(1 << hspi_pin->cs);   /* input  */
 	gpio.word &= ~(1 << hspi_pin->clk);  /* input  */
@@ -672,14 +704,14 @@ static void _hif_hspi_pin_enable (void)
 	nrc_gpio_outb(hspi_pin->clk, 0);
 	nrc_gpio_outb(hspi_pin->mosi, 0); */
 	nrc_gpio_outb(hspi_pin->miso, 1);
-	nrc_gpio_outb(hspi_pin->eirq, 1);
+	nrc_gpio_outb(hspi_pin->eirq, 0);
 
 	nrc_gpio_get_dir(&gpio);
-	_hif_hspi_pin_info("GPIO_DIR: 0x%08X\n", gpio.word);
+	_hif_hspi_pin_info("GPIO_DIR_set: 0x%08X", gpio.word);
 
 	/* GPIO_ATL2 */
 	nrc_gpio_get_alt2(&gpio);
-	_hif_hspi_pin_info("GPIO_ALT2: 0x%08X\n", gpio.word);
+	_hif_hspi_pin_info("GPIO_ALT2_get: 0x%08X", gpio.word);
 
 	gpio.word |= (1 << hspi_pin->cs);
 	gpio.word |= (1 << hspi_pin->clk);
@@ -689,11 +721,11 @@ static void _hif_hspi_pin_enable (void)
 
 	nrc_gpio_set_alt2(&gpio);
 	nrc_gpio_get_alt2(&gpio);
-	_hif_hspi_pin_info("GPIO_ALT2: 0x%08X\n", gpio.word);
+	_hif_hspi_pin_info("GPIO_ALT2_set: 0x%08X", gpio.word);
 
 	/* UIO_SEL */
 	nrc_gpio_get_uio_sel(UIO_SEL_HSPI, &uio);
-	_hif_hspi_pin_info("UIO_SEL_HSPI: 0x%08X\n", uio.word);
+	_hif_hspi_pin_info("UIO_SEL_HSPI_get: 0x%08X", uio.word);
 
 	uio.bit.sel7_0 = hspi_pin->clk;
 	uio.bit.sel15_8 = hspi_pin->cs;
@@ -702,10 +734,10 @@ static void _hif_hspi_pin_enable (void)
 
 	nrc_gpio_set_uio_sel(UIO_SEL_HSPI, &uio);
 	nrc_gpio_get_uio_sel(UIO_SEL_HSPI, &uio);
-	_hif_hspi_pin_info("UIO_SEL_HSPI: 0x%08X\n", uio.word);
+	_hif_hspi_pin_info("UIO_SEL_HSPI_set: 0x%08X", uio.word);
 
 	nrc_gpio_get_uio_sel(UIO_SEL_EIRQ, &uio);
-	_hif_hspi_pin_info("UIO_SEL_EIRQ: 0x%08X\n", uio.word);
+	_hif_hspi_pin_info("UIO_SEL_EIRQ_get: 0x%08X", uio.word);
 
 	uio.bit.sel7_0 = hspi_pin->eirq;
 	uio.bit.sel15_8 = 0xff;
@@ -714,7 +746,7 @@ static void _hif_hspi_pin_enable (void)
 
 	nrc_gpio_set_uio_sel(UIO_SEL_EIRQ, &uio);
 	nrc_gpio_get_uio_sel(UIO_SEL_EIRQ, &uio);
-	_hif_hspi_pin_info("UIO_SEL_EIRQ: 0x%08X\n", uio.word);
+	_hif_hspi_pin_info("UIO_SEL_EIRQ_set: 0x%08X", uio.word);
 }
 
 static void _hif_hspi_pin_disable (void)
@@ -919,7 +951,7 @@ int _hif_hspi_open (_hif_info_t *info)
 	_hif_hspi_pin_enable();
 #endif
 
-	_hif_hspi_ready();
+/*	_hif_hspi_ready(); */
 
 /*	_hif_hspi_print_regs(); */
 
@@ -955,3 +987,165 @@ void _hif_hspi_close (void)
 #endif
 }
 
+static void _hif_hspi_eirq_pin_config (bool enable)
+{
+#define UIO_SEL_EIRQ    UIO_SEL_SPI3
+
+	const int pin = 30;
+	gpio_io_t alt2;
+	uio_sel_t uio;
+
+	nrc_gpio_get_alt2(&alt2);
+	nrc_gpio_get_uio_sel(UIO_SEL_EIRQ, &uio);
+
+#if 0
+	_hif_info("GPIO_ALT2_GET: 0x%08X", alt2.word);
+	_hif_info("UIO_SEL_EIRQ_GET: 0x%08X", uio.word);
+#endif
+
+	if (enable)
+	{
+		alt2.word |= (1 << pin);
+		uio.bit.sel7_0 = pin;
+	}
+	else
+	{
+		alt2.word &= ~(1 << pin);
+		uio.bit.sel7_0 = 0xff;
+	}
+
+	uio.bit.sel15_8 = 0xff;
+	uio.bit.sel23_16 = 0xff;
+	uio.bit.sel31_24 = 0xff;
+
+	nrc_gpio_set_alt2(&alt2);
+	nrc_gpio_set_uio_sel(UIO_SEL_EIRQ, &uio);
+
+#if 0
+	alt2.word = 0;
+	uio.word = 0;
+
+	nrc_gpio_get_alt2(&alt2);
+	nrc_gpio_get_uio_sel(UIO_SEL_EIRQ, &uio);
+
+	_hif_info("GPIO_ALT2_SET: 0x%08X", alt2.word);
+	_hif_info("UIO_SEL_EIRQ_SET: 0x%08X", uio.word);
+#endif
+}
+
+#define _hif_hspi_eirq_pin_enable()		_hif_hspi_eirq_pin_config(true)
+#define _hif_hspi_eirq_pin_disable()	_hif_hspi_eirq_pin_config(false)
+
+void _hfi_hspi_eirq_boot_done (bool active_high)
+{
+	NRC_GPIO_CONFIG hspi_eirq =
+	{
+		.gpio_pin = 30, /* HSPI_EIRQ */
+		.gpio_alt = GPIO_FUNC,
+		.gpio_dir = GPIO_OUTPUT,
+		.gpio_mode = GPIO_PULL_DOWN,
+	};
+
+	_hif_info("HSPI_EIRQ_BOOT_DONE: GP%d", hspi_eirq.gpio_pin);
+
+	_hif_hspi_eirq_pin_disable();
+
+	if (nrc_gpio_config(&hspi_eirq) != NRC_SUCCESS)
+		_hif_error("nrc_gpio_config() failed");
+	else if (active_high)
+	{
+		nrc_gpio_outputb(hspi_eirq.gpio_pin, GPIO_LEVEL_LOW);
+		_delay_ms(1);
+		nrc_gpio_outputb(hspi_eirq.gpio_pin, GPIO_LEVEL_HIGH);
+		_delay_ms(1);
+		nrc_gpio_outputb(hspi_eirq.gpio_pin, GPIO_LEVEL_LOW);
+		_delay_ms(1);
+	}
+	else
+	{
+		nrc_gpio_outputb(hspi_eirq.gpio_pin, GPIO_LEVEL_HIGH);
+		_delay_ms(1);
+		nrc_gpio_outputb(hspi_eirq.gpio_pin, GPIO_LEVEL_LOW);
+		_delay_ms(1);
+		nrc_gpio_outputb(hspi_eirq.gpio_pin, GPIO_LEVEL_HIGH);
+		_delay_ms(1);
+	}
+
+	_hif_hspi_eirq_pin_enable();
+}
+
+static void _hif_hspi_delay_ms (int ms)
+{
+	TickType_t tick_current = xTaskGetTickCount(); 
+	TickType_t tick_delay = pdMS_TO_TICKS(ms);
+	
+	while ((xTaskGetTickCount() - tick_current) < tick_delay);
+}
+
+void _hif_hspi_enter_sleep (bool check_txq, bool check_rxq, uint32_t timeout)
+{
+	if (check_txq || check_rxq)
+	{
+		const int txq_max = _HSPI_TX_SLOT_NUM;
+		const int rxq_max = _HSPI_RX_SLOT_NUM;
+		int txq_cnt = _hif_hspi_queue_count(_HSPI_TXQ);
+		int rxq_cnt = _hif_hspi_queue_count(_HSPI_RXQ);
+		uint32_t t;
+
+		_hif_info("HSPI_SLEEP: txq=%d/%d rxq=%d/%d check=%d,%d timeout=%u", 
+					txq_cnt, txq_max, rxq_max - rxq_cnt, rxq_max, 
+					check_txq, check_rxq, timeout);
+
+#if 0		
+		if (txq_cnt > 0)
+			_hif_hspi_queue_event_to_host(_HSPI_TXQ);
+#endif
+
+		for (t = 0 ; timeout == 0 || t < timeout ; t++)
+		{
+			if (check_txq)
+				txq_cnt = _hif_hspi_queue_count(_HSPI_TXQ);
+			else
+				txq_cnt = 0;
+			
+			if (check_rxq)
+				rxq_cnt = _hif_hspi_queue_count(_HSPI_RXQ);
+			else
+				rxq_cnt = 0;
+
+			if (txq_cnt == 0 && rxq_cnt == 0)
+				break;
+	
+			_delay_ms(1);
+		}
+
+		if ((txq_cnt > 0 || rxq_cnt > 0) && (t == timeout))
+			_hif_info("HSPI_SLEEP: timeout, txq=%d rxq=%d", txq_cnt, rxq_cnt);
+
+#if 0		
+		timeout -= t;		
+		_hif_info("HSPI_SLEEP: delay %ums", timeout);
+		for (t = 0 ; t < timeout ; t++)
+			_hif_hspi_delay_ms(1);
+#endif		
+	}
+
+	_hif_hspi_sleep();
+	_hif_hspi_delay_ms(10);
+
+#if 0 /* Check if HSPI_EIRQ mode is disabled in the host application. */
+	if (g_hspi_sys_reg->host_eirq.val[0] == 0)
+		_hif_error("!!! host eirq disabled !!!");
+	else
+	{
+		//_hif_debug("%s: > 0x%08X", __func__, g_hspi_sys_reg->host_eirq.val[0]); 
+
+		for ( ; g_hspi_sys_reg->host_eirq.val[0] != 0 ; )
+			_hif_hspi_delay_ms(1);
+	
+		//_hif_debug("%s: < 0x%08X", __func__, g_hspi_sys_reg->host_eirq.val[0]);
+	}
+#endif
+	
+	_hif_info("HSPI_SLEEP: done");
+}

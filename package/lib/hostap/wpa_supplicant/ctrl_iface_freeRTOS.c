@@ -157,17 +157,17 @@ int wpa_cmd_receive(int vif_id, int argc, char *argv[])
 		return -1;
 	}
 
-	eloop_msg_t* eloop_msg = os_zalloc(ELOOP_MESSAGE_SIZE);
+	eloop_msg_t eloop_msg;
 	char *buf = os_zalloc(ELOOP_MESSAGE_BUF_SIZE);
 
-	if ((eloop_msg == NULL) || (buf == NULL))
+	if (buf == NULL)
 	{
 		return -2;
 	}
 
-	eloop_msg->vif_id = vif_id;
-	eloop_msg->wait_rsp = 0;
-	eloop_msg->buf = buf;
+	eloop_msg.vif_id = vif_id;
+	eloop_msg.wait_rsp = 0;
+	eloop_msg.buf = buf;
 	sprintf(buf, "%s", argv[1]);
 
 	//If there are additional strings separated by spaces,
@@ -175,7 +175,10 @@ int wpa_cmd_receive(int vif_id, int argc, char *argv[])
 	for (i = 2; i < argc; i++) {
 		sprintf(buf + strlen(buf), " %s", argv[i]);
 	}
-	xQueueSend(eloop_message_queue_req, &eloop_msg, 0);
+	if (xQueueSend(eloop_message_queue_req, &eloop_msg, 0) != pdPASS) {
+		os_free(buf);
+		return -3;
+	}
 	eloop_run_signal();
 
 	return 0;
@@ -272,8 +275,8 @@ ctrl_iface_resp_t *ctrl_iface_receive_response(int vif_id, const char *fmt, ...)
 					default:
 						if (resp->len < 0) {
 							os_free(reply);
-							os_free(resp);
-							resp = NULL;
+							//os_free(resp);
+							//resp = NULL;
 						}
 				}
 			}
@@ -324,6 +327,26 @@ void CTRL_IFACE_RESP_FREE (ctrl_iface_resp_t *resp)
 
 		os_free(resp);
 	}
+}
+
+#if defined(INCLUDE_SOFT_AP)
+struct hostapd_iface * wpas_nrc_get_ap_iface(struct wpa_supplicant *wpa_s)
+{
+	struct hostapd_iface *iface = NULL;
+	if (wpa_s->ap_iface) {
+		iface = wpa_s->ap_iface;
+	}
+	return iface;
+}
+#endif
+
+int wpas_nrc_get_sae_state(struct wpa_supplicant *wpa_s)
+{
+	int state = -1;
+#if defined(CONFIG_SME) && defined(CONFIG_SAE)	
+		state = wpa_s->sme.sae.state;
+#endif	
+	return state;
 }
 
 /***********************************************************************************************************/

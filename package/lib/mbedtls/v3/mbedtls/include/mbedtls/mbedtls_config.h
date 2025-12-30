@@ -514,13 +514,13 @@
  * function.
  */
 /* Required for all the functions in this section */
-//#define MBEDTLS_ECP_INTERNAL_ALT
+#define MBEDTLS_ECP_INTERNAL_ALT
 /* Turn off software fallback for curves not supported in hardware */
 //#define MBEDTLS_ECP_NO_FALLBACK
 /* Support for Weierstrass curves with Jacobi representation */
 //#define MBEDTLS_ECP_RANDOMIZE_JAC_ALT
-//#define MBEDTLS_ECP_ADD_MIXED_ALT
-//#define MBEDTLS_ECP_DOUBLE_JAC_ALT
+#define MBEDTLS_ECP_ADD_MIXED_ALT
+#define MBEDTLS_ECP_DOUBLE_JAC_ALT
 //#define MBEDTLS_ECP_NORMALIZE_JAC_MANY_ALT
 //#define MBEDTLS_ECP_NORMALIZE_JAC_ALT
 /* Support for curves with Montgomery arithmetic */

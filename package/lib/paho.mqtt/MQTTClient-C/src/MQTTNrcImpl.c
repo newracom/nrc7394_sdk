@@ -187,6 +187,9 @@ void NetworkInit(Network* n)
 	n->my_socket = -1;
 	n->mqttread = nrc_sock_read;
 	n->mqttwrite = nrc_sock_write;
+#if defined(INCLUDE_MQTT_RECOVERY)
+	n->recovered = false;
+#endif
 }
 
 int NetworkConnect(Network* n, char* addr, int port)
@@ -198,9 +201,6 @@ int NetworkConnect(Network* n, char* addr, int port)
 
 	if ((rc = getaddrinfo(addr, NULL, &hints, &result)) == 0) {
 		struct addrinfo *res = result;
-
-		oled_log(0, 0,  "[0:Network conn 1]");
-
 		/* prefer ip4 addresses */
 		while (res) {
 			if (res->ai_family == AF_INET) {
@@ -210,26 +210,40 @@ int NetworkConnect(Network* n, char* addr, int port)
 			res = res->ai_next;
 		}
 
-		oled_log(0, 0,  "[0:Network conn 2]");
 		if (result->ai_family == AF_INET) {
 			address.sin_port = htons(port);
 			address.sin_family = AF_INET;
 			address.sin_addr = ((struct sockaddr_in *)(result->ai_addr))->sin_addr;
 #if !defined(INCLUDE_MEASURE_AIRTIME)
-			nrc_usr_print("[%s]ip address found: %s\n", __func__, inet_ntoa(address.sin_addr));
+			nrc_usr_print("[%s]ip address found: %s port %d\n",
+				__func__, inet_ntoa(address.sin_addr), ntohs(address.sin_port));
 #endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
 		} else {
 			rc = -1;
 		}
 		freeaddrinfo(result);
 	}
-	else {
-		oled_log(0, 0,  "[0:Network conn 3]");
-	}
 
 	/* create client socket */
 	if (rc == 0) {
 		int opval = 1;
+#if defined(INCLUDE_MQTT_RECOVERY)
+		int conn_socket[MEMP_NUM_NETCONN];
+
+		if (lwip_get_sockfd_array(SOCK_STREAM, conn_socket, NULL, (struct sockaddr *)&address) > 0) {
+			n->my_socket = conn_socket[0];
+			n->recovered = true;
+			nrc_usr_print("[%s] Socket(%d) recovered\n", __func__, n->my_socket);
+			nrc_usr_print("     ip address: %s port %d\n",
+				inet_ntoa(address.sin_addr), ntohs(address.sin_port));
+			return rc;
+		} else {
+			nrc_usr_print("[%s] Fail to recover Socket(%d)\n", __func__, n->my_socket);
+			nrc_usr_print("     ip address: %s port %d\n",
+				inet_ntoa(address.sin_addr), ntohs(address.sin_port));
+		}
+#endif /* defined(INCLUDE_MQTT_RECOVERY) */
+
 		//n->my_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 		n->my_socket = socket(AF_INET, SOCK_STREAM, 0);
 		if (n->my_socket < 0) {
@@ -240,7 +254,6 @@ int NetworkConnect(Network* n, char* addr, int port)
 		/* connect remote servers*/
 		rc = connect(n->my_socket, (struct sockaddr *)&address, sizeof(address));
 		if (rc < 0) {
-			oled_log(0, 0,  "[0:Network conn 4]");
 			if (n->my_socket >= 0) {
 				nrc_usr_print("Shutting down and close socket %d\n",n->my_socket);
 				shutdown(n->my_socket, SHUT_RDWR);
@@ -251,9 +264,6 @@ int NetworkConnect(Network* n, char* addr, int port)
 		}
 
 		setsockopt(n->my_socket, IPPROTO_TCP, TCP_NODELAY, &opval, sizeof(opval));
-	}
-	else {
-		oled_log(0, 0,  "[0:Network conn 5]");
 	}
 
 	return rc;

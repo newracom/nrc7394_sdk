@@ -20,7 +20,17 @@ extern "C"{
 
 /******************************************************************************/
 #define DRV_ADC_IOCTL_OPT_SET_CLK_INVERSION_DISABLE			0
-#define DRV_ADC_IOCTL_OPT_SET_CLK_INVERSION_ENABLE			1	
+#define DRV_ADC_IOCTL_OPT_SET_CLK_INVERSION_ENABLE			1
+
+#define DRV_ADC_IOCTL_OPT_SET_NO_AVERAGE			0
+#define DRV_ADC_IOCTL_OPT_SET_2_AVERAGE			1
+#define DRV_ADC_IOCTL_OPT_SET_4_AVERAGE			2
+#define DRV_ADC_IOCTL_OPT_SET_8_AVERAGE			3
+#define DRV_ADC_IOCTL_OPT_SET_16_AVERAGE			4
+#define DRV_ADC_IOCTL_OPT_SET_32_AVERAGE			5
+#define DRV_ADC_IOCTL_OPT_SET_64_AVERAGE			6
+#define DRV_ADC_IOCTL_OPT_SET_128_AVERAGE			7
+
 
 #define DRV_ADC_IOCTL_OPT_SET_CLK_MAIN_CRYSTAL_OSC_CLOCK_EXTERNAL			4
 #define DRV_ADC_IOCTL_OPT_SET_CLK_SUB_32KHZ_CLOCK_EXTERNAL_INTERNAL			6
@@ -72,32 +82,32 @@ struct drv_adc_ops_t{
 	void (*ioctl)(struct drv_adc_t *, uint32_t , unsigned int );
 };
 
-/** 
+/**
   \brief		adc driver open function
-  \details		
+  \details
   \param [in]	id
   \return		ret
 */
 uint32_t drv_adc_open(enum drv_adc_id_t id);
 
-/** 
+/**
   \brief		adc driver close function
-  \details		
+  \details
   \param [in]	id
   \return		ret
 */
 uint32_t drv_adc_close(enum drv_adc_id_t id);
 
-/** 
+/**
   \brief		adc driver read function
-  \details		
+  \details
   \param [in]	id
   \param [in]	dat
   \return		ret
 */
 uint32_t drv_adc_read(enum drv_adc_id_t id, uint32_t *dat);
 
-/** 
+/**
   \brief		adc driver input output control function
   \details		critical section
   \param [in]	id
@@ -117,9 +127,9 @@ uint32_t drv_adc_read(enum drv_adc_id_t id, uint32_t *dat);
 */
 struct drv_adc_ioctl_t drv_adc_ioctl(enum drv_adc_id_t id, uint32_t opt, unsigned int val);
 
-/** 
+/**
   \brief		adc driver registration function
-  \details		
+  \details
   \param [in]	adc
   \return		ret
 */
@@ -130,4 +140,3 @@ uint32_t drv_adc_register_driver( struct drv_adc_t * adc);
 #endif
 
 #endif
-

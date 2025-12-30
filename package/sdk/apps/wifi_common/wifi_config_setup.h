@@ -88,15 +88,21 @@ typedef struct  {
 	const char *eap_client_cert;
 	const char *eap_private_key;
 	uint8_t sae_pwe;
+	uint8_t dpp_configurator;
 	uint8_t bgscan_enable;
 	uint16_t bgscan_short;
 	int bgscan_thresh;
 	uint16_t bgscan_long;
-	uint8_t auth_control;
 	uint8_t ps_mode;
 	uint16_t ps_idle;
 	uint32_t ps_sleep;
+	uint8_t fast_connect;
+	uint8_t	auth_control;
+	uint32_t auth_control_ps_threshold;
 	uint32_t scan_period;
+	char broker_addr[MAX_STATIC_IP_LENGTH+1];
+	uint16_t broker_port;
+	uint8_t ap_optimal_channel_enable;
 }WIFI_CONFIG;
 #define WIFI_CONFIG_SIZE	sizeof (WIFI_CONFIG)
 

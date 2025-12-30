@@ -49,13 +49,6 @@
 
 static void nrc_atcmd_firmware_info (void)
 {
-	_atcmd_info("FLASH: %s, %s", 
-					ATCMD_FLASH_SIZE, ATCMD_FLASH_PROFILE);
-
-	_atcmd_info("BUILD: %s,%s,%s (%s, %s)", 
-					ATCMD_CHIP_NAME, ATCMD_CPU_TYPE, ATCMD_IP_VER,
-					__TIME__, __DATE__);
-
 #if defined(SDK_VER_DESCRIPTION)
 	_atcmd_info("VERSION: %d.%d.%d (SDK-%d.%d.%d-%s)",
 					ATCMD_VER_MAJOR, ATCMD_VER_MINOR, ATCMD_VER_REVISION,
@@ -65,6 +58,15 @@ static void nrc_atcmd_firmware_info (void)
 					ATCMD_VER_MAJOR, ATCMD_VER_MINOR, ATCMD_VER_REVISION,
 					SDK_VER_MAJOR, SDK_VER_MINOR, SDK_VER_REVISION);
 #endif
+	
+	_atcmd_info("BUILD: %s,%s,%s (%s, %s)", 
+					ATCMD_CHIP_NAME, ATCMD_CPU_TYPE, ATCMD_IP_VER,
+					__TIME__, __DATE__);
+
+	_atcmd_info("FLASH: %s, %s", 
+					ATCMD_FLASH_SIZE, ATCMD_FLASH_PROFILE);
+
+	_atcmd_info("HEAP: %d", configTOTAL_HEAP_SIZE);
 }
 
 /*******************************************************************************/
@@ -99,6 +101,7 @@ static int nrc_atcmd_enable (int type, ...)
 			info.uart.stop_bits = UART_SB1;
 			info.uart.parity = UART_PB_NONE;
 			info.uart.hfc = (type == _HIF_TYPE_UART_HFC) ? UART_HFC_ENABLE : UART_HFC_DISABLE;
+			info.uart.hfc_rx_irq = false;
 			break;
 
 		default:

@@ -173,6 +173,7 @@ nrc_err_t run_sample_wps_pbc_softap(WIFI_CONFIG *param)
 	nrc_usr_print(" - password : %s\n", param->security_mode == WIFI_SEC_WPA2 ? (char *)param->password : "");
 
 	/* set initial wifi configuration */
+	param->scan_period = 0;
 	while(1){
 		if (wifi_init(param)== WIFI_SUCCESS) {
 			nrc_usr_print ("[%s] wifi_init Success !! \n", __func__);

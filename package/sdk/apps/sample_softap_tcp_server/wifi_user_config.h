@@ -15,6 +15,13 @@
 */
 
 #define COUNTRY_CODE "US"
+
+#define WIFI_AP_OPTIMAL_CHANNEL_ENABLE 1
+
+#if WIFI_AP_OPTIMAL_CHANNEL_ENABLE
+#define NRC_WIFI_CHANNEL 0 // For scanning channel
+#else
 #define NRC_WIFI_CHANNEL 9250
+#endif
 
 #endif // __WIFI_USER_CONFIG_H__ //

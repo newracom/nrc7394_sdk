@@ -89,9 +89,11 @@ extern void raspi_eirq_close (void);
 extern int raspi_eirq_poll (int timeout);
 
 extern int raspi_hif_open (int type, char *device, uint32_t speed, uint32_t flags);
+extern int raspi_hif_reopen (int type, char *device, uint32_t speed, uint32_t flags);
 extern void raspi_hif_close (void);
 extern int raspi_hif_read (char *buf, int len);
 extern int raspi_hif_write (char *buf, int len);
+extern enum HSPI_EIRQ_STATUS raspi_hif_hspi_eirq_status (void);
 
 /**********************************************************************************************/
 #endif /* #ifndef __RASPI_HIF_H__ */

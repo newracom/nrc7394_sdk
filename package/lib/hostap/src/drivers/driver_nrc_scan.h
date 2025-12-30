@@ -22,6 +22,8 @@
 #include "drivers/driver.h"
 
 #include <stdbool.h>
+#include "FreeRTOS.h"
+#include "semphr.h"
 
 #define DRIVER_SCAN_DEBUG_DUMP_ENTRY
 #define DRIVER_SCAN_DEBUG_TEST_SUITE
@@ -45,7 +47,9 @@ struct last_scan {
 
 struct nrc_scan_info {
 	bool		is_run;
+	bool		keep_scan_results;
 	struct		dl_list scan_list;
+	SemaphoreHandle_t scan_mutex;
 	struct		wpa_driver_scan_params params;
 	int			history_cnt;
 	struct		last_scan history[MAX_SCAN_HISTORY];

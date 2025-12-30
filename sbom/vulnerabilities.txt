@@ -1,0 +1,12 @@
+NAME                              INSTALLED  FIXED-IN  TYPE           VULNERABILITY        SEVERITY 
+dawidd6/action-download-artifact  v2         6         github-action  GHSA-5xr6-xhww-33m4  High      
+jinja2                            3.1.4      3.1.6     python         GHSA-cpwx-vrp4-4pq7  Medium    
+jinja2                            3.1.4      3.1.5     python         GHSA-gmj6-6f8f-6699  Medium    
+jinja2                            3.1.4      3.1.5     python         GHSA-q2x7-8rv6-6q7h  Medium    
+requests                          2.31.0     2.32.4    python         GHSA-9hjg-9r4m-mvj7  Medium    
+requests                          2.31.0     2.32.0    python         GHSA-9wx4-h78v-vm56  Medium    
+requests                          2.32.3     2.32.4    python         GHSA-9hjg-9r4m-mvj7  Medium    
+urllib3                           2.2.2      2.6.0     python         GHSA-2xpw-w6gg-jr37  High      
+urllib3                           2.2.2      2.6.0     python         GHSA-gm62-xv2j-4w53  High      
+urllib3                           2.2.2      2.5.0     python         GHSA-48p4-8xcf-vxj5  Medium    
+urllib3                           2.2.2      2.5.0     python         GHSA-pq67-6m6q-mj2v  Medium

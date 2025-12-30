@@ -138,7 +138,9 @@ endif
 
 bdf:
 	@echo "BDFILE = $(BDFSYSDATA)"
-	@cp -f $(BDFSYSDATA) $(BDFDATA)
+	@if [ "$(BDFSYSDATA)" != "$(BDFDATA)" ]; then \
+		cp -f $(BDFSYSDATA) $(BDFDATA); \
+	fi
 	@xxd --include $(BDFDATA) > $(BDFHDR)
 	@sed  -i '1i const' $(BDFHDR)
 	@sed -i '/unsigned int/i const' $(BDFHDR)

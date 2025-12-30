@@ -14,6 +14,7 @@
 #endif /* CONFIG_SQLITE */
 
 #include "common/defs.h"
+#include "common/dpp.h"
 #include "utils/list.h"
 #include "ap_config.h"
 #include "drivers/driver.h"
@@ -75,6 +76,17 @@ struct hapd_interfaces {
 
 #ifdef CONFIG_DPP
 	struct dpp_global *dpp;
+#ifdef CONFIG_DPP3
+	struct os_reltime dpp_pb_time;
+	struct os_reltime dpp_pb_announce_time;
+	struct dpp_pb_info dpp_pb[DPP_PB_INFO_COUNT];
+	struct dpp_bootstrap_info *dpp_pb_bi;
+	u8 dpp_pb_c_nonce[DPP_MAX_NONCE_LEN];
+	u8 dpp_pb_resp_hash[SHA256_MAC_LEN];
+	struct os_reltime dpp_pb_last_resp;
+	bool dpp_pb_result_indicated;
+	char *dpp_pb_cmd;
+#endif /* CONFIG_DPP3 */
 #endif /* CONFIG_DPP */
 
 #ifdef CONFIG_CTRL_IFACE_UDP
@@ -387,7 +399,9 @@ struct hostapd_data {
 	struct dpp_pkex *dpp_pkex;
 	struct dpp_bootstrap_info *dpp_pkex_bi;
 	char *dpp_pkex_code;
+	size_t dpp_pkex_code_len;
 	char *dpp_pkex_identifier;
+	enum dpp_pkex_ver dpp_pkex_ver;
 	char *dpp_pkex_auth_cmd;
 	char *dpp_configurator_params;
 	struct os_reltime dpp_last_init;
@@ -406,6 +420,7 @@ struct hostapd_data {
 	int dpp_chirp_round;
 	int dpp_chirp_scan_done;
 	int dpp_chirp_listen;
+	struct os_reltime dpp_relay_last_needs_ctrl;
 #endif /* CONFIG_DPP2 */
 #ifdef CONFIG_TESTING_OPTIONS
 	char *dpp_config_obj_override;

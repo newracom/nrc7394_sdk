@@ -28,25 +28,32 @@
 #include "mbedtls/arc4.h"
 #endif
 
+#include "mbedtls/oid.h"
+#include "mbedtls/entropy.h"
+#include "mbedtls/ctr_drbg.h"
+#include "mbedtls/x509_csr.h"
+#include "mbedtls/pkcs7.h"
+#include "mbedtls/pem.h"
+
 #include "system.h"
 #include "platform.h"
 
 #include "system_common.h"
 
-#if (defined (CONFIG_SAE) || defined (CONFIG_OWE))
+#if defined(CONFIG_ECC)
 #include "random.h"
 
 #include "mbedtls/ecp.h"
-#include "mbedtls/entropy.h"
-#include "mbedtls/ctr_drbg.h"
 
 #include "mbedtls/pk.h"
 #include "mbedtls/ecdh.h"
 #include "mbedtls/asn1write.h"
 #include "mbedtls/error.h"
-#include "mbedtls/oid.h"
 
 #include "mbedtls/bignum.h"
+
+#define ECP_PRV_DER_MAX_BYTES   ( 29 + 3 * MBEDTLS_ECP_MAX_BYTES )
+#define ECP_PUB_DER_MAX_BYTES   ( 30 + 2 * MBEDTLS_ECP_MAX_BYTES )
 
 #ifdef CONFIG_MBEDTLS_ECDH_LEGACY_CONTEXT
 #define ACCESS_ECDH(S, var) S->MBEDTLS_PRIVATE(var)
@@ -54,7 +61,7 @@
 #define ACCESS_ECDH(S, var) S->MBEDTLS_PRIVATE(ctx).MBEDTLS_PRIVATE(mbed_ecdh).MBEDTLS_PRIVATE(var)
 #endif
 
-//Print Elapsed time for ECC Proceeing for SAE/OWE for debug
+//Print Elapsed time for ECC Proceeing for SAE/OWE/DPP for debug
 #define DEBUG_ECC_PROCESS_TIME 1
 
 #if DEBUG_ECC_PROCESS_TIME //For Debug
@@ -72,7 +79,7 @@ static void _wpa_msg_crypto(void *ctx, int level, const char *fmt, ...)
 }
 #endif //DEBUG_ECC_PROCESS_TIME
 
-#endif //#if (defined (CONFIG_SAE) || defined (CONFIG_OWE))
+#endif //#if defined(CONFIG_ECC)
 
 #ifdef TAG
 #undef TAG
@@ -694,7 +701,7 @@ int rc4_skip(const u8 *key, size_t keylen, size_t skip,
 	return 0;
 }
 
-#if (defined (CONFIG_SAE) || defined (CONFIG_OWE))
+#if defined(CONFIG_ECC)
 struct crypto_ec {
 	mbedtls_ecp_group group;
 };
@@ -741,6 +748,41 @@ static mbedtls_ecp_group_id get_ecp_group_id(int id)
 	}
 
 	return grp_id;
+}
+
+unsigned int crypto_ec_get_mbedtls_to_nist_group_id(int id)
+{
+	unsigned int nist_grpid = 0;
+	switch (id) {
+	case MBEDTLS_ECP_DP_SECP256R1:
+		nist_grpid = 19;
+		break;
+	case MBEDTLS_ECP_DP_SECP384R1:
+		nist_grpid = 20;
+		break;
+	case MBEDTLS_ECP_DP_SECP521R1:
+		nist_grpid = 21;
+		break;
+	case MBEDTLS_ECP_DP_SECP192R1:
+		nist_grpid = 25;
+		break;
+	case MBEDTLS_ECP_DP_SECP224R1:
+		nist_grpid = 26;
+		break;
+	case MBEDTLS_ECP_DP_BP256R1:
+		nist_grpid = 28;
+		break;
+	case MBEDTLS_ECP_DP_BP384R1:
+		nist_grpid = 29;
+		break;
+	case MBEDTLS_ECP_DP_BP512R1:
+		nist_grpid = 30;
+		break;
+	default:
+		break;
+	}
+
+	return nist_grpid;
 }
 
 struct crypto_ec *crypto_ec_init(int group)
@@ -820,10 +862,21 @@ struct crypto_ec_point *crypto_ec_point_init(struct crypto_ec *e)
 	return (struct crypto_ec_point *) pt;
 }
 
+const struct crypto_ec_point *crypto_ec_get_generator(struct crypto_ec *e)
+{
+	return (const struct crypto_ec_point *) &e->group.G;
+}
+
 void crypto_ec_point_deinit(struct crypto_ec_point *p, int clear)
 {
 	mbedtls_ecp_point_free((mbedtls_ecp_point *) p);
 	os_free(p);
+}
+
+int crypto_ec_point_x(struct crypto_ec *e, const struct crypto_ec_point *p,
+		      struct crypto_bignum *x)
+{
+	return mbedtls_mpi_copy((mbedtls_mpi*) x, &((mbedtls_ecp_point* )p)->MBEDTLS_PRIVATE(X));
 }
 
 int crypto_ec_point_to_bin(struct crypto_ec *e,
@@ -968,6 +1021,18 @@ int crypto_ec_point_cmp(const struct crypto_ec *e,
 			(const mbedtls_ecp_point *) b);
 }
 
+void crypto_ec_point_debug_print(const struct crypto_ec *e,
+				 const struct crypto_ec_point *p,
+				 const char *title)
+{
+	mbedtls_ecp_point *pt = (mbedtls_ecp_point *) p;
+	wpa_printf(MSG_DEBUG, "%s", title);
+	if (MSG_DEBUG >= wpa_debug_level) {
+		bignum_print("X", &pt->MBEDTLS_PRIVATE(X));
+		bignum_print("Y", &pt->MBEDTLS_PRIVATE(Y));
+	}
+}
+
 struct crypto_bignum *crypto_ec_point_compute_y_sqr(struct crypto_ec *e,
 		const struct crypto_bignum *x)
 {
@@ -1076,10 +1141,17 @@ int crypto_ec_point_is_on_curve(struct crypto_ec *e,
 
 	/* Calculate y^2  mod P*/
 #if defined(INCLUDE_HW_SECURITY_ACC_BN) && defined(INCLUDE_HW_SECURITY_ACC_BN_MUL_MOD)
-	MBEDTLS_MPI_CHK(mbedtls_mpi_mul_mpi_mod_mpi(&y_sqr_lhs,
-		&((const mbedtls_ecp_point *)p)->MBEDTLS_PRIVATE(Y),
-		&((const mbedtls_ecp_point *)p)->MBEDTLS_PRIVATE(Y),
-		&e->group.P));
+	if (e->group.pbits / 8 / sizeof(mbedtls_mpi_uint) >= 16) {
+		mbedtls_mpi_init(&two);
+		MBEDTLS_MPI_CHK(mbedtls_mpi_lset(&two, 2));
+		MBEDTLS_MPI_CHK(mbedtls_mpi_exp_mod(&y_sqr_lhs, &((const mbedtls_ecp_point *)p)->MBEDTLS_PRIVATE(Y), &two, &e->group.P, NULL));
+		mbedtls_mpi_free(&two);
+	} else {
+		MBEDTLS_MPI_CHK(mbedtls_mpi_mul_mpi_mod_mpi(&y_sqr_lhs,
+			&((const mbedtls_ecp_point *)p)->MBEDTLS_PRIVATE(Y),
+			&((const mbedtls_ecp_point *)p)->MBEDTLS_PRIVATE(Y),
+			&e->group.P));
+	}
 #else
 	mbedtls_mpi_init(&two);
 	MBEDTLS_MPI_CHK(mbedtls_mpi_lset(&two, 2));
@@ -1103,6 +1175,11 @@ cleanup:
 #if 1 //New functions added since v2.10.
 const struct crypto_bignum * crypto_ec_get_a(struct crypto_ec *e)
 {
+	if (e->group.A.MBEDTLS_PRIVATE(p) == NULL) {
+		/* NIST curves are defined A = 0 but need to be set A = -3 */
+		mbedtls_mpi_lset(&e->group.A, -3);
+		mbedtls_mpi_mod_mpi(&e->group.A, &e->group.A, &e->group.P);
+	}
 	return (const struct crypto_bignum *) &e->group.A;
 }
 
@@ -1292,7 +1369,21 @@ int crypto_bignum_mulmod(const struct crypto_bignum *a,
     int res;
 #if ALLOW_EVEN_MOD || !CONFIG_MBEDTLS_HARDWARE_MPI // Must enable ALLOW_EVEN_MOD if c is even
 #if defined(INCLUDE_HW_SECURITY_ACC_BN) && defined(INCLUDE_HW_SECURITY_ACC_BN_MUL_MOD)
-    res = mbedtls_mpi_mul_mpi_mod_mpi((mbedtls_mpi *) d, (mbedtls_mpi *) a, (mbedtls_mpi *) b, (mbedtls_mpi *) c);
+	if (((mbedtls_mpi *) c)->MBEDTLS_PRIVATE(n) >= 16) {
+		mbedtls_mpi temp;
+		mbedtls_mpi_init(&temp);
+
+		res = mbedtls_mpi_mul_mpi(&temp, (const mbedtls_mpi *) a, (const mbedtls_mpi *) b);
+		if (res) {
+			return -1;
+		}
+
+		res = mbedtls_mpi_mod_mpi((mbedtls_mpi *) d, &temp, (mbedtls_mpi *) c);
+
+		mbedtls_mpi_free(&temp);
+	} else {
+		res = mbedtls_mpi_mul_mpi_mod_mpi((mbedtls_mpi *) d, (mbedtls_mpi *) a, (mbedtls_mpi *) b, (mbedtls_mpi *) c);
+	}
 #else
     mbedtls_mpi temp;
     mbedtls_mpi_init(&temp);
@@ -1414,16 +1505,16 @@ struct crypto_ecdh * crypto_ecdh_init(int group)
 
 	//Set Group ID
 	grp_id = get_ecp_group_id(group);
-	
-	//INIT ECDH 
-	ecdh = os_zalloc(sizeof(*ecdh));
+
+	//INIT ECDH
+	ecdh = os_zalloc(sizeof(struct crypto_ecdh));
 	mbedtls_ecdh_init(&ecdh->ctx);
 #ifndef CONFIG_MBEDTLS_ECDH_LEGACY_CONTEXT
 	ecdh->ctx.MBEDTLS_PRIVATE(var) = MBEDTLS_ECDH_VARIANT_MBEDTLS_2_0;
 #endif
 	if(mbedtls_ecdh_setup(&ecdh->ctx, grp_id) != 0)
 	{
-		wpa_msg(0, MSG_DEBUG, "OWE : Fail to setup ECDH\n");
+		wpa_msg(0, MSG_DEBUG, "ECDH : Fail to setup ECDH\n");
 		crypto_ecdh_deinit(ecdh);
 		goto clean;
 	}
@@ -1431,7 +1522,7 @@ struct crypto_ecdh * crypto_ecdh_init(int group)
 	if(mbedtls_ecdh_make_public( &ecdh->ctx, &olen, buf, 1000,
                                   mbedtls_ctr_drbg_random, &ctr_drbg ) != 0)
 	{
-		wpa_msg(0, MSG_DEBUG, "OWE : Fail to make public key\n");
+		wpa_msg(0, MSG_DEBUG, "ECDH : Fail to make public key\n");
 		crypto_ecdh_deinit(ecdh);
 		goto clean;
 	}
@@ -1455,40 +1546,123 @@ clean:
 
 }
 
+struct crypto_ecdh * crypto_ecdh_init2(int group, struct crypto_ec_key *own_key)
+{
+	struct crypto_ecdh *ecdh;
+	mbedtls_entropy_context entropy;
+	mbedtls_ctr_drbg_context ctr_drbg;
+	mbedtls_pk_context *pkey = (mbedtls_pk_context *) own_key;
+	struct mbedtls_ecp_keypair *kp = mbedtls_pk_ec(*pkey);
+
+	mbedtls_ecp_group_id grp_id = MBEDTLS_ECP_DP_NONE;
+	grp_id = get_ecp_group_id(group);
+
+	ecdh = os_zalloc(sizeof(*ecdh));
+	if (ecdh == NULL) {
+		wpa_printf(MSG_ERROR, "%s: Fail to alloc ecdh", __func__);
+		return NULL;
+	}
+
+#if DEBUG_ECC_PROCESS_TIME //For Debug
+	unsigned int ptime, ctime;
+	ptime = TSF;
+	_wpa_msg_crypto(NULL, MSG_DEBUG, TAG "[Enter] %s", __func__);
+#endif
+
+	mbedtls_ecdh_init(&ecdh->ctx);
+#ifndef CONFIG_MBEDTLS_ECDH_LEGACY_CONTEXT
+	ecdh->ctx.MBEDTLS_PRIVATE(var) = MBEDTLS_ECDH_VARIANT_MBEDTLS_2_0;
+#endif
+	if (mbedtls_ecdh_setup(&ecdh->ctx, grp_id) != 0) {
+		wpa_printf(MSG_ERROR, "%s: Fail to setup ECDH", __func__);
+		crypto_ecdh_deinit(ecdh);
+		return NULL;
+	}
+
+	if (mbedtls_ecdh_get_params(&ecdh->ctx, kp, MBEDTLS_ECDH_OURS) != 0) {
+		wpa_printf(MSG_ERROR, "%s: Fail to set our ecdh params", __func__);
+		crypto_ecdh_deinit(ecdh);
+		return NULL;
+	}
+
+	if (mbedtls_ecdh_get_params(&ecdh->ctx, kp, MBEDTLS_ECDH_THEIRS) != 0) {
+		wpa_printf(MSG_ERROR, "%s: Fail to set peer ecdh params", __func__);
+		crypto_ecdh_deinit(ecdh);
+		return NULL;
+	}
+
+	mbedtls_entropy_init(&entropy);
+	mbedtls_ctr_drbg_init(&ctr_drbg);
+	mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, NULL, 0);
+
+	size_t olen;
+	unsigned char buf[MBEDTLS_MPI_MAX_SIZE];
+	if (mbedtls_ecdh_calc_secret(&ecdh->ctx, &olen, buf, MBEDTLS_MPI_MAX_SIZE,
+		mbedtls_ctr_drbg_random, &ctr_drbg) != 0) {
+		wpa_printf(MSG_ERROR, "%s: Fail to calc secret", __func__);
+		mbedtls_ctr_drbg_free(&ctr_drbg);
+		mbedtls_entropy_free(&entropy);
+		crypto_ecdh_deinit(ecdh);
+		return NULL;
+	}
+	mbedtls_ctr_drbg_free(&ctr_drbg);
+	mbedtls_entropy_free(&entropy);
+
+#if DEBUG_ECC_PROCESS_TIME //For Debug
+	ctime = TSF;
+	_wpa_msg_crypto(0, MSG_DEBUG, TAG "[Exit ] %s (elapsed time: %u us)", __func__, (ctime - ptime));
+#endif
+
+	return ecdh;
+}
+
 void crypto_ecdh_deinit(struct crypto_ecdh *ecdh)
 {
-	if(ecdh)
-	{
+	mbedtls_ecdh_context *ctx = (mbedtls_ecdh_context *) &ecdh->ctx;
+
+	if(ctx) {
 		mbedtls_ecdh_free(&ecdh->ctx);
 		os_free(ecdh);
+		ecdh = NULL;
 	}
 }
 
 struct wpabuf * crypto_ecdh_get_pubkey(struct crypto_ecdh *ecdh, int inc_y)
 {
 	struct wpabuf *buf = NULL;
-	// int len = ecdh->ctx.Q.X.n * 2 + 2;
 	mbedtls_ecdh_context *ctx = (mbedtls_ecdh_context *) &ecdh->ctx;
-	int len = (ACCESS_ECDH(ctx, grp).pbits >> 3) + 2;
-	size_t olen = 0;
+	size_t prime_len = crypto_ec_prime_len((struct crypto_ec *) &ACCESS_ECDH(ctx, grp));
+	size_t olen = inc_y ? prime_len * 2 : prime_len;
 
-	buf = wpabuf_alloc(len);
-
-	wpa_msg(0, MSG_DEBUG, "LEN : %d, T_size : %d pbits : %d, nbits :  %d\n", len,
-		ACCESS_ECDH(ctx, grp).MBEDTLS_PRIVATE(T_size),
-		ACCESS_ECDH(ctx, grp).pbits, ACCESS_ECDH(ctx, grp).nbits);
-
-	if(mbedtls_mpi_write_binary(ACCESS_ECDH(&ctx, Q).MBEDTLS_PRIVATE(X), wpabuf_put(buf, len), len) != 0)
-	{
-		wpa_msg(0, MSG_DEBUG, "OWE : Fail to get public-key\n");
-		if(buf)
-			wpabuf_free(buf);
+	buf = wpabuf_alloc(olen);
+	if (!buf) {
+		wpa_msg(0, MSG_DEBUG, "ECDH : Fail to alloc buffer\n");
 		return NULL;
 	}
 
-	wpa_msg(0, MSG_DEBUG, "OWE : ECDH key length : %d\n", len);
-	// bignum_print("Public Bignum", &ecdh->ctx.Q.X);
-	wpa_hexdump(MSG_DEBUG, "OWE : Public Key", wpabuf_head(buf), olen);
+	wpa_msg(0, MSG_DEBUG, "LEN : %d, T_size : %d pbits : %d, nbits :  %d\n", prime_len,
+		ACCESS_ECDH(ctx, grp).MBEDTLS_PRIVATE(T_size),
+		ACCESS_ECDH(ctx, grp).pbits, ACCESS_ECDH(ctx, grp).nbits);
+
+	if (crypto_bignum_to_bin((struct crypto_bignum *) &ACCESS_ECDH(ctx, Q).MBEDTLS_PRIVATE(X),
+			wpabuf_put(buf, prime_len), prime_len, prime_len) != prime_len) {
+		wpa_msg(0, MSG_DEBUG, "ECDH : Fail to get pubkey.X\n");
+		wpabuf_free(buf);
+		return NULL;
+	}
+
+	if (inc_y) {
+		if (crypto_bignum_to_bin((struct crypto_bignum *) &ACCESS_ECDH(ctx, Q).MBEDTLS_PRIVATE(Y),
+				wpabuf_put(buf, prime_len), prime_len, prime_len) != prime_len) {
+			wpa_msg(0, MSG_DEBUG, "ECDH : Fail to get pubkey.Y\n");
+			wpabuf_free(buf);
+			return NULL;
+		}
+	}
+
+	wpa_msg(0, MSG_DEBUG, "ECDH : ECDH key length : %d\n", olen);
+	// bignum_print("Public Bignum", &ACCESS_ECDH(ctx, Q).MBEDTLS_PRIVATE(X));
+	wpa_hexdump(MSG_DEBUG, "ECDH : Public Key", wpabuf_head(buf), olen);
 
     return buf;
 }
@@ -1521,24 +1695,32 @@ struct wpabuf * crypto_ecdh_set_peerkey(struct crypto_ecdh *ecdh, int inc_y,
 	mbedtls_ecp_point *peerKey;
 	peerKey = &ACCESS_ECDH(ctx, Qp);
 
-	if(mbedtls_mpi_read_binary(&peerKey->MBEDTLS_PRIVATE(X), key, len) != 0)
+	if(mbedtls_mpi_read_binary(&peerKey->MBEDTLS_PRIVATE(X), key, inc_y ? len / 2 : len) != 0)
 	{
-		wpa_msg(0, MSG_DEBUG, "OWE : [%s, %d] Fail to read peer public-key(point X)", __func__, __LINE__);
+		wpa_msg(0, MSG_DEBUG, "ECDH : [%s, %d] Fail to read peer public-key(point X)", __func__, __LINE__);
 		goto clean;
 	}
 
 	if(mbedtls_mpi_lset(&peerKey->MBEDTLS_PRIVATE(Z), 1) != 0)
 	{
-		wpa_msg(0, MSG_DEBUG, "OWE : [%s, %d] Fail to Set bit in public-key(point Z)", __func__, __LINE__);
+		wpa_msg(0, MSG_DEBUG, "ECDH : [%s, %d] Fail to Set bit in public-key(point Z)", __func__, __LINE__);
 		goto clean;
 	}
 
-	if(crypto_ec_point_solve_y_coord((struct crypto_ec *) &ACCESS_ECDH(ctx, grp), (void *) peerKey, (void *) &peerKey->MBEDTLS_PRIVATE(X), 0))
+	if (inc_y)
 	{
-		wpa_msg(0, MSG_DEBUG, "OWE : [%s, %d] Fail to calc Y using X(y^2 = x^3 + ax + b  mod  P)", __func__, __LINE__);
-		goto clean;
+		if(mbedtls_mpi_read_binary(&peerKey->MBEDTLS_PRIVATE(Y), key + (len / 2), len / 2) != 0)
+		{
+			wpa_msg(0, MSG_DEBUG, "ECDH : [%s, %d] Fail to read peer public-key(point Y)", __func__, __LINE__);
+			goto clean;
+		}
+	} else {
+		if(crypto_ec_point_solve_y_coord((struct crypto_ec *) &ACCESS_ECDH(ctx, grp), (void *) peerKey, (void *) &peerKey->MBEDTLS_PRIVATE(X), 0))
+		{
+			wpa_msg(0, MSG_DEBUG, "ECDH : [%s, %d] Fail to calc Y using X(y^2 = x^3 + ax + b  mod  P)", __func__, __LINE__);
+			goto clean;
+		}
 	}
-
 	// bignum_print("Public  Key : ", &ecdh->ctx.Q.X);
 	// bignum_print("Private Key : ", &ecdh->ctx.d);
 	// bignum_print("pr Public X Key : ", &ecdh->ctx.Qp.X);
@@ -1548,17 +1730,17 @@ struct wpabuf * crypto_ecdh_set_peerkey(struct crypto_ecdh *ecdh, int inc_y,
 	if(mbedtls_ecdh_calc_secret( &ecdh->ctx, &res_len, res_buf, 1000,
                                            mbedtls_ctr_drbg_random, &ctr_drbg ) != 0)
 	{
-		wpa_msg(0, MSG_DEBUG, "OWE : [%s, %d] Fail to calc secret", __func__, __LINE__);
+		wpa_msg(0, MSG_DEBUG, "ECDH : [%s, %d] Fail to calc secret", __func__, __LINE__);
 		goto clean;
 	}
 
-	wpa_hexdump(MSG_DEBUG, "OWE : SHARED KEY", res_buf, res_len);
+	wpa_hexdump(MSG_DEBUG, "ECDH : SHARED KEY", res_buf, res_len);
 
 	ecdh->length = res_len;
 
 	secret = wpabuf_alloc(ecdh->length);
 	if (secret == NULL) {
-		wpa_msg(0, MSG_DEBUG, "OWE : [%s, %d] Fail to alloc buffer", __func__, __LINE__);
+		wpa_msg(0, MSG_DEBUG, "ECDH : [%s, %d] Fail to alloc buffer", __func__, __LINE__);
 		return NULL;
 	}
 
@@ -1585,4 +1767,790 @@ int omac1_aes_128(const u8 *key, const u8 *data, size_t data_len, u8 *mac)
 }
 #endif
 
-#endif //#if (defined (CONFIG_SAE) || defined (CONFIG_OWE))
+static struct crypto_ec_key *crypto_alloc_key(void)
+{
+	mbedtls_pk_context *pkey = os_malloc(sizeof(*pkey));
+
+	if (!pkey) {
+		wpa_printf(MSG_ERROR, "%s: Fail to alloc key", __func__);
+		return NULL;
+	}
+	mbedtls_pk_init(pkey);
+
+	return (struct crypto_ec_key *) pkey;
+}
+
+struct crypto_ec_key *crypto_ec_key_parse_priv(const u8 *der, size_t der_len)
+{
+	int ret;
+	mbedtls_entropy_context entropy;
+	mbedtls_ctr_drbg_context ctr_drbg;
+
+	mbedtls_pk_context *pkey = (mbedtls_pk_context *) crypto_alloc_key();
+	if (!pkey) {
+		return NULL;
+	}
+
+#if (MBEDTLS_VERSION_MAJOR >= 3)
+	mbedtls_entropy_init(&entropy);
+	mbedtls_ctr_drbg_init(&ctr_drbg);
+	mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, NULL, 0);
+
+	ret = mbedtls_pk_parse_key(pkey, der, der_len, NULL, 0, mbedtls_ctr_drbg_random, &ctr_drbg);
+	mbedtls_ctr_drbg_free(&ctr_drbg);
+	mbedtls_entropy_free(&entropy);
+#else
+	ret = mbedtls_pk_parse_key(pkey, der, der_len, NULL, 0);
+#endif
+
+	if (ret < 0) {
+		wpa_printf(MSG_ERROR, "%s: Failed to parse EC Private Key", __func__);
+		crypto_ec_key_deinit((struct crypto_ec_key *) pkey);
+		return NULL;
+	}
+
+	return (struct crypto_ec_key *) pkey;
+}
+
+struct crypto_ec_key *crypto_ec_key_parse_pub(const u8 *der, size_t der_len)
+{
+	int ret;
+
+	mbedtls_pk_context *pkey = (mbedtls_pk_context *) crypto_alloc_key();
+	if (!pkey) {
+		return NULL;
+	}
+
+	ret = mbedtls_pk_parse_public_key(pkey, der, der_len);
+	if (ret < 0) {
+		wpa_printf(MSG_ERROR, "%s: Failed to parse EC Public Key", __func__);
+		crypto_ec_key_deinit((struct crypto_ec_key *) pkey);
+		return NULL;
+	}
+
+	return (struct crypto_ec_key *) pkey;
+}
+
+struct crypto_ec_key *crypto_ec_key_set_pub(int group, const u8 *buf_x,
+					     const u8 *buf_y, size_t len)
+{
+	u8 *buf = NULL;
+	mbedtls_pk_context *pkey = NULL;
+	struct crypto_ec_point *point = NULL;
+	struct crypto_ec *e = crypto_ec_init(group);
+	if (!e) {
+		wpa_printf(MSG_ERROR, "%s: Fail to init ec", __func__);
+		return NULL;
+	}
+
+	buf = os_malloc(len * 2);
+	if (!buf) {
+		wpa_printf(MSG_ERROR, "%s: Fail to alloc buffer(%d)", __func__, len);
+		goto fail;
+	}
+	os_memcpy(buf, buf_x, len);
+	os_memcpy(buf + len, buf_y, len);
+	point = crypto_ec_point_from_bin(e, buf);
+	if (!point) {
+		wpa_printf(MSG_ERROR, "%s: Fail to init ec point", __func__);
+		goto fail;
+	}
+	if (crypto_ec_point_is_at_infinity(e, point)) {
+		wpa_printf(MSG_ERROR, "%s: Point is at infinity", __func__);
+		goto fail;
+	}
+	if (!crypto_ec_point_is_on_curve(e, point)) {
+		wpa_printf(MSG_ERROR, "%s: Point is not on curve", __func__);
+		goto fail;
+	}
+	if (mbedtls_ecp_check_pubkey(&e->group, (mbedtls_ecp_point *) point) != 0) {
+		wpa_printf(MSG_ERROR, "%s: Invalid public key", __func__);
+		goto fail;
+	}
+
+	pkey = (mbedtls_pk_context *) crypto_alloc_key();
+	if (!pkey) {
+		wpa_printf(MSG_ERROR, "%s: Fail to alloc key", __func__);
+		goto fail;
+	}
+	if (mbedtls_pk_setup(pkey, mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY)) != 0) {
+		wpa_printf(MSG_ERROR, "%s: Fail to setup key", __func__);
+		crypto_ec_key_deinit((struct crypto_ec_key *) pkey);
+		pkey = NULL;
+		goto fail;
+	}
+
+	mbedtls_ecp_copy(&mbedtls_pk_ec(*pkey)->MBEDTLS_PRIVATE(Q), (mbedtls_ecp_point *) point);
+	mbedtls_ecp_group_load(&mbedtls_pk_ec(*pkey)->MBEDTLS_PRIVATE(grp), e->group.id);
+
+fail:
+	os_free(buf);
+	crypto_ec_point_deinit(point, 0);
+	crypto_ec_deinit(e);
+	return (struct crypto_ec_key *) pkey;
+}
+
+struct crypto_ec_key *
+crypto_ec_key_set_pub_point(struct crypto_ec *ec,
+			    const struct crypto_ec_point *pub)
+{
+	mbedtls_pk_context *pkey = (mbedtls_pk_context *) crypto_alloc_key();
+	if (!pkey) {
+		wpa_printf(MSG_ERROR, "%s: Fail to alloc key", __func__);
+		return NULL;
+	}
+	if (mbedtls_pk_setup(pkey, mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY)) != 0) {
+		wpa_printf(MSG_ERROR, "%s: Fail to setup key", __func__);
+		crypto_ec_key_deinit((struct crypto_ec_key *) pkey);
+		return NULL;
+	}
+
+	mbedtls_ecp_copy(&mbedtls_pk_ec(*pkey)->MBEDTLS_PRIVATE(Q), (mbedtls_ecp_point *) pub);
+	mbedtls_ecp_group_load(&mbedtls_pk_ec(*pkey)->MBEDTLS_PRIVATE(grp), ec->group.id);
+
+	return (struct crypto_ec_key *) pkey;
+}
+
+struct crypto_ec_key *crypto_ec_key_gen(int group)
+{
+	mbedtls_entropy_context entropy;
+	mbedtls_ctr_drbg_context ctr_drbg;
+	mbedtls_pk_context *pkey = (mbedtls_pk_context *) crypto_alloc_key();
+	if (!pkey) {
+		return NULL;
+	}
+
+#if DEBUG_ECC_PROCESS_TIME //For Debug
+	unsigned int ptime, ctime;
+	ptime = TSF;
+	_wpa_msg_crypto(NULL, MSG_DEBUG, TAG "[Enter] %s", __func__);
+#endif
+
+	if (mbedtls_pk_setup(pkey, mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY)) != 0) {
+		crypto_ec_key_deinit((struct crypto_ec_key *) pkey);
+		return NULL;
+	}
+
+	mbedtls_entropy_init(&entropy);
+	mbedtls_ctr_drbg_init(&ctr_drbg);
+	mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, NULL, 0);
+
+	if (mbedtls_ecp_gen_key(get_ecp_group_id(group), mbedtls_pk_ec(*pkey),
+					mbedtls_ctr_drbg_random, &ctr_drbg) != 0) {
+		wpa_printf(MSG_ERROR, "%s: Fail to generate key", __func__);
+		crypto_ec_key_deinit((struct crypto_ec_key *) pkey);
+		pkey = NULL;
+	}
+
+	mbedtls_ctr_drbg_free(&ctr_drbg);
+	mbedtls_entropy_free(&entropy);
+
+#if DEBUG_ECC_PROCESS_TIME //For Debug
+	ctime = TSF;
+	_wpa_msg_crypto(0, MSG_DEBUG, TAG "[Exit ] %s (elapsed time: %u us)", __func__, (ctime - ptime));
+#endif
+
+	return (struct crypto_ec_key *) pkey;
+}
+
+void crypto_ec_key_deinit(struct crypto_ec_key *key)
+{
+	mbedtls_pk_context *pkey = (mbedtls_pk_context *) key;
+	mbedtls_pk_free(pkey);
+	os_free(pkey);
+}
+
+struct wpabuf *crypto_ec_key_get_subject_public_key(struct crypto_ec_key *key)
+{
+	struct wpabuf *der = NULL;
+	unsigned char *end;
+	const char *oid = NULL;
+	size_t der_len = 0, par_len = 0, oid_len = 0;
+	mbedtls_pk_context *pkey = (mbedtls_pk_context *) key;
+	mbedtls_ecp_keypair *kp = mbedtls_pk_ec(*pkey);
+	unsigned char buf[MBEDTLS_ECP_MAX_PT_LEN];
+	unsigned char der_data[ECP_PUB_DER_MAX_BYTES];
+
+	end = der_data + ECP_PUB_DER_MAX_BYTES;
+	if (mbedtls_ecp_point_write_binary(&kp->MBEDTLS_PRIVATE(grp), &kp->MBEDTLS_PRIVATE(Q),
+		MBEDTLS_ECP_PF_COMPRESSED, &der_len, buf, MBEDTLS_ECP_MAX_PT_LEN) < 0) {
+		wpa_printf(MSG_ERROR, "%s: Failed to get pubkey", __func__);
+		return NULL;
+	}
+	if (der_len <= 0) {
+		wpa_printf(MSG_ERROR, "%s: invalid pubkey length(%d)", __func__, der_len);
+		return NULL;
+	}
+
+	end -= der_len;
+	os_memcpy(end, buf, der_len);
+
+	*--end = 0;
+	der_len += 1;
+
+	der_len += mbedtls_asn1_write_len(&end, der_data, der_len);
+	der_len += mbedtls_asn1_write_tag(&end, der_data, MBEDTLS_ASN1_BIT_STRING);
+
+#if defined(MBEDTLS_ECP_C)
+    if (mbedtls_pk_get_type(pkey) == MBEDTLS_PK_ECKEY) {
+		if (mbedtls_oid_get_oid_by_ec_grp(kp->MBEDTLS_PRIVATE(grp).id, &oid, &oid_len) != 0) {
+			wpa_printf(MSG_ERROR, "%s: Failed to get oid by grp", __func__);
+			return NULL;
+		}
+		par_len += mbedtls_asn1_write_oid(&end, der_data, oid, oid_len);
+	}
+#endif
+
+	if (mbedtls_oid_get_oid_by_pk_alg(mbedtls_pk_get_type(pkey),
+		&oid, &oid_len) != 0) {
+		wpa_printf(MSG_ERROR, "%s: Failed to get oid by alg", __func__);
+		return NULL;
+	}
+
+	der_len += mbedtls_asn1_write_algorithm_identifier(&end, der_data, oid, oid_len,
+		par_len);
+
+	der_len += mbedtls_asn1_write_len(&end, der_data, der_len);
+	der_len += mbedtls_asn1_write_tag(&end, der_data, MBEDTLS_ASN1_CONSTRUCTED |
+		MBEDTLS_ASN1_SEQUENCE);
+
+	der = wpabuf_alloc(der_len);
+	if (!der) {
+		wpa_printf(MSG_ERROR, "%s: Failed to alloc memory for pubkey der(%d)",
+					__func__, der_len);
+		return NULL;
+	}
+	wpabuf_put_data(der, der_data + ECP_PUB_DER_MAX_BYTES - der_len, der_len);
+
+	return der;
+}
+
+struct wpabuf * crypto_ec_key_get_ecprivate_key(struct crypto_ec_key *key,
+						bool include_pub)
+{
+	struct wpabuf *ret;
+	mbedtls_pk_context *pkey = (mbedtls_pk_context *) key;
+	int der_len = 0;
+	size_t pub_len = 0;
+	unsigned char der_data[ECP_PRV_DER_MAX_BYTES];
+
+	der_len = mbedtls_pk_write_key_der(pkey, der_data, ECP_PRV_DER_MAX_BYTES);
+	if (der_len <= 0) {
+		wpa_printf(MSG_DEBUG, "%s: Failed to get priv der", __func__);
+		return NULL;
+	}
+
+	if (!include_pub) {
+		unsigned char *der_end = der_data + ECP_PRV_DER_MAX_BYTES;
+		unsigned char *der_start = der_end - der_len;
+		while (der_start < der_end) {
+			if (mbedtls_asn1_get_tag(&der_start, der_end, &pub_len,
+				MBEDTLS_ASN1_CONTEXT_SPECIFIC | MBEDTLS_ASN1_CONSTRUCTED | 1) != 0) {
+				pub_len = 0;
+				wpa_printf(MSG_ERROR, "%s: Failed to find pub der", __func__);
+				break;
+			}
+		}
+	}
+	ret = wpabuf_alloc_copy(der_data + ECP_PRV_DER_MAX_BYTES - der_len, der_len - pub_len);
+
+	return ret;
+}
+
+struct wpabuf * crypto_ec_key_get_pubkey_point(struct crypto_ec_key *key,
+					       int prefix)
+{
+	struct wpabuf *kbuf = NULL;
+	mbedtls_pk_context *pkey = (mbedtls_pk_context *) key;
+	unsigned char buf[MBEDTLS_MPI_MAX_SIZE + 10]; /* tag, length + MPI */
+	unsigned char *c = buf + sizeof(buf);
+	int pk_len = mbedtls_pk_write_pubkey(&c, buf, pkey);
+	if (pk_len <= 0) {
+		wpa_printf(MSG_ERROR, "%s: Fail to get public-key", __func__);
+		return NULL;
+	}
+
+	kbuf = wpabuf_alloc_copy(buf + MBEDTLS_MPI_MAX_SIZE + 10 - pk_len, pk_len);
+	if (!kbuf) {
+		wpa_printf(MSG_ERROR, "%s: Fail to alloc memory for public-key", __func__);
+		return NULL;
+	}
+
+	if (!prefix) {
+		/* Remove 0x04 prefix if requested */
+		u8 *pos = wpabuf_mhead(kbuf);
+		os_memmove(pos, pos + 1, pk_len - 1);
+		kbuf->used--;
+	}
+
+	return kbuf;
+}
+
+struct crypto_ec_point *
+crypto_ec_key_get_public_key(struct crypto_ec_key *key)
+{
+	mbedtls_pk_context *pkey = (mbedtls_pk_context *) key;
+	struct mbedtls_ecp_point *pt = os_zalloc(sizeof(mbedtls_ecp_point));
+
+	if (pt == NULL) {
+		wpa_printf(MSG_ERROR, "%s: Fail to alloc ec point", __func__);
+		return NULL;
+	}
+	mbedtls_ecp_point_init(pt);
+	mbedtls_ecp_copy(pt, &mbedtls_pk_ec(*pkey)->MBEDTLS_PRIVATE(Q));
+	return (struct crypto_ec_point *) pt;
+}
+
+struct crypto_bignum *
+crypto_ec_key_get_private_key(struct crypto_ec_key *key)
+{
+	mbedtls_pk_context *pkey = (mbedtls_pk_context *) key;
+	mbedtls_mpi *privkey = os_zalloc(sizeof(mbedtls_mpi));
+
+	if (privkey == NULL) {
+		wpa_printf(MSG_ERROR, "%s: Fail to alloc mpi", __func__);
+		return NULL;
+	}
+	mbedtls_mpi_init(privkey);
+	mbedtls_mpi_copy(privkey, &mbedtls_pk_ec(*pkey)->MBEDTLS_PRIVATE(d));
+	return (struct crypto_bignum *) privkey;
+}
+
+struct wpabuf * crypto_ec_key_sign_r_s(struct crypto_ec_key *key,
+				       const u8 *data, size_t len)
+{
+	struct wpabuf *sig = NULL;
+	mbedtls_entropy_context entropy;
+	mbedtls_ctr_drbg_context ctr_drbg;
+	mbedtls_pk_context *pkey = (mbedtls_pk_context *) key;
+	mbedtls_ecp_keypair *kp = mbedtls_pk_ec(*pkey);
+	mbedtls_mpi r, s;
+
+#if DEBUG_ECC_PROCESS_TIME //For Debug
+	unsigned int ptime, ctime;
+	ptime = TSF;
+	_wpa_msg_crypto(NULL, MSG_DEBUG, TAG "[Enter] %s", __func__);
+#endif
+
+	mbedtls_mpi_init(&r);
+	mbedtls_mpi_init(&s);
+	mbedtls_entropy_init(&entropy);
+	mbedtls_ctr_drbg_init(&ctr_drbg);
+	mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, NULL, 0);
+	if (mbedtls_ecdsa_sign(&kp->MBEDTLS_PRIVATE(grp), &r, &s, &kp->MBEDTLS_PRIVATE(d),
+		data, len, mbedtls_ctr_drbg_random, &ctr_drbg) == 0) {
+		u8 r_bin[32], s_bin[32];
+		size_t sig_len = 0;
+		size_t prime_len = crypto_ec_prime_len((struct crypto_ec *) &kp->MBEDTLS_PRIVATE(grp));
+		sig = wpabuf_alloc(prime_len * 2);
+		if (sig) {
+			sig_len = crypto_bignum_to_bin((struct crypto_bignum *) &r, r_bin,
+					prime_len, prime_len);
+			wpabuf_put_data(sig, r_bin, sig_len);
+			sig_len = crypto_bignum_to_bin((struct crypto_bignum *) &s, s_bin,
+					prime_len, prime_len);
+			wpabuf_put_data(sig, s_bin, sig_len);
+		} else {
+			wpa_printf(MSG_ERROR, "%s: Fail to alloc buffer", __func__);
+		}
+	} else {
+		wpa_printf(MSG_ERROR, "%s: Fail to ecdsa sign", __func__);
+	}
+	mbedtls_ctr_drbg_free(&ctr_drbg);
+	mbedtls_entropy_free(&entropy);
+	mbedtls_mpi_free(&r);
+	mbedtls_mpi_free(&s);
+
+#if DEBUG_ECC_PROCESS_TIME //For Debug
+	ctime = TSF;
+	_wpa_msg_crypto(0, MSG_DEBUG, TAG "[Exit ] %s (elapsed time: %u us)", __func__, (ctime - ptime));
+#endif
+
+	return sig;
+}
+
+int crypto_ec_key_verify_signature_r_s(struct crypto_ec_key *key,
+				       const u8 *data, size_t len,
+				       const u8 *r, size_t r_len,
+				       const u8 *s, size_t s_len)
+{
+	int ret = 1;
+	mbedtls_pk_context *pkey = (mbedtls_pk_context *) key;
+	mbedtls_ecp_keypair *kp = mbedtls_pk_ec(*pkey);
+	mbedtls_mpi *pr, *ps;
+
+#if DEBUG_ECC_PROCESS_TIME //For Debug
+	unsigned int ptime, ctime;
+	ptime = TSF;
+	_wpa_msg_crypto(NULL, MSG_DEBUG, TAG "[Enter] %s", __func__);
+#endif
+
+	pr = (mbedtls_mpi *) crypto_bignum_init_set(r, r_len);
+	ps = (mbedtls_mpi *) crypto_bignum_init_set(s, s_len);
+	if (!pr || !ps) {
+		return -1;
+	}
+
+	if (mbedtls_ecdsa_verify(&kp->MBEDTLS_PRIVATE(grp), data, len, &kp->MBEDTLS_PRIVATE(Q), pr, ps) != 0) {
+		wpa_printf(MSG_ERROR, "%s: Fail to verify ec signature", __func__);
+		ret = 0;
+		goto cleanup;
+	}
+
+#if DEBUG_ECC_PROCESS_TIME //For Debug
+	ctime = TSF;
+	_wpa_msg_crypto(0, MSG_DEBUG, TAG "[Exit ] %s (elapsed time: %u us)", __func__, (ctime - ptime));
+#endif
+
+cleanup:
+	crypto_bignum_deinit((struct crypto_bignum *) pr, 0);
+	crypto_bignum_deinit((struct crypto_bignum *) ps, 0);
+	return ret;
+}
+
+int crypto_ec_key_group(struct crypto_ec_key *key)
+{
+	mbedtls_pk_context *pkey = (mbedtls_pk_context *) key;
+	return (int)crypto_ec_get_mbedtls_to_nist_group_id(mbedtls_pk_ec(*pkey)->MBEDTLS_PRIVATE(grp).id);
+}
+
+int crypto_ec_key_cmp(struct crypto_ec_key *key1, struct crypto_ec_key *key2)
+{
+	mbedtls_pk_context *pkey;
+	struct mbedtls_ecp_keypair *kp;
+	struct mbedtls_ecp_point *A, *B;
+
+	pkey = (mbedtls_pk_context *) key1; kp = mbedtls_pk_ec(*pkey);
+	A = (struct mbedtls_ecp_point *) &kp->MBEDTLS_PRIVATE(Q);
+	pkey = (mbedtls_pk_context *) key2; kp = mbedtls_pk_ec(*pkey);
+	B = (struct mbedtls_ecp_point *) &kp->MBEDTLS_PRIVATE(Q);
+
+	return mbedtls_ecp_point_cmp((const mbedtls_ecp_point *) A,
+			(const mbedtls_ecp_point *) B) ? -1 : 0;
+}
+
+void crypto_ec_key_debug_print(const struct crypto_ec_key *key,
+			       const char *title)
+{
+	mbedtls_pk_context *pkey = (mbedtls_pk_context *) key;
+	struct mbedtls_ecp_keypair *kp = mbedtls_pk_ec(*pkey);
+	uint8_t x[32], y[32], d[32];
+
+	wpa_printf(MSG_DEBUG, "curve: %s",
+		   mbedtls_ecp_curve_info_from_grp_id(kp->MBEDTLS_PRIVATE(grp).id)->name);
+
+	size_t len = mbedtls_mpi_size((mbedtls_mpi *) &kp->MBEDTLS_PRIVATE(grp).P);
+	wpa_printf(MSG_DEBUG, "prime len is %d", len);
+
+	if (crypto_bignum_to_bin((struct crypto_bignum *) &kp->MBEDTLS_PRIVATE(Q).MBEDTLS_PRIVATE(X),
+		x, len, len) < 0) {
+		return;
+	}
+	wpa_hexdump(MSG_DEBUG, "Q_x:", x, 32);
+
+	if (crypto_bignum_to_bin((struct crypto_bignum *) &kp->MBEDTLS_PRIVATE(Q).MBEDTLS_PRIVATE(Y),
+		y, len, len) < 0) {
+		return;
+	}
+	wpa_hexdump(MSG_DEBUG, "Q_y:", y, 32);
+
+	if (crypto_bignum_to_bin((struct crypto_bignum *) &kp->MBEDTLS_PRIVATE(d),
+		d, len, len) < 0) {
+		return;
+	}
+	wpa_hexdump(MSG_DEBUG, "d  :", d, 32);
+}
+
+#endif /* CONFIG_ECC */
+
+struct crypto_csr {
+	mbedtls_x509_csr ctx;
+	mbedtls_x509write_csr write_ctx;
+};
+
+struct crypto_csr * crypto_csr_init()
+{
+	struct crypto_csr *csr = os_malloc(sizeof(*csr));
+	if (!csr) {
+		wpa_printf(MSG_ERROR, "%s: Fail to alloc csr", __func__);
+		return NULL;
+	}
+	mbedtls_x509_csr_init(&csr->ctx);
+	mbedtls_x509write_csr_init(&csr->write_ctx);
+	return csr;
+}
+
+struct crypto_csr * crypto_csr_verify(const struct wpabuf *req)
+{
+	struct crypto_csr *csr = crypto_csr_init();
+	if (!csr) {
+		wpa_printf(MSG_ERROR, "%s: Fail to init csr", __func__);
+		return NULL;
+	}
+	mbedtls_x509_csr_parse(&csr->ctx, (const unsigned char *)wpabuf_head(req),
+				   wpabuf_len(req));
+	return csr;
+}
+
+void crypto_csr_deinit(struct crypto_csr *csr)
+{
+	if (!csr)
+		return;
+
+	mbedtls_x509write_csr_free(&csr->write_ctx);
+	mbedtls_x509_csr_free(&csr->ctx);
+	os_free(csr);
+}
+
+int crypto_csr_set_ec_public_key(struct crypto_csr *csr, struct crypto_ec_key *key)
+{
+	mbedtls_pk_context *pkey = (mbedtls_pk_context *) key;
+
+	if (!csr || !pkey) {
+		wpa_printf(MSG_ERROR, "%s: No csr or key", __func__);
+		return -1;
+	}
+
+	mbedtls_pk_init(&csr->ctx.pk);
+	if (mbedtls_pk_setup(&csr->ctx.pk,
+					mbedtls_pk_info_from_type(mbedtls_pk_get_type(pkey))) != 0) {
+		wpa_printf(MSG_ERROR, "%s: Fail to setup key", __func__);
+		mbedtls_pk_free(&csr->ctx.pk);
+		return -1;
+	}
+
+	if (mbedtls_ecp_group_copy(&mbedtls_pk_ec(csr->ctx.pk)->MBEDTLS_PRIVATE(grp),
+					&mbedtls_pk_ec(*pkey)->MBEDTLS_PRIVATE(grp)) != 0) {
+		wpa_printf(MSG_ERROR, "%s: Fail to copy group", __func__);
+		mbedtls_pk_free(&csr->ctx.pk);
+		return -1;
+	}
+
+	if (mbedtls_ecp_copy(&mbedtls_pk_ec(csr->ctx.pk)->MBEDTLS_PRIVATE(Q),
+					&mbedtls_pk_ec(*pkey)->MBEDTLS_PRIVATE(Q)) != 0) {
+		wpa_printf(MSG_ERROR, "%s: Fail to copy pubkey point", __func__);
+		mbedtls_pk_free(&csr->ctx.pk);
+		return -1;
+	}
+
+	return 0;
+}
+
+int crypto_csr_set_name(struct crypto_csr *csr, enum crypto_csr_name type,
+			const char *name)
+{
+	const char *oid = NULL;
+	char buf[MBEDTLS_X509_MAX_DN_NAME_SIZE];
+
+	if (!csr) {
+		wpa_printf(MSG_ERROR, "%s: No csr", __func__);
+		return -1;
+	}
+
+	switch (type) {
+	case CSR_NAME_CN:
+		oid = MBEDTLS_OID_AT_CN;
+		break;
+	case CSR_NAME_SN:
+		oid = MBEDTLS_OID_AT_SUR_NAME;
+		break;
+	case CSR_NAME_C:
+		oid = MBEDTLS_OID_AT_COUNTRY;
+		break;
+	case CSR_NAME_O:
+		oid = MBEDTLS_OID_AT_ORGANIZATION;
+		break;
+	case CSR_NAME_OU:
+		oid = MBEDTLS_OID_AT_ORG_UNIT;
+		break;
+	default:
+		wpa_printf(MSG_ERROR, "%s: invalid csr type:%d", __func__, type);
+		return -1;
+	}
+
+	os_snprintf(buf, sizeof(buf), "%s=%s", oid, name);
+	if (mbedtls_x509write_csr_set_subject_name(&csr->write_ctx, name) != 0) {
+		wpa_printf(MSG_ERROR, "%s: Fail to set csr name", __func__);
+		return -1;
+	}
+
+	return 0;
+}
+
+int crypto_csr_set_attribute(struct crypto_csr *csr, enum crypto_csr_attr attr,
+			     int attr_type, const u8 *value, size_t len)
+{
+	const char *oid = NULL;
+
+	if (!csr) {
+		wpa_printf(MSG_ERROR, "%s: No csr", __func__);
+		return -1;
+	}
+
+	switch (attr) {
+	case CSR_ATTR_CHALLENGE_PASSWORD:
+		oid = MBEDTLS_OID_PKCS9_CSR_CHALLENGE_PASSWORD;
+		break;
+	default:
+		wpa_printf(MSG_ERROR, "%s: Invalid csr attr:%d", __func__, attr);
+		return -1;
+	}
+
+#if (MBEDTLS_VERSION_MAJOR >= 3)
+	if (mbedtls_x509write_csr_set_extension(&csr->write_ctx,
+					oid, MBEDTLS_OID_SIZE(oid), 0, value, len) != 0) {
+		wpa_printf(MSG_ERROR, "%s: Fail to set csr attr", __func__);
+		return -1;
+	}
+#else
+	if (mbedtls_x509write_csr_set_extension(&csr->write_ctx,
+					oid, MBEDTLS_OID_SIZE(oid), value, len) != 0) {
+		wpa_printf(MSG_ERROR, "%s: Fail to set csr attr", __func__);
+		return -1;
+	}
+#endif
+
+	if (csr->write_ctx.MBEDTLS_PRIVATE(extensions)) {
+		csr->write_ctx.MBEDTLS_PRIVATE(extensions)->val.tag = attr_type;
+	}
+
+	return 0;
+}
+
+const u8 * crypto_csr_get_attribute(struct crypto_csr *csr,
+				    enum crypto_csr_attr attr,
+				    size_t *len, int *type)
+{
+	const mbedtls_asn1_named_data *data = NULL;
+
+	if (!csr) {
+		wpa_printf(MSG_ERROR, "%s: No csr", __func__);
+		return NULL;
+	}
+
+	switch (attr) {
+	case CSR_ATTR_CHALLENGE_PASSWORD:
+		data = mbedtls_asn1_find_named_data(csr->write_ctx.MBEDTLS_PRIVATE(extensions),
+				MBEDTLS_OID_PKCS9_CSR_CHALLENGE_PASSWORD,
+				MBEDTLS_OID_SIZE(MBEDTLS_OID_PKCS9_CSR_CHALLENGE_PASSWORD));
+		break;
+	default:
+		wpa_printf(MSG_ERROR, "%s: Invalid csr attr:%d", __func__, attr);
+		return NULL;
+	}
+
+	if (!data) {
+		wpa_printf(MSG_ERROR, "%s: Fail to get csr attr", __func__);
+		return NULL;
+	}
+
+	*len = data->val.len;
+	*type = data->val.tag;
+
+	return data->val.p;
+}
+
+struct wpabuf * crypto_csr_sign(struct crypto_csr *csr,
+				struct crypto_ec_key *key,
+				enum crypto_hash_alg algo)
+{
+	struct wpabuf *buf = NULL;
+	unsigned char der[MBEDTLS_ECP_MAX_PT_LEN];
+	int der_len = 0;
+	mbedtls_md_type_t md_alg = MBEDTLS_MD_NONE;
+	mbedtls_entropy_context entropy;
+	mbedtls_ctr_drbg_context ctr_drbg;
+
+	if (!csr || !key) {
+		wpa_printf(MSG_ERROR, "%s: No csr or key", __func__);
+		return NULL;
+	}
+
+	switch (algo) {
+	case CRYPTO_HASH_ALG_SHA256:
+		md_alg = MBEDTLS_MD_SHA256;
+		break;
+	case CRYPTO_HASH_ALG_SHA384:
+		md_alg = MBEDTLS_MD_SHA384;
+		break;
+	case CRYPTO_HASH_ALG_SHA512:
+		md_alg = MBEDTLS_MD_SHA512;
+		break;
+	default:
+		wpa_printf(MSG_ERROR, "%s: Invalid algo:%d", __func__, algo);
+		return NULL;
+	}
+	mbedtls_x509write_csr_set_md_alg(&csr->write_ctx, md_alg);
+	mbedtls_x509write_csr_set_key(&csr->write_ctx, (mbedtls_pk_context *) key);
+
+	mbedtls_entropy_init(&entropy);
+	mbedtls_ctr_drbg_init(&ctr_drbg);
+	mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, NULL, 0);
+
+	der_len = mbedtls_x509write_csr_der(&csr->write_ctx, der,
+					MBEDTLS_ECP_MAX_PT_LEN,
+					mbedtls_ctr_drbg_random, &ctr_drbg);
+	if (der_len < 0) {
+		wpa_printf(MSG_ERROR, "%s: Fail to sign csr", __func__);
+		mbedtls_ctr_drbg_free(&ctr_drbg);
+		mbedtls_entropy_free(&entropy);
+		return NULL;
+	}
+	mbedtls_ctr_drbg_free(&ctr_drbg);
+	mbedtls_entropy_free(&entropy);
+
+	buf = wpabuf_alloc_copy(der, der_len);
+
+	return buf;
+}
+
+#define PEM_BEGIN_CRT           "-----BEGIN CERTIFICATE-----\n"
+#define PEM_END_CRT             "-----END CERTIFICATE-----\n"
+struct wpabuf * crypto_pkcs7_get_certificates(const struct wpabuf *pkcs7)
+{
+	struct wpabuf *buf = NULL;
+	const unsigned char *p = wpabuf_head(pkcs7);
+	mbedtls_pkcs7 pkcs7_ctx;
+	mbedtls_x509_crt *certs;
+	int i, num;
+	size_t olen = 0;
+	unsigned char output_buf[4096];
+
+	mbedtls_pkcs7_init(&pkcs7_ctx);
+
+	if (mbedtls_pkcs7_parse_der(&pkcs7_ctx, p, wpabuf_len(pkcs7)) != MBEDTLS_PKCS7_SIGNED_DATA) {
+		wpa_printf(MSG_ERROR, "Fail to parse pkcs7", __func__);
+		mbedtls_pkcs7_free(&pkcs7_ctx);
+		return NULL;
+	}
+
+	num = pkcs7_ctx.MBEDTLS_PRIVATE(signed_data).MBEDTLS_PRIVATE(no_of_certs);
+	certs = &pkcs7_ctx.MBEDTLS_PRIVATE(signed_data).MBEDTLS_PRIVATE(certs);
+	for (i = 0; i < num; i++) {
+		if (!certs) {
+			break;
+		}
+		if (mbedtls_pem_write_buffer(PEM_BEGIN_CRT, PEM_END_CRT,
+							certs->raw.p, certs->raw.len,
+							output_buf, sizeof(output_buf), &olen) == 0) {
+			if (buf) {
+				if (wpabuf_resize(&buf, olen)) {
+					wpa_printf(MSG_ERROR, "Fail to resize pem buf(%d)", __func__, olen);
+					break;
+				}
+			} else {
+				buf = wpabuf_alloc(olen);
+				if (!buf) {
+					wpa_printf(MSG_ERROR, "Fail to alloc pem buf(%d)", __func__, olen);
+					break;
+				}
+			}
+			wpabuf_put_data(buf, output_buf, olen);
+		}
+		certs = certs->next;
+	}
+
+	mbedtls_pkcs7_free(&pkcs7_ctx);
+
+	return buf;
+}

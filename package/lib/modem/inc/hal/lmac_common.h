@@ -115,11 +115,17 @@ typedef struct _CCA_RESULT_4M
 #define lmac_set_enable_auth_ctrl(x)		set_enable_auth_ctrl(x)
 #define lmac_get_enable_auth_ctrl()		get_enable_auth_ctrl()
 #endif
+#define lmac_set_frag_threshold(x)             set_frag_threshold(x)
+#define lmac_get_frag_threshold()              get_frag_threshold()
 
 #define lmac_set_group_mcs(x)		set_group_mcs(x)
 #define lmac_get_group_mcs()		get_group_mcs()
 #define lmac_set_dhcp_mcs(x)		set_dhcp_mcs(x)
 #define lmac_get_dhcp_mcs()		get_dhcp_mcs()
+#define lmac_set_null_mcs(x)		set_null_mcs(x)
+#define lmac_get_null_mcs()		get_null_mcs()
+#define lmac_set_probe_resp_mcs(x)		set_probe_resp_mcs(x)
+#define lmac_get_probe_resp_mcs()		get_probe_resp_mcs()
 
 void set_group_mcs(int8_t mcs);
 

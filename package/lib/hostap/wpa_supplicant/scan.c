@@ -1168,6 +1168,17 @@ static void wpa_supplicant_scan(void *eloop_ctx, void *timeout_ctx)
 		     tssid = tssid->next) {
 			if (wpas_network_disabled(wpa_s, tssid))
 				continue;
+#ifdef NRC_WPA_SUPP
+			//JIRA#MACSW-620 manual scan freq has higher priority than scan_freq
+			if (wpa_s->last_scan_req == MANUAL_SCAN_REQ &&
+			    wpa_s->manual_scan_freqs) {
+				if (params.freqs) {
+					os_free(params.freqs);
+					params.freqs = NULL;
+				}
+				break;
+			}
+#endif
 			if (((params.freqs || !freqs_set) &&
 			     tssid->scan_freq) &&
 			    int_array_len(params.freqs) < 100) {

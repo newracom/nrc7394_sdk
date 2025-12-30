@@ -1242,6 +1242,9 @@ int wpas_wps_start_pbc(struct wpa_supplicant *wpa_s, const u8 *bssid,
 		return -1;
 	ssid->temporary = 1;
 	ssid->p2p_group = p2p_group;
+	/* JIRA#MACSW-608 : fail to connect using wps_pbc
+		new network is added on demand for wps_pbc, so need to set mode here */
+	ssid->mode = WPAS_MODE_INFRA;
 	/*
 	 * When starting a regular WPS process (not P2P group formation)
 	 * the registrar/final station can be either AP or PCP

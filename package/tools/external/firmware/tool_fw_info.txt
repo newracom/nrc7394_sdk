@@ -1,4 +1,4 @@
 [Tool Firmware Information]
- - DATE: 2025-04-22 10:50:43
- - Commit ID: d212d8911871b94283413f78bb04736fd7941aa4
-
+ - DATE: 2025-12-24 11:26:19
+ - Commit ID: c3440830914ce0321f1b0bb27ab7a4d50124c0f7
+ - Comment: The tool package and the binary is from master/25865 except for NRC7292/NRC7394 XIP firmware binaries.

@@ -15,7 +15,7 @@ typedef struct _scan_info {
 	uint8_t			vif_id;
 	struct _SYS_BUF*	probereq;
 	uint16_t		probereq_len;
-	void			(*scan_done_cb)(int);
+	void			(*scan_done_cb)(int,bool);
 	uint8_t			n_bssids;
 
 	uint8_t			n_channels;
@@ -35,20 +35,22 @@ typedef struct _scan_info {
 	bool			bg_scan;
 } scan_info;
 
-void	umac_scan_init( void (*cb)(int) );
+void	umac_scan_init( void (*cb)(int,bool) );
 void	umac_scan_deinit(void);
 bool	umac_scan_set_param(int vif_id, struct wim_scan_param* param);
 void	umac_scan_set_probereq_ie(uint16_t len , uint8_t* ie);
 uint8_t* umac_scan_get_probereq_ie_buffer(uint16_t len);
 void	umac_scan_start();
 void	umac_scan_stop();
-int32_t umac_scan_done();
+int32_t umac_scan_done(bool auth_ctrl);
 void	umac_scan_set_return_channel(uint16_t channel);
 void	umac_scan_set_channel(uint16_t channel);
 bool	umac_scan_check_bg_supported(void);
 void	umac_scan_probe();
 bool	umac_scan_check_ch();
 bool	umac_scan_change_dwell_time(int vif_id, uint32_t time);
+void    umac_set_scan_random_delay(bool enable);
+bool    umac_get_scan_random_delay(void);
 #if defined(INCLUDE_SCAN_MODE)
 void	umac_scan_change_period(uint32_t multiply);
 #endif

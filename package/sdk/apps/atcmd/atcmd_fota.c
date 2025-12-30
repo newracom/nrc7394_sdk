@@ -460,11 +460,32 @@ static int _atcmd_fota_info_parse (char *fota_info, atcmd_fota_info_t *info)
 	char *val = NULL;
 	int i;
 
-	_atcmd_fota_log("[ INFO FILE ]");
-
 	cjson = cJSON_Parse(fota_info);
 	if (!cjson)
+	{
+		_atcmd_error("cJSON_Parse() failed");
 		return -1;
+	}
+
+	_atcmd_fota_log("[ INFO FILE ]");
+
+	if (0)
+	{
+		cJSON *c = cjson->child;
+		char *out;
+
+		for ( ; c ; c = c->next)
+		{
+			out = cJSON_Print(c);
+			if (!out)
+				_atcmd_error("cJSON_Print() failed");
+			else
+			{
+				_atcmd_info("%s", out);
+				_atcmd_free(out);
+			}
+		}
+	}
 
 	for (i = 0 ; keys[i] ; i++)
 	{
@@ -475,13 +496,19 @@ static int _atcmd_fota_info_parse (char *fota_info, atcmd_fota_info_t *info)
 			continue;
 		}
 
+		if (!(obj->type & cJSON_String))
+		{
+			_atcmd_fota_log("%s: no string, type=0x%X", keys[i], obj->type);
+			continue;
+		}
+
 		if (!obj->valuestring)
 		{
 			_atcmd_fota_log("%s: no value", keys[i]);
 			continue;
 		}
-
-		val = strdup(obj->valuestring);
+			
+		val = obj->valuestring;
 
 		switch (i)
 		{
@@ -520,8 +547,6 @@ static int _atcmd_fota_info_parse (char *fota_info, atcmd_fota_info_t *info)
 				break;
 			}
 		}
-
-		free(val);
 	}
 
 	cJSON_Delete(cjson);
@@ -549,7 +574,7 @@ static int _atcmd_fota_fw_check_callback (char *data, int len, int total)
 
 	if (!fota_info)
 	{
-		fota_info = _atcmd_malloc(total);
+		fota_info = _atcmd_malloc(total+1);
 		if (!fota_info)
 		{
 			_atcmd_error("malloc()");
@@ -562,7 +587,7 @@ static int _atcmd_fota_fw_check_callback (char *data, int len, int total)
 
 	if (cnt == total)
 	{
-		fota_info[cnt] = '\0';
+		fota_info[total] = '\0';
 
 		_atcmd_fota_info_parse(fota_info, &g_atcmd_fota.info);
 

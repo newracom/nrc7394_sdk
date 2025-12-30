@@ -3838,6 +3838,14 @@ struct rsn_pmksa_cache_entry * wpa_sm_pmksa_cache_get(struct wpa_sm *sm,
 }
 
 
+void wpa_sm_pmksa_cache_remove(struct wpa_sm *sm,
+				struct rsn_pmksa_cache_entry *entry)
+{
+	if (sm && sm->pmksa)
+		pmksa_cache_remove(sm->pmksa, entry);
+}
+
+
 void wpa_sm_drop_sa(struct wpa_sm *sm)
 {
 	wpa_dbg(sm->ctx->msg_ctx, MSG_DEBUG, "WPA: Clear old PMK and PTK");
@@ -5046,10 +5054,11 @@ struct wpabuf * owe_build_assoc_req(struct wpa_sm *sm, u16 group)
 	else
 		return NULL;
 
-	crypto_ecdh_deinit(sm->owe_ecdh);
 	sm->owe_ecdh = crypto_ecdh_init(group);
+
 	if (!sm->owe_ecdh)
 		goto fail;
+
 	sm->owe_group = group;
 	pub = crypto_ecdh_get_pubkey(sm->owe_ecdh, 0);
 	pub = wpabuf_zeropad(pub, prime_len);
@@ -5070,9 +5079,10 @@ struct wpabuf * owe_build_assoc_req(struct wpa_sm *sm, u16 group)
 
 	return ie;
 fail:
-	wpabuf_free(pub);
-	crypto_ecdh_deinit(sm->owe_ecdh);
-	sm->owe_ecdh = NULL;
+	if(pub)
+		wpabuf_free(pub);
+	if(sm->owe_ecdh)
+		crypto_ecdh_deinit(sm->owe_ecdh);
 	return NULL;
 }
 

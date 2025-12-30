@@ -64,6 +64,7 @@ static WIFI_CONFIG* g_wifi_config;
 	memset(wifi_config->pmk_pw,  0x0,  (MAX_PW_LENGTH+1));
 	nrc_set_default_scan_channel(wifi_config);
 	wifi_config->channel = NRC_WIFI_CHANNEL;
+	wifi_config->ap_optimal_channel_enable = WIFI_AP_OPTIMAL_CHANNEL_ENABLE;
 	wifi_config->nons1g_freq = STAGetNonS1GFreq(wifi_config->channel);
 	wifi_config->bw = NRC_AP_SET_CHANNEL_BW;
 	wifi_config->bcn_interval =  NRC_WIFI_BCN_INTERVAL;
@@ -103,6 +104,7 @@ static WIFI_CONFIG* g_wifi_config;
 	wifi_config->eap_client_cert = (strcmp(NRC_WIFI_EAP_CLIENT_CERT, "") == 0) ? NULL : NRC_WIFI_EAP_CLIENT_CERT;
 	wifi_config->eap_private_key = (strcmp(NRC_WIFI_EAP_PRIVATE_KEY, "") == 0) ? NULL : NRC_WIFI_EAP_PRIVATE_KEY;
 	wifi_config->sae_pwe = NRC_WIFI_SAE_PWE;
+	wifi_config->dpp_configurator = NRC_WIFI_DPP_CONFIGURATOR;
 	wifi_config->bgscan_enable = NRC_WIFI_BGSCAN_ENABLE;
 	wifi_config->bgscan_short = NRC_WIFI_BGSCAN_SHORT_INTERVAL;
 	wifi_config->bgscan_thresh = NRC_WIFI_BGSCAN_THRSHOLD;
@@ -111,7 +113,11 @@ static WIFI_CONFIG* g_wifi_config;
 	wifi_config->ps_mode = NRC_WIFI_PS_MODE_DEFAULT;
 	wifi_config->ps_idle = NRC_WIFI_PS_IDLE_TIMEOUT_DEFAULT;
 	wifi_config->ps_sleep = NRC_WIFI_PS_SLEEP_TIME_DEFAULT;
+	wifi_config->fast_connect = NRC_WIFI_FAST_CONNECT;
+	wifi_config->auth_control_ps_threshold = NRC_WIFI_AUTH_CONTROL_PS_THRESHOLD;
 	wifi_config->scan_period = NRC_WIFI_SCAN_PERIOD;
+	memcpy(wifi_config->broker_addr,  NRC_BROKER_ADDRESS, sizeof(NRC_BROKER_ADDRESS));
+	wifi_config->broker_port = NRC_BROKER_PORT;
 
 	return NRC_SUCCESS;
 }
@@ -165,6 +171,7 @@ nrc_err_t nrc_save_wifi_config(WIFI_CONFIG* wifi_config, int rewrite)
 	nvs_set_str(nvs_handle, NVS_WIFI_PMK_SSID, (char*)wifi_config->pmk_ssid);
 	nvs_set_str(nvs_handle, NVS_WIFI_PMK_PASSWORD, (char*)wifi_config->pmk_pw);
 	nvs_set_u16(nvs_handle, NVS_WIFI_CHANNEL, (uint16_t)wifi_config->channel);
+	nvs_set_u8(nvs_handle, NVS_WIFI_AP_OPT_CHANNEL, (uint8_t)wifi_config->ap_optimal_channel_enable);
 	nvs_set_u8(nvs_handle, NVS_WIFI_CHANNEL_BW, (uint8_t)wifi_config->bw);
 	nvs_set_u16(nvs_handle, NVS_WIFI_BCN_INTERVAL, (uint16_t)wifi_config->bcn_interval);
 	nvs_set_u8(nvs_handle, NVS_WIFI_DTIM_PERIOD, (uint8_t)wifi_config->dtim_period);
@@ -204,9 +211,11 @@ nrc_err_t nrc_save_wifi_config(WIFI_CONFIG* wifi_config, int rewrite)
 	nvs_set_i16(nvs_handle, NVS_BGSCAN_THRESHOLD, (int16_t)wifi_config->bgscan_thresh);
 	nvs_set_u16(nvs_handle, NVS_BGSCAN_LONG_INTERVAL, (uint16_t)wifi_config->bgscan_long);
 	nvs_set_u8(nvs_handle, NVS_WIFI_AUTH_CTRL, (uint8_t)wifi_config->auth_control);
+	nvs_set_u8(nvs_handle, NVS_WIFI_FAST_CONNECT, (uint8_t)wifi_config->fast_connect);
 	nvs_set_u8(nvs_handle, NVS_PS_DEEPSLEEP_MODE, (uint8_t)wifi_config->ps_mode);
 	nvs_set_u16(nvs_handle, NVS_PS_IDLE_TIMEOUT, (uint8_t)wifi_config->ps_idle);
 	nvs_set_u32(nvs_handle, NVS_PS_SLEEP_TIME, (uint8_t)wifi_config->ps_sleep);
+	nvs_set_u8(nvs_handle, NVS_DPP_CONFIGURATOR, (uint8_t)wifi_config->dpp_configurator);
 
 	if(wifi_config->eap_ca_cert != NULL) {
 		size_t cert_size = strlen(wifi_config->eap_ca_cert) + 1;  // +1 for the null terminator
@@ -273,6 +282,7 @@ void print_settings(WIFI_CONFIG* wifi_config)
 		( wifi_config->sae_pwe == 0) ? "HAP" :
 		( wifi_config->sae_pwe == 1) ? "H2E" :
 		( wifi_config->sae_pwe == 2) ? "BOTH" : "UNKNOWN");
+	nrc_usr_print("dpp_configurator %d\n", wifi_config->dpp_configurator);
 	nrc_usr_print("bgscan_enable %d\n", wifi_config->bgscan_enable);
 	nrc_usr_print("bgscan_short %d\n", wifi_config->bgscan_short);
 	nrc_usr_print("bgscan_thresh %d\n", wifi_config->bgscan_thresh);
@@ -282,6 +292,8 @@ void print_settings(WIFI_CONFIG* wifi_config)
 		nrc_usr_print("%d \n", wifi_config->scan_freq_list[i]);
 		if((i%10)==9) nrc_usr_print("\n");
 	}
+	nrc_usr_print("AP opt channel %d [%s]\n", wifi_config->ap_optimal_channel_enable,
+		( wifi_config->ap_optimal_channel_enable == 0) ? "DISABLE" : "ENABLE");
 	nrc_usr_print("channel %d\n", wifi_config->channel);
 	nrc_usr_print("bw %d\n", wifi_config->bw);
 	nrc_usr_print("bcn interval %d\n", wifi_config->bcn_interval);
@@ -331,6 +343,8 @@ void print_settings(WIFI_CONFIG* wifi_config)
 		( wifi_config->ps_mode == 0) ? "NonTIM" : "TIM");
 	nrc_usr_print("ps_idle %d\n", wifi_config->ps_idle);
 	nrc_usr_print("ps_sleep %d\n", wifi_config->ps_sleep);
+	nrc_usr_print("fast_connect %d [%s]\n", wifi_config->fast_connect,
+		( wifi_config->fast_connect == 0) ? "DISABLE" : "ENABLE");
 	nrc_usr_print("scan_period %d\n", wifi_config->scan_period);
 	nrc_usr_print("-----------------------------------------------\n\n");
 #endif
@@ -527,6 +541,7 @@ static nrc_err_t load_wifi_config_from_nvs(WIFI_CONFIG *wifi_config)
 	length = sizeof(wifi_config->pmk_pw);
 	nvs_get_str(nvs_handle, NVS_WIFI_PMK_PASSWORD, (char *) wifi_config->pmk_pw, &length);
 
+	nvs_get_u8(nvs_handle, NVS_WIFI_AP_OPT_CHANNEL, (uint8_t*)&wifi_config->ap_optimal_channel_enable);
 	nvs_get_u16(nvs_handle,NVS_WIFI_CHANNEL, (uint16_t*)&wifi_config->channel);
 	nvs_get_u8(nvs_handle, NVS_WIFI_CHANNEL_BW, (uint8_t*)&wifi_config->bw);
 	nvs_get_u16(nvs_handle, NVS_WIFI_BCN_INTERVAL, (uint16_t*)&wifi_config->bcn_interval);
@@ -578,9 +593,11 @@ static nrc_err_t load_wifi_config_from_nvs(WIFI_CONFIG *wifi_config)
 	nvs_get_i16(nvs_handle, NVS_BGSCAN_THRESHOLD, (int16_t*)&wifi_config->bgscan_thresh);
 	nvs_get_u16(nvs_handle, NVS_BGSCAN_LONG_INTERVAL, (uint16_t*)&wifi_config->bgscan_long);
 	nvs_get_u8(nvs_handle, NVS_WIFI_AUTH_CTRL, (uint8_t*)&wifi_config->auth_control);
+	nvs_get_u8(nvs_handle, NVS_WIFI_FAST_CONNECT, (uint8_t*)&wifi_config->fast_connect);
 	nvs_get_u8(nvs_handle, NVS_PS_DEEPSLEEP_MODE, (uint8_t*)&wifi_config->ps_mode);
 	nvs_get_u16(nvs_handle, NVS_PS_IDLE_TIMEOUT, (uint16_t*)&wifi_config->ps_idle);
 	nvs_get_u32(nvs_handle, NVS_PS_SLEEP_TIME, (uint32_t*)&wifi_config->ps_sleep);
+	nvs_get_u8(nvs_handle, NVS_DPP_CONFIGURATOR, (uint8_t*)&wifi_config->dpp_configurator);
 	err = nvs_get_blob(nvs_handle, NVS_EAP_CA_CERT, NULL, &length);
 	if (err == NVS_OK && length > 0) {
 		ca_cert = nrc_mem_malloc(length);
@@ -801,6 +818,39 @@ nrc_err_t nrc_erase_all_wifi_nvs(void)
 	 return NRC_FAIL;
 #endif
  }
+
+/*********************************************************************
+ * @brief nrc_get_nvs_fast_connect
+ *
+ * Return Fast Connect flag in NVS
+ *
+ * @param void
+ * @returns int
+ **********************************************************************/
+int nrc_get_nvs_fast_connect(void)
+{
+#ifdef SUPPORT_NVS_FLASH
+	nvs_handle_t nvs_handle;
+	uint8_t fast_connect = 0;
+
+	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) != NVS_OK) {
+		A("nvs open failed.\n");
+		return NRC_FAIL;
+	}
+
+	if (nvs_get_u8(nvs_handle, NVS_WIFI_FAST_CONNECT, &fast_connect) != NVS_OK) {
+		return NRC_FAIL;
+	}
+
+	if (nvs_handle)
+		nvs_close(nvs_handle);
+
+	return fast_connect;
+#else
+	nrc_usr_print("[%s] NVS is not enabled\n", __func__);
+	return NRC_FAIL;
+#endif
+}
 
  /*********************************************************************
  * @brief get global config

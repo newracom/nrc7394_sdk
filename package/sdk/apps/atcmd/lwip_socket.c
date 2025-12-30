@@ -1246,7 +1246,18 @@ static int __lwip_socket_send (int fd, ip_addr_t *remote_addr, uint16_t remote_p
 		}
 
 		if (ret < 0)
-			return _lwip_socket_error(errno);
+		{
+			switch (errno)
+			{
+				case ENOMEM:
+				case ENOBUFS:
+				case EWOULDBLOCK:
+					return -errno;
+
+				default:
+					return _lwip_socket_error(errno);
+			}
+		}
 
 		return ret;
 	}

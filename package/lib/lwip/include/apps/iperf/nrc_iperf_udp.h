@@ -28,5 +28,6 @@
 
 void iperf_udp_client(void *pvParameters);
 void iperf_udp_server(void *pvParameters);
+void iperf_udp_server_results_print(void);
 
 #endif /* __NRC_IPERF_UDP_H__ */

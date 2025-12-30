@@ -29,6 +29,8 @@
 #define GAS_QUERY_WAIT_TIME_INITIAL 1000
 #define GAS_QUERY_WAIT_TIME_COMEBACK 150
 
+#define GAS_QUERY_MAX_COMEBACK_DELAY 60000
+
 /**
  * struct gas_query_pending - Pending GAS query
  */
@@ -520,6 +522,8 @@ int gas_query_ap_rx(struct gas_query_ap *gas, const u8 *sa, u8 categ,
 	}
 
 	query->status_code = WPA_GET_LE16(pos);
+	if (comeback_delay > GAS_QUERY_MAX_COMEBACK_DELAY)
+		comeback_delay = GAS_QUERY_MAX_COMEBACK_DELAY;
 	pos += 2;
 
 	if (query->status_code == WLAN_STATUS_QUERY_RESP_OUTSTANDING &&

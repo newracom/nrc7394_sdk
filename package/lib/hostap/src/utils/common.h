@@ -464,13 +464,13 @@ void perror(const char *s);
 #ifndef MAC2STR
 #define MAC2STR(a) (a)[0], (a)[1], (a)[2], (a)[3], (a)[4], (a)[5]
 #define MACSTR "%02x:%02x:%02x:%02x:%02x:%02x"
+#endif
 
 /*
  * Compact form for string representation of MAC address
  * To be used, e.g., for constructing dbus paths for P2P Devices
  */
 #define COMPACT_MACSTR "%02x%02x%02x%02x%02x%02x"
-#endif
 
 #ifndef BIT
 #define BIT(x) (1U << (x))
@@ -524,6 +524,7 @@ int hwaddr_aton(const char *txt, u8 *addr);
 int hwaddr_masked_aton(const char *txt, u8 *addr, u8 *mask, u8 maskable);
 int hwaddr_compact_aton(const char *txt, u8 *addr);
 int hwaddr_aton2(const char *txt, u8 *addr);
+int hex2num(char c);
 int hex2byte(const char *hex);
 int hexstr2bin(const char *hex, u8 *buf, size_t len);
 void inc_byte_array(u8 *counter, size_t len);

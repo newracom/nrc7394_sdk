@@ -57,6 +57,7 @@ enum {
 	NZ,
 	AU,
 	K2,
+	T2, //10, Taiwan NCC Band
 	MAX_COUNTRY_CODE
 };
 // extern  CHANNEL_MAPPING_TABLE nons1g_cc_ch_mapping_table[MAX_COUNTRY_CODE][MAX_NON_S1G_CHANNEL_NUM];
@@ -115,7 +116,7 @@ bool umac_s1g_freq_check(uint16_t freq);
 void umac_set_channel_table(const struct s1g_channel_table *cc_table, uint8_t chans_num);
 #endif /*  defined(INCLUDE_NEW_CHANNEL_CTX) */
 uint32_t GetS1GFreqByNonS1GFreq(const uint16_t nons1g_freq);
-void UpdateCHTableByCC(const char* country_code);
+bool UpdateCHTableByCC(const char* country_code);
 void CheckNUpdateCHTableByVif(int vif_id);
 
 #if defined(INCLUDE_BD_SUPPORT)

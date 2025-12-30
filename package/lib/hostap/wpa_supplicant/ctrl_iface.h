@@ -164,4 +164,34 @@ static inline void wpas_ctrl_radio_work_flush(struct wpa_supplicant *wpa_s)
 
 #endif /* CONFIG_CTRL_IFACE */
 
+#ifdef CONFIG_TESTING_OPTIONS
+#ifndef _FREERTOS
+#else
+struct ip {
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+    unsigned int ip_hl:4;
+    unsigned int ip_v:4;
+#else
+    unsigned int ip_v:4;
+    unsigned int ip_hl:4;
+#endif
+    uint8_t ip_tos;
+    uint16_t ip_len;
+    uint16_t ip_id;
+    uint16_t ip_off;
+    uint8_t ip_ttl;
+    uint8_t ip_p;
+    uint16_t ip_sum;
+    uint32_t ip_src;
+    uint32_t ip_dst;
+};
+
+struct ether_header {
+    uint8_t  ether_dhost[6];  // Destination MAC
+    uint8_t  ether_shost[6];  // Source MAC
+    uint16_t ether_type;      // Protocol type
+};
+#define	ETHERTYPE_IP		0x0800		/* IP */
+#endif
+#endif /* CONFIG_TESTING_OPTIONS */
 #endif /* CTRL_IFACE_H */

@@ -21,6 +21,8 @@
 #ifndef CRYPTO_H
 #define CRYPTO_H
 
+#define HMAC_VECTOR_MAX_ELEM 11
+
 /**
  * md4_vector - MD4 hash for data vector
  * @num_elem: Number of elements in the data vector
@@ -1065,7 +1067,8 @@ void crypto_ec_key_deinit(struct crypto_ec_key *key);
 /**
  * crypto_ec_key_get_subject_public_key - Get SubjectPublicKeyInfo ASN.1 for an EC key
  * @key: EC key from crypto_ec_key_parse/set_pub/priv() or crypto_ec_key_gen()
- * Returns: Buffer with DER encoding of ASN.1 SubjectPublicKeyInfo or %NULL on failure
+ * Returns: Buffer with DER encoding of ASN.1 SubjectPublicKeyInfo using
+ * compressed point format, or %NULL on failure
  */
 struct wpabuf * crypto_ec_key_get_subject_public_key(struct crypto_ec_key *key);
 
@@ -1093,16 +1096,20 @@ struct wpabuf * crypto_ec_key_get_pubkey_point(struct crypto_ec_key *key,
  * crypto_ec_key_get_public_key - Get EC public key as an EC point
  * @key: EC key from crypto_ec_key_parse/set_pub() or crypto_ec_key_parse_priv()
  * Returns: Public key as an EC point or %NULL on failure
+ *
+ * The caller needs to free the returned value with crypto_ec_point_deinit().
  */
-const struct crypto_ec_point *
+struct crypto_ec_point *
 crypto_ec_key_get_public_key(struct crypto_ec_key *key);
 
 /**
  * crypto_ec_key_get_private_key - Get EC private key as a bignum
  * @key: EC key from crypto_ec_key_parse/set_pub() or crypto_ec_key_parse_priv()
  * Returns: Private key as a bignum or %NULL on failure
+ *
+ * The caller needs to free the returned value with crypto_bignum_deinit().
  */
-const struct crypto_bignum *
+struct crypto_bignum *
 crypto_ec_key_get_private_key(struct crypto_ec_key *key);
 
 /**

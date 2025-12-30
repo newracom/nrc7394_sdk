@@ -93,6 +93,8 @@ typedef enum {
 	WIFI_EVT_AP_STA_CONNECTED,
 	WIFI_EVT_AP_STA_DISCONNECTED,
 	WIFI_EVT_ASSOC_REJECT,
+	WIFI_EVT_BEACON,
+	WIFI_EVT_CONNECT_ABORT,
 
 	WIFI_EVT_MAX,
 } tWIFI_EVENT_ID;
@@ -117,7 +119,7 @@ typedef enum {
 	WIFI_SEC_WPA2,
 	WIFI_SEC_WPA3_OWE,
 	WIFI_SEC_WPA3_SAE, /* SoftAP cannot support WPA3-SAE */
-
+	WIFI_SEC_DPP,
 	WIFI_SEC_MAX,
 } tWIFI_SECURITY;
 
@@ -144,6 +146,8 @@ typedef enum {
 	WIFI_SUCCESS			= 0,
 	WIFI_NOMEM				= -1,
 	WIFI_BUSY				= -2,
+	WIFI_ABORTED			= -3,
+	WIFI_NOOP				= -4,
 
 	WIFI_INVALID			= -5,
 	WIFI_INVALID_STATE		= (WIFI_INVALID - 1),
@@ -180,15 +184,17 @@ typedef enum {
 	WIFI_CC_US = 0,
 	WIFI_CC_JP,
 	WIFI_CC_K1,
-	WIFI_CC_T8,
-	WIFI_CC_EU,
-	WIFI_CC_CN,
+	WIFI_CC_T8, // Deprecated. Don't use this.
+	WIFI_CC_EU = 4,
+	WIFI_CC_CN, // Deprecated. Don't use this.
 	WIFI_CC_NZ,
 	WIFI_CC_AU,
 	WIFI_CC_K2,
-	WIFI_CC_S8,
-	WIFI_CC_S9,
-	WIFI_CC_T9,
+	WIFI_CC_S8, // Deprecated. Don't use this.
+	WIFI_CC_S9, // Deprecated. Don't use this.
+	WIFI_CC_T9, // Deprecated. Don't use this.
+	WIFI_CC_TW = 12,
+	WIFI_CC_SG,
 
 	WIFI_CC_MAX
 }tWIFI_COUNTRY_CODE;
@@ -232,7 +238,7 @@ typedef enum {
 
 /** @brief Wi-Fi Guard interval type */
 typedef enum {
-	WIFI_GI_UNKNOWN,
+	WIFI_GI_UNKNOWN = -1,
 	WIFI_GI_LONG,
 	WIFI_GI_SHORT,
 } tWIFI_GI;
@@ -249,6 +255,22 @@ typedef enum {
 	WIFI_SCAN_MODE_ACTIVE,
 	WIFI_SCAN_MODE_PASSIVE,
 } tWIFI_SCAN_MODE;
+
+typedef struct {
+	int vif_id;
+	uint32_t timeout_ms;
+	const char *ssid;
+	const uint16_t *freq_list;
+	uint8_t num_freq;
+} SCAN_CONFIG;
+
+#define SCAN_CONFIG_INIT(vif) (SCAN_CONFIG){ \
+	.vif_id = (vif), \
+	.timeout_ms = 0, \
+	.ssid = NULL, \
+	.freq_list = NULL, \
+	.num_freq = 0 \
+}
 
 /** @brief scan item */
 typedef union {
@@ -299,6 +321,13 @@ typedef struct {
 } STA_LIST;
 
 typedef struct {
+	uint8_t bw;	//bandwidth
+	uint16_t s1g_freq; //s1g freq
+	uint16_t s1g_ch_idx; //s1g ch index
+	uint16_t cca; //cca count
+} OPT_CH_RESULTS;
+
+typedef struct {
 	uint8_t major;
 	uint8_t minor;
 	uint8_t patch;
@@ -309,6 +338,12 @@ typedef enum {
 	WIFI_DISABLE_AUTH_CONTROL,
 	WIFI_ENABLE_AUTH_CONTROL,
 } tWIFI_AUTH_CONTROL;
+
+/** @brief Wi-Fi auth control */
+typedef enum {
+	WIFI_DISABLE_FAST_CONNECT,
+	WIFI_ENABLE_FAST_CONNECT,
+} tWIFI_FAST_CONNECT;
 
 
 typedef void (*intr_handler_fn)(int vector);

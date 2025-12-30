@@ -40,7 +40,7 @@
 
 #define ATCMD_VER_MAJOR			(1)
 #define ATCMD_VER_MINOR			(26)
-#define ATCMD_VER_REVISION		(11)
+#define ATCMD_VER_REVISION		(16)
 
 /**********************************************************************************************/
 
@@ -215,10 +215,12 @@ enum ATCMD_ID
 	ATCMD_WIFI_MCS,
 	ATCMD_WIFI_DUTY_CYCLE,
 	ATCMD_WIFI_CCA_THRESHOLD,
+	ATCMD_WIFI_CCA_SCAN,
 	ATCMD_WIFI_TX_TIME,
 	ATCMD_WIFI_TSF,
 	ATCMD_WIFI_BEACON_INTERVAL,
 	ATCMD_WIFI_LISTEN_INTERVAL,
+	ATCMD_WIFI_NDP_PROBE_REQUEST,
 	ATCMD_WIFI_SCAN,
 	ATCMD_WIFI_SCAN_SSID,
 	ATCMD_WIFI_SCAN_BACKGROUND,
@@ -227,6 +229,7 @@ enum ATCMD_ID
 	ATCMD_WIFI_DISCONNECT,
 	ATCMD_WIFI_DHCP,
 	ATCMD_WIFI_DHCPS,
+	ATCMD_WIFI_HOSTNAME,
 	ATCMD_WIFI_IPADDR,
 	ATCMD_WIFI_PING,
 #ifdef CONFIG_ATCMD_IPV6
@@ -468,6 +471,8 @@ extern void atcmd_disable (void);
 extern int atcmd_user_register (const char *cmd, int id, atcmd_handler_t handler[]);
 extern int atcmd_user_unregister (int id);
 
+extern char *atcmd_boot_reason_string (void);
+
 /**********************************************************************************************/
 
 #define _atcmd_malloc		pvPortMalloc
@@ -480,6 +485,10 @@ extern int atcmd_log (const char *fmt, ...);
 #define _atcmd_error(fmt, ...)		atcmd_log("(%s,%d) " fmt, __func__, __LINE__, ##__VA_ARGS__)
 #define _atcmd_debug(fmt, ...)		atcmd_log(fmt, ##__VA_ARGS__)
 #define _atcmd_trace()				atcmd_log("%s,%d", __func__, __LINE__)
+
+extern void atcmd_log_hex_dump (void *data, int len);
+
+#define print_hex_dump(data, len)	atcmd_log_hex_dump(data, len)
 
 /**********************************************************************************************/
 #endif /* #ifndef __NRC_ATCMD_H__ */

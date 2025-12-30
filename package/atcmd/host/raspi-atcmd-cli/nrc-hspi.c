@@ -31,6 +31,7 @@
 
 
 #define _hspi_log(fmt, ...)				if (g_hspi_info.ops.printf) g_hspi_info.ops.printf(fmt, ##__VA_ARGS__)
+#define _hspi_eirq_debug(fmt, ...)		/* _hspi_log("hspi_eirq: " fmt, ##__VA_ARGS__) */
 #define _hspi_read_debug(fmt, ...)		/* _hspi_log("hspi_read: " fmt, ##__VA_ARGS__) */
 #define _hspi_write_debug(fmt, ...)		/* _hspi_log("hspi_write: " fmt, ##__VA_ARGS__) */
 
@@ -168,6 +169,20 @@ static void hspi_transfer_setup (hspi_xfer_t *xfer, void *tx_buf, void *rx_buf, 
 	xfer->rx_buf = (char *)rx_buf;
 }
 
+static int hspi_transfer_dummy (void)
+{
+	char dummy[8];
+	int ret;
+
+	memset(dummy, 0xff, sizeof(dummy));
+
+	ret = SPI_TRANSFER(dummy, NULL, sizeof(dummy));
+
+/*	_hspi_log("%s: ret=%d\n", __func__, ret); */
+
+	return ret;
+}
+
 static int hspi_transfer (hspi_opcode_t *opcode, char *buf, int len)
 {
 	const int retry_max = HSPI_XFER_RETRY_MAX;
@@ -249,6 +264,8 @@ static int hspi_transfer (hspi_opcode_t *opcode, char *buf, int len)
 
 			break;
 		}
+
+		hspi_transfer_dummy();
 	}
 
 	if (ret != 0 || retry >= retry_max)
@@ -301,9 +318,13 @@ static int hspi_regs_read_sys (hspi_sys_t *sys)
 	hspi_sys_t sys_tmp;
 	int err;
 
+	memset(&sys_tmp, 0, sizeof(hspi_sys_t));
+
 	err = hspi_reg_read(HSPI_REG_SYS, (char *)&sys_tmp, sizeof(hspi_sys_t));
 	if (!err)
 	{
+		memset(sys, 0, sizeof(hspi_sys_t));
+
 		sys->status.ready = sys_tmp.status.ready;
 		sys->status.sleep = sys_tmp.status.sleep;
 
@@ -326,13 +347,21 @@ static int hspi_regs_read_status (hspi_status_t *status)
 	hspi_status_t status_tmp;
 	int err;
 
+	memset(&status_tmp, 0, sizeof(hspi_status_t));
+
 	err = hspi_reg_read(HSPI_REG_STATUS, (char *)&status_tmp, sizeof(hspi_status_t));
 	if (!err)
 	{
+		memset(status, 0, sizeof(hspi_status_t));
+
+#if 1
+		status->eirq.flags = status_tmp.eirq.flags;
+#else
 		status->eirq.txq = status_tmp.eirq.txq;
 		status->eirq.rxq = status_tmp.eirq.rxq;
 		status->eirq.ready = status_tmp.eirq.ready;
 		status->eirq.sleep = status_tmp.eirq.sleep;
+#endif		
 
 		status->txq.error = status_tmp.txq.error;
 		status->txq.slot_cnt = status_tmp.txq.slot_cnt;
@@ -350,14 +379,16 @@ static int hspi_regs_read_status (hspi_status_t *status)
 
 static int hspi_regs_read_message (hspi_msg_t msg)
 {
-	hspi_status_t status_tmp;
 	hspi_msg_t msg_tmp;
 	int err;
 
-	err = hspi_reg_read(HSPI_REG_STATUS, (char *)&status_tmp, sizeof(hspi_status_t));
+	memset(msg_tmp, 0, sizeof(hspi_msg_t));
+
 	err = hspi_reg_read(HSPI_REG_MSG, (char *)msg_tmp, sizeof(hspi_msg_t));
 	if (!err)
 	{
+		memset(msg, 0, sizeof(hspi_msg_t));
+
 		msg[0] = _BE32_TO_CPU(msg_tmp[0]);
 		msg[1] = _BE32_TO_CPU(msg_tmp[1]);
 		msg[2] = _BE32_TO_CPU(msg_tmp[2]);
@@ -451,11 +482,52 @@ static void hspi_regs_print_all (hspi_regs_t *regs)
 
 /**********************************************************************************************/
 
+static void hspi_status_init (int que)
+{
+	hspi_status_t *status = HSPI_QUEUE_STATUS();
+
+	if (que == HSPI_TXQ || que == HSPI_QUE_ALL)
+		memset(&status->txq, 0, sizeof(status->txq));
+
+	if (que == HSPI_RXQ || que == HSPI_QUE_ALL)
+		memset(&status->rxq, 0, sizeof(status->rxq));
+}
+
+static int hspi_status_update (void)
+{
+	hspi_status_t *old = HSPI_QUEUE_STATUS();
+	hspi_status_t new;
+	int ret;
+
+	ret = hspi_regs_read_status(&new);
+	if (ret != 0)
+		return ret;
+
+/*	hspi_regs_print_status(old); */
+/*	hspi_regs_print_status(&new); */
+
+	*(uint8_t *)&old->eirq = *(uint8_t *)&new.eirq;
+
+	if (new.txq.slot_cnt > 0 && new.txq.slot_cnt <= HSPI_TXQ_SLOT_NUM() &&
+			(new.txq.slot_size << 2) == HSPI_TXQ_SLOT_SIZE() &&
+			(new.txq.slot_cnt * new.txq.slot_size) == new.txq.total_slot_size)
+		memcpy(&old->txq, &new.txq, sizeof(old->txq));
+
+	if (new.rxq.slot_cnt > 0 && new.rxq.slot_cnt <= HSPI_RXQ_SLOT_NUM() &&
+			(new.rxq.slot_size << 2) == HSPI_RXQ_SLOT_SIZE() &&
+			(new.rxq.slot_cnt * new.rxq.slot_size) == new.rxq.total_slot_size)
+		memcpy(&old->rxq, &new.rxq, sizeof(old->rxq));
+
+	return 0;
+}
+
+/**********************************************************************************************/
+
 static int hspi_eirq_enable (int mode, int enable)
 {
 	hspi_eirq_t eirq;
 
-/*	_hspi_log("mode(0x%X), enable(0x%X)\n", mode & 0x3, enable & 0xf); */
+	_hspi_eirq_debug("enable, mode=0x%X enable=0x%X\n", mode & 0x3, enable & 0xf);
 
 	eirq.mode.active = !!(mode & HSPI_EIRQ_HIGH);
 	eirq.mode.trigger = !!(mode & HSPI_EIRQ_EDGE);
@@ -486,6 +558,8 @@ static int hspi_eirq_disable (void)
 {
 	hspi_eirq_t eirq;
 
+	_hspi_eirq_debug("disable\n");
+
 	eirq.mode.active = 0;
 	eirq.mode.trigger = 0;
 
@@ -503,43 +577,37 @@ static int hspi_eirq_disable (void)
 	return 0;
 }
 
-/**********************************************************************************************/
-
-static void hspi_status_init (int que)
+static uint8_t hspi_eirq_status (void)
 {
-	hspi_status_t *status = HSPI_QUEUE_STATUS();
+	uint8_t eirq_status = 0;
 
-	if (que == HSPI_TXQ || que == HSPI_QUE_ALL)
-		memset(&status->txq, 0, sizeof(status->txq));
+	if (hspi_status_update() != 0)
+	{
+		_hspi_eirq_debug("failed to update status\n");
+	}
+	else
+	{
+		hspi_status_t *status = HSPI_QUEUE_STATUS();
+		uint8_t txq_slot_cnt = HSPI_TXQ_SLOT_COUNT();
 
-	if (que == HSPI_RXQ || que == HSPI_QUE_ALL)
-		memset(&status->rxq, 0, sizeof(status->rxq));
-}
+		_hspi_eirq_debug("sleep=%d ready=%d rxq=%d txq=%d (0x%02X, %u)\n", 
+					status->eirq.sleep,	status->eirq.ready,		
+					status->eirq.rxq, status->eirq.txq, 
+					status->eirq.flags, txq_slot_cnt);
 
-static int hspi_status_update (void)
-{
-	hspi_status_t *old = HSPI_QUEUE_STATUS();
-	hspi_status_t new;
-	int ret;
+		eirq_status = status->eirq.flags & HSPI_EIRQ_MASK;
+		status->eirq.flags = 0;
 
-	ret = hspi_regs_read_status(&new);
-	if (ret != 0)
-		return ret;
-
-/*	hspi_regs_print_status(old); */
-/*	hspi_regs_print_status(&new); */
-
-	if (new.txq.slot_cnt > 0 && new.txq.slot_cnt <= HSPI_TXQ_SLOT_NUM() &&
-			(new.txq.slot_size << 2) == HSPI_TXQ_SLOT_SIZE() &&
-			(new.txq.slot_cnt * new.txq.slot_size) == new.txq.total_slot_size)
-		memcpy(&old->txq, &new.txq, sizeof(old->txq));
-
-	if (new.rxq.slot_cnt > 0 && new.rxq.slot_cnt <= HSPI_RXQ_SLOT_NUM() &&
-			(new.rxq.slot_size << 2) == HSPI_RXQ_SLOT_SIZE() &&
-			(new.rxq.slot_cnt * new.rxq.slot_size) == new.rxq.total_slot_size)
-		memcpy(&old->rxq, &new.rxq, sizeof(old->rxq));
-
-	return 0;
+		if (eirq_status == HSPI_EIRQ_MASK)
+		{
+			eirq_status = 0; /* invalid */
+			_hspi_eirq_debug("invalid eirq status (%u)\n", txq_slot_cnt);
+		}
+		else if (eirq_status == 0 && txq_slot_cnt > 0)
+			eirq_status = 0xFF; /* boot */
+	}
+		
+	return eirq_status;
 }
 
 /**********************************************************************************************/
@@ -555,6 +623,7 @@ static int hspi_read_slot (int slot_num, int slot_size, char *buf, int *len)
 	for (i = 0, j = 0 ; i < slot_num ; i++, j += slot->len)
 	{
 		opcode.val = HSPI_OPCODE_READ_DATA(HSPI_REG_TXQ_WINDOW, slot_size);
+/*		hspi_opcode_print(&opcode); */
 
 		if (hspi_transfer(&opcode, (char *)slot, slot_size) != 0)
 			return -1;
@@ -562,9 +631,9 @@ static int hspi_read_slot (int slot_num, int slot_size, char *buf, int *len)
 		if (memcmp(slot->start, HSPI_SLOT_START, HSPI_SLOT_START_SIZE) != 0 ||
 				slot->len > (slot_size - HSPI_SLOT_HDR_SIZE))
 		{
-			_hspi_log("hspi_read: invalid header, start=%c(%X),%c(%X) len=%u \n",
-						slot->start[0], slot->start[0], slot->start[1], slot->start[1],
-						slot->len);
+			_hspi_read_debug("hspi_read: invalid header, start=%c(%X),%c(%X) len=%u \n",
+							slot->start[0], slot->start[0], slot->start[1], slot->start[1],
+							slot->len);
 
 			slot->len = 0;
 			continue;
@@ -576,7 +645,7 @@ static int hspi_read_slot (int slot_num, int slot_size, char *buf, int *len)
 
 		if (slot->seq != seq)
 		{
-/*			_hspi_log("hspi_read: slot_seq: %u -> %u\n", seq, slot->seq); */
+			_hspi_read_debug("hspi_read: slot_seq: %u -> %u\n", seq, slot->seq); 
 
 			seq = slot->seq;
 		}
@@ -843,7 +912,33 @@ static int hspi_open (hspi_ops_t *ops, enum HSPI_EIRQ_MODE mode)
 		case HSPI_EIRQ_MODE_HIGH:
 		case HSPI_EIRQ_MODE_RISING:
 		case HSPI_EIRQ_MODE_FALLING:
-			ret = hspi_eirq_enable(mode, HSPI_EIRQ_ALL);
+			ret = hspi_eirq_enable(mode, HSPI_EIRQ_ALL & HSPI_EIRQ_MASK);
+			break;
+
+		default:
+			ret = hspi_eirq_disable();
+	}
+
+	return ret;
+}
+
+static int hspi_reopen (enum HSPI_EIRQ_MODE mode)
+{
+	int ret;
+
+	if (!HSPI_ACTIVE())
+		return -1;
+
+	if (hspi_status_update() != 0)
+		return -1;
+
+	switch (mode)
+	{
+		case HSPI_EIRQ_MODE_LOW:
+		case HSPI_EIRQ_MODE_HIGH:
+		case HSPI_EIRQ_MODE_RISING:
+		case HSPI_EIRQ_MODE_FALLING:
+			ret = hspi_eirq_enable(mode, HSPI_EIRQ_ALL & HSPI_EIRQ_MASK);
 			break;
 
 		default:
@@ -878,6 +973,11 @@ int nrc_hspi_open (hspi_ops_t *ops, enum HSPI_EIRQ_MODE mode)
 	return hspi_open(ops, mode);
 }
 
+int nrc_hspi_reopen (enum HSPI_EIRQ_MODE mode)
+{
+	return hspi_reopen(mode);
+}
+
 void nrc_hspi_close (void)
 {
 	hspi_close();
@@ -892,3 +992,37 @@ int nrc_hspi_write (char *buf, int len)
 {
 	return hspi_write(buf, len);
 }
+
+enum HSPI_EIRQ_STATUS nrc_hspi_eirq_status (void)
+{
+	uint8_t eirq_status = hspi_eirq_status();
+	enum HSPI_EIRQ_STATUS ret;
+
+	if (eirq_status == 0xFF)
+		ret = HSPI_EIRQ_BOOT_DONE;
+	else if (eirq_status & HSPI_EIRQ_READY)
+		ret = HSPI_EIRQ_READ_READY;
+	else if (eirq_status & HSPI_EIRQ_SLEEP)
+	{
+		hspi_eirq_disable();
+		ret = HSPI_EIRQ_DEEP_SLEEP;	
+	}
+	else
+		ret = HSPI_EIRQ_NONE;
+
+	if (0)
+	{
+		const char *str_eirq_status[] =
+		{
+			[HSPI_EIRQ_NONE] = "NONE",
+			[HSPI_EIRQ_BOOT_DONE] = "BOOT_DONE",
+			[HSPI_EIRQ_READ_READY] = "READ_READY",
+			[HSPI_EIRQ_DEEP_SLEEP] = "DEEP_SLEEP",
+		};
+
+		_hspi_log("HSPI_EIRQ_%s\n", str_eirq_status[ret]);
+	}
+
+	return ret;
+}
+

@@ -201,6 +201,8 @@ struct rsn_pmksa_cache_entry * wpa_sm_pmksa_cache_get(struct wpa_sm *sm,
 						      const u8 *pmkid,
 						      const void *network_ctx,
 						      int akmp);
+void wpa_sm_pmksa_cache_remove(struct wpa_sm *sm,
+				struct rsn_pmksa_cache_entry *entry);
 int wpa_sm_has_ptk(struct wpa_sm *sm);
 int wpa_sm_has_ptk_installed(struct wpa_sm *sm);
 

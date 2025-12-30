@@ -262,11 +262,14 @@ void lmac_ps_set_qos_null_pm1_ack_flag(int ack_flag);
 int lmac_ps_get_qos_null_pm1_ack_flag();
 void lmac_ps_set_usr_timer(uint8_t vif_id, uint32_t timeout_ms);
 void lmac_ps_set_target_wake(uint8_t wake);
-void lmac_ps_set_statype(uint8_t sta_type);
+void lmac_ps_set_statype(uint8_t vif_id, uint8_t sta_type);
 void lmac_ps_set_aid(uint16_t aid);
 void lmac_ps_set_channel(uint16_t freq);
 void lmac_ps_set_rc_mode (uint8_t mode);
 void lmac_ps_set_rc_default_mcs (uint8_t mcs);
+#if defined(INCLUDE_BOOT_NONCE_IE)
+void lmac_ps_set_ap_boot_nonce(void);
+#endif
 #if defined(INCLUDE_LEGACY_ACK)
 void lmac_ps_set_legacy_ack(uint8_t enable);
 #endif /* INCLUDE_LEGACY_ACK */
@@ -274,9 +277,18 @@ void lmac_ps_set_legacy_ack(uint8_t enable);
 void lmac_ps_set_beacon_bypass(uint8_t enable);
 #endif /* INCLUDE_BEACON_BYPASS */
 #if defined(INCLUDE_AUTH_CONTROL)
-uint8_t lmac_ps_get_auth_control_enable();
 void lmac_ps_set_auth_control_enable(uint8_t enable);
-void lmac_ps_set_auth_control_param(uint8_t scale, uint8_t slot, uint8_t min, uint8_t max);
+void lmac_ps_set_auth_control_param(uint8_t scale, uint8_t slot, uint8_t min, uint8_t max, uint8_t curr);
+void lmac_ps_set_auth_control_start_auth_rtc(uint64_t time);
+uint64_t lmac_ps_get_auth_control_start_auth_rtc();
+uint8_t lmac_ps_get_auth_current_ti();
+void lmac_ps_set_auth_current_ti(uint8_t curr_ti);
+void lmac_ps_set_auth_control_bo_cnt(uint8_t value);
+uint8_t lmac_ps_get_auth_control_bo_cnt();
+void lmac_ps_set_auth_control_retry_cnt(uint8_t value);
+uint8_t lmac_ps_get_auth_control_retry_cnt();
+void lmac_ps_set_auth_control_msg_cnt(uint32_t count);
+uint32_t lmac_ps_get_auth_control_msg_cnt();
 #endif /* INCLUDE_AUTH_CONTROL */
 #if defined (INCLUDE_AVOID_FRAG_ATTACK_TEST)
 void lmac_ps_set_prev_ptk(uint8_t *ptk, uint32_t ptk_len);

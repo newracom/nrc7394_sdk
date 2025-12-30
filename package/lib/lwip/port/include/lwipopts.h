@@ -83,6 +83,8 @@ extern int ip4_input_nat(struct pbuf *p, struct netif *inp);
 #define LWIP_NETIF_STATUS_CALLBACK  1
 #define LWIP_NETIF_LINK_CALLBACK    1
 
+#define LWIP_NETIF_HOSTNAME         1
+
 /* DNS is not going to be used as this is a simple local example. */
 #define LWIP_DNS						1
 #define DNS_TABLE_SIZE 1

@@ -6,6 +6,8 @@ extern "C" {
 #endif
 
 #include "system.h"
+#include "system_recovery.h"
+#include "system_modem_api.h"
 
 #include "lwip/netif.h"
 #include "lwip/ip_addr.h"
@@ -99,6 +101,7 @@ typedef void (*lwiperf_report_cb_t) (const char *report_type,
 
 struct netif * nrc_netif_get_by_idx(uint8_t idx);
 int nrc_idx_get_by_name(char *argv);
+struct netif* nrc_netif_get_by_name(const char* ifname);
 int nrc_is_local_mac(uint8_t *addr);
 
 bool wifi_get_ip_info(int vif_id, struct ip_info *info);
@@ -137,6 +140,8 @@ bool delete_wifi_bridge_interface(void);
 
 int setup_wifi_ap_mode(struct netif *net_if, int updated_lease_time);
 int start_dhcps_on_if(struct netif *net_if, int updated_lease_time);
+int netif_ip_update(struct netif *netif);
+int netif_ip_recovery(struct netif *netif);
 
 void reset_ip_address(int vif);
 int reset_wifi_ap_mode(int vif);

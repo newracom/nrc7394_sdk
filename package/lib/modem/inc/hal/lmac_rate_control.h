@@ -62,10 +62,10 @@ enum {
 #define RC_USE_CAP_BASE_RETRY0_RANGE_N
 
  #if defined (RC_USE_CAP_BASE_RETRY0_RANGE_N)
-   #undef RC_USE_UPPER_CAP_PROBE_WEAK_RF_F_ONLY	 /* use upper cap in case of weak rf field only */ 
+   #undef RC_USE_UPPER_CAP_PROBE_WEAK_RF_F_ONLY	 /* use upper cap in case of weak rf field only */
    #define RC_USE_LOWER_CAP_PROBE				  /* use downward cap when getting random probing rate index */
  #else
-  #define RC_USE_UPPER_CAP_PROBE_WEAK_RF_F_ONLY    /* use upper cap in case of weak rf field only */ 
+  #define RC_USE_UPPER_CAP_PROBE_WEAK_RF_F_ONLY    /* use upper cap in case of weak rf field only */
   #undef RC_USE_LOWER_CAP_PROBE    				/* use downward cap when getting random probing rate index */
  #endif
 
@@ -156,7 +156,7 @@ typedef struct _RC_INFO {
 #if defined(RC_USE_CAP_BASE_RETRY0_RANGE_N)
 	uint8_t probe_range_n; /* random probe range */
 #endif
-    
+
 } RC_INFO;
 
 struct track_index {

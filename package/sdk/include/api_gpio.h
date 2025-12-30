@@ -113,9 +113,12 @@ typedef enum {
 
 /** @brief GPIO alternative function */
 typedef enum {
-	GPIO_FUNC = 0,		/**< GPIO function	*/
-	GPIO_NORMAL_OP = 1,	/**< GPIO Normal operation	*/
+	GPIO_FUNC = 0,		/**< Normal GPIO input/output operation */
+	GPIO_ALT_FUNC = 1,	/**< Alternate function (e.g., UART/SPI/etc.) */
 } NRC_GPIO_ALT;
+
+// For compatibility
+#define GPIO_NORMAL_OP GPIO_ALT_FUNC
 
 /**
 @struct NRC_GPIO_CONFIG
@@ -242,6 +245,22 @@ nrc_err_t nrc_gpio_get_pullup_setting(uint32_t *word);
  * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
 nrc_err_t nrc_gpio_trigger_config(int vector, nrc_gpio_trigger_t trigger, nrc_gpio_trigger_level_t level, bool debounce);
+
+/**********************************************
+ * @fn bool nrc_gpio_is_reserved(NRC_GPIO_PIN pin)
+ *
+ * @brief Check whether a GPIO pin is reserved by system or hardware configuration.
+ *
+ * This API returns whether the specified GPIO pin is unavailable for general-purpose use
+ * due to fixed hardware functions, optional system features, or RF FEM control usage.
+ *
+ * @param pin : GPIO pin number to check
+ *
+ * @return
+ *  - true  : GPIO pin is reserved
+ *  - false : GPIO pin is available
+ ***********************************************/
+bool nrc_gpio_is_reserved(NRC_GPIO_PIN pin);
 #endif
 
 /**********************************************

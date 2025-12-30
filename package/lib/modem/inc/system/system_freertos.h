@@ -24,7 +24,7 @@
 #endif /* defined(LMAC_TEST) */
 
 #if defined(NRC7292) || defined(NRC7394)
-#define BACKGROUND_TASK_STACK_SIZE		(4096 / sizeof(StackType_t))
+#define BACKGROUND_TASK_STACK_SIZE		((2 * 4096) / sizeof(StackType_t))
 #else
 #define BACKGROUND_TASK_STACK_SIZE		(1024 / sizeof(StackType_t))
 #endif

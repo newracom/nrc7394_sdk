@@ -94,6 +94,7 @@ typedef	struct
 #define HSPI_EIRQ_READY				(1<<2)
 #define HSPI_EIRQ_SLEEP				(1<<3)
 #define HSPI_EIRQ_ALL				0xF
+#define HSPI_EIRQ_MASK				(HSPI_EIRQ_READY | HSPI_EIRQ_SLEEP)
 
 typedef union
 {
@@ -126,13 +127,18 @@ typedef struct
 
 	uint8_t latch; /* Read others after read this value, and then interrupt is cleared. */
 
-	struct
+	union
 	{
-		uint8_t txq:1;
-		uint8_t rxq:1;
-		uint8_t ready:1;
-		uint8_t sleep:1;
-		uint8_t reserved:4;
+		uint8_t flags;
+
+		struct
+		{
+			uint8_t txq:1;
+			uint8_t rxq:1;
+			uint8_t ready:1;
+			uint8_t sleep:1;
+			uint8_t reserved:4;
+		};
 	} eirq;
 
 	struct
@@ -222,31 +228,13 @@ typedef union
 
 #define HSPI_ACK_VALUE			0x47
 
-enum
+enum HSPI_QUEUE
 {
 	HSPI_TXQ = 0,	/* from target to host */
 	HSPI_RXQ,	  	/* from host to target */
 
 	HSPI_QUE_NUM,
 	HSPI_QUE_ALL = HSPI_QUE_NUM
-};
-
-enum HSPI_EIRQ_MODE
-{
-	/* No interrupt */
-	HSPI_EIRQ_MODE_NONE = -1,
-
-	/* Low-level inerrupt */
-	HSPI_EIRQ_MODE_LOW = HSPI_EIRQ_LEVEL | HSPI_EIRQ_LOW,
-
-	/* High-level interrupt */
-	HSPI_EIRQ_MODE_HIGH = HSPI_EIRQ_LEVEL | HSPI_EIRQ_HIGH,
-
-	/* Faling-edge interrupt */
-	HSPI_EIRQ_MODE_FALLING = HSPI_EIRQ_EDGE | HSPI_EIRQ_LOW,
-
-	/* Rising-edge interrupt */
-	HSPI_EIRQ_MODE_RISING = HSPI_EIRQ_EDGE | HSPI_EIRQ_HIGH,
 };
 
 typedef struct
@@ -327,13 +315,42 @@ typedef struct
  *	H-SPI Functions
  **********************************************************************************************/
 
+enum HSPI_EIRQ_MODE
+{
+	/* No interrupt */
+	HSPI_EIRQ_MODE_NONE = -1,
+
+	/* Low-level inerrupt */
+	HSPI_EIRQ_MODE_LOW = HSPI_EIRQ_LEVEL | HSPI_EIRQ_LOW,
+
+	/* High-level interrupt */
+	HSPI_EIRQ_MODE_HIGH = HSPI_EIRQ_LEVEL | HSPI_EIRQ_HIGH,
+
+	/* Faling-edge interrupt */
+	HSPI_EIRQ_MODE_FALLING = HSPI_EIRQ_EDGE | HSPI_EIRQ_LOW,
+
+	/* Rising-edge interrupt */
+	HSPI_EIRQ_MODE_RISING = HSPI_EIRQ_EDGE | HSPI_EIRQ_HIGH,
+};
+
+enum HSPI_EIRQ_STATUS
+{
+	HSPI_EIRQ_NONE = 0,
+	HSPI_EIRQ_BOOT_DONE,
+	HSPI_EIRQ_READ_READY,
+	HSPI_EIRQ_DEEP_SLEEP
+};
+
 extern int nrc_hspi_reset (void);
 
 extern int nrc_hspi_open (hspi_ops_t *ops, enum HSPI_EIRQ_MODE mode);
+extern int nrc_hspi_reopen (enum HSPI_EIRQ_MODE mode);
 extern void nrc_hspi_close (void);
 
 extern int nrc_hspi_read (char *data, int len);
 extern int nrc_hspi_write (char *data, int len);
+
+extern enum HSPI_EIRQ_STATUS nrc_hspi_eirq_status (void);
 
 /**********************************************************************************************/
 #endif /* #ifndef __NRC_HSPI_H__ */

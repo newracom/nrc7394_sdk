@@ -49,18 +49,6 @@ void user_init(void)
 {
 	WIFI_CONFIG wifi_config;
 
-	/* prepare bridge interface */
-	if (nrc_add_bridge() != NRC_SUCCESS) {
-		nrc_usr_print("[%s] Bridge interface bring up failed.\n", __func__);
-		return;
-	}
-
-	/* add softap interface to the bridge */
-	if (nrc_add_bridge_interfaces() != NRC_SUCCESS) {
-		nrc_usr_print("[%s] Adding wlan0/wlan1 to br interface failed.\n", __func__);
-		return;
-	}
-
 	memset(&wifi_config, 0, WIFI_CONFIG_SIZE);
 
 	nrc_wifi_set_config(&wifi_config);
@@ -68,10 +56,22 @@ void user_init(void)
 	/* set network_mode to bridge */
 	wifi_config.network_mode = WIFI_NETWORK_MODE_BRIDGE;
 
+	/* prepare bridge interface */
+	if (nrc_add_bridge() != NRC_SUCCESS) {
+		nrc_usr_print("[%s] Bridge interface bring up failed.\n", __func__);
+		return;
+	}
+
 	if (relay_connect_to_ap(&wifi_config) == NRC_FAIL) {
 		nrc_usr_print("[%s] Connection to %s failed.\n",
 					  __func__,
 					  wifi_config.ssid);
+		return;
+	}
+
+	/* add softap interface to the bridge */
+	if (nrc_add_bridge_interfaces() != NRC_SUCCESS) {
+		nrc_usr_print("[%s] Adding wlan0/wlan1 to br interface failed.\n", __func__);
 		return;
 	}
 

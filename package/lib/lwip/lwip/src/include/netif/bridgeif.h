@@ -100,6 +100,13 @@ err_t bridgeif_fdb_remove(struct netif *bridgeif, const struct eth_addr *addr);
 void                bridgeif_fdb_update_src(void *fdb_ptr, struct eth_addr *src_addr, u8_t port_idx);
 bridgeif_portmask_t bridgeif_fdb_get_dst_ports(void *fdb_ptr, struct eth_addr *dst_addr);
 void*               bridgeif_fdb_init(u16_t max_fdb_entries);
+u8_t                bridgeif_get_dst_port(struct netif *bridgeif, struct eth_addr *dst_addr);
+
+void bridgeif_fdb_flush_port(void *fdb_ptr, u8_t port_idx);
+void bridgeif_fdb_flush_all(void *fdb_ptr);
+
+void bridgeif_flush_port(struct netif *bridgeif, struct netif *portif);
+void bridgeif_flush_all(struct netif *bridgeif);
 
 #if BRIDGEIF_PORT_NETIFS_OUTPUT_DIRECT
 #ifndef BRIDGEIF_DECL_PROTECT

@@ -1,6 +1,8 @@
 #ifndef	__SYSTEM_CONSTANT_H__
 #define __SYSTEM_CONSTANT_H__
 
+#include <stdint.h>
+
 static const uint32_t Hz    = 1;
 static const uint32_t KHz   = 1000 * 1;
 static const uint32_t MHz   = 1000 * 1000;

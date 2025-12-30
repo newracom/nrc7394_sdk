@@ -25,7 +25,7 @@
 
 #include "nrc_sdk.h"
 
-#define TEST_COUNT 100
+#define TEST_COUNT 10
 #define TEST_INTERVAL 2000 /* msec */
 
 /******************************************************************************
@@ -36,30 +36,28 @@
  *******************************************************************************/
 nrc_err_t run_sample_adc(int count, int interval)
 {
-	bool flag = false;
-	uint16_t data = 0;
-	uint32_t id;
-	int i = 0;
-
 	nrc_usr_print("[%s] Sample App for ADC API \n", __func__);
+#ifdef NRC7394
+	nrc_adc_set_gpio(ADC0, GPIO_17);
+	nrc_adc_set_gpio(ADC1, GPIO_18);
+#endif
 	nrc_adc_init(true);
 	_delay_ms(100);
 
-	for(i=0; i<count; i++) {
+	for(int i=0; i<count; i++) {
 		nrc_usr_print("[%s] ", __func__);
 
 #ifdef NRC7292
-		for (id = ADC1; id <= ADC3 ; id++) {
+		nrc_usr_print("ADC1=%03d   ", nrc_adc_get_data(ADC1));
+		nrc_usr_print("ADC2=%03d   ", nrc_adc_get_data(ADC2));
+		nrc_usr_print("ADC3=%03d   ", nrc_adc_get_data(ADC3));
 #else
-		for (id = ADC0; id <= ADC1 ; id++) {
+		nrc_usr_print("ADC0=%03d   ", nrc_adc_get_data(ADC0));
+		nrc_usr_print("ADC1=%03d   ", nrc_adc_get_data(ADC1));
 #endif
-			data = nrc_adc_get_data(id);
-			nrc_usr_print("CH%d=%03d  ", id, data);
-		}
 		nrc_usr_print("\n");
 		_delay_ms(interval);
 	}
-	nrc_adc_deinit();
 	nrc_usr_print("[%s] exit \n",__func__);
 	return NRC_SUCCESS;
 }

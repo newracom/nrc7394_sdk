@@ -44,17 +44,19 @@ int vif_id_max = 1;
 static const wifi_country_t _wifi_country_list[] =
 {
 	{ COUNTRY_CODE_AU, "AU" },
-	{ COUNTRY_CODE_CN, "CN" },
+	{ COUNTRY_CODE_CN, "CN" }, // Deprecated. Don't use this.
 	{ COUNTRY_CODE_EU, "EU" },
 	{ COUNTRY_CODE_JP, "JP" },
 	{ COUNTRY_CODE_NZ, "NZ" },
-	{ COUNTRY_CODE_T8, "T8" },
+	{ COUNTRY_CODE_T8, "T8" }, // Deprecated. Don't use this.
 	{ COUNTRY_CODE_US, "US" },
 	{ COUNTRY_CODE_K1, "K1" },
 	{ COUNTRY_CODE_K2, "K2" },
-	{ COUNTRY_CODE_S8, "S8" },
-	{ COUNTRY_CODE_S9, "S9" },
-	{ COUNTRY_CODE_T9, "T9" },
+	{ COUNTRY_CODE_S8, "S8" }, // Deprecated. Don't use this.
+	{ COUNTRY_CODE_S9, "S9" }, // Deprecated. Don't use this.
+	{ COUNTRY_CODE_T9, "T9" }, // Deprecated. Don't use this.
+	{ COUNTRY_CODE_TW, "TW" },
+	{ COUNTRY_CODE_SG, "SG" },
 
 	{ COUNTRY_CODE_MAX, "00" }
 };
@@ -93,6 +95,8 @@ static wifi_event_cb_t g_wifi_event_cb[WIFI_EVT_MAX] =
 	[WIFI_EVT_AP_STA_CONNECTED] = NULL,
 	[WIFI_EVT_AP_STA_DISCONNECTED] = NULL,
 	[WIFI_EVT_ASSOC_REJECT] = NULL,
+	[WIFI_EVT_BEACON] = NULL,
+	[WIFI_EVT_CONNECT_ABORT] = NULL,
 };
 
 static void _wifi_api_event_handler (int vif_id, tWIFI_EVENT_ID id, int data_len, void *data)
@@ -108,12 +112,17 @@ static void _wifi_api_event_handler (int vif_id, tWIFI_EVENT_ID id, int data_len
 		[WIFI_EVT_AP_STA_CONNECTED] = "sta_connected",
 		[WIFI_EVT_AP_STA_DISCONNECTED] = "sta_disconnected",
 		[WIFI_EVT_ASSOC_REJECT] = "assocication_reject",
+		[WIFI_EVT_BEACON] = "beacon",
+		[WIFI_EVT_CONNECT_ABORT] = "connect_abort",
 	};
 
 	if (id < 0 || id >= WIFI_EVT_MAX)
 		_atcmd_info("[%d] wifi_event: %d (invalid)", vif_id, id);
 	else if (!g_wifi_event_cb[id])
-		_atcmd_info("[%d] wifi_event: %d, %s (unused)", vif_id, id, str_event[id]);
+	{
+		if (id != WIFI_EVT_VENDOR_IE &&  id != WIFI_EVT_BEACON)
+			_atcmd_info("[%d] wifi_event: %d, %s (unused)", vif_id, id, str_event[id]);
+	}
 	else
 	{
 		_atcmd_info("[%d] wifi_event: %s, data=%p,%d", vif_id, str_event[id], data, data_len);
@@ -169,38 +178,124 @@ int wifi_api_register_event_callback (wifi_event_cb_t event_cb[])
 
 /**********************************************************************************************/
 
-int wifi_api_get_if_mode (void)
+static const char *str_dev_mode[] =
 {
-	int mode;
+	[MODE_AP] = "AP",
+	[MODE_STA] = "STA",
+	[MODE_MESH] = "MESH",
+#if defined(INCLUDE_IBSS)
+	[MODE_IBSS] = "IBSS"
+#endif
+};
 
-	if (vif_id_ap == 0 && vif_id_sta == 0)
-		mode = IF_MODE_APSTA;
-	else if (vif_id_ap == 0 && vif_id_sta == 1)
-		mode = IF_MODE_RELAY;
-	else
+static const char *str_if_mode[] =
+{
+	[IF_MODE_AP] = "AP",
+	[IF_MODE_STA] = "STA",
+	[IF_MODE_RELAY] = "RELAY"
+};
+
+void wifi_api_init_if_mode (void)
+{
+	uint8_t dev_mode[VIF_MAX];
+	int vif_id;
+
+	for (vif_id = 0 ; vif_id < VIF_MAX ; vif_id++)
 	{
-		_atcmd_error("invalid if_mode, ap=%d sta=%d", vif_id_ap, vif_id_sta);
-		return -1;
+		dev_mode[vif_id] = get_device_mode(vif_id);
+
+		if (dev_mode[vif_id] < MODE_MAX)
+			_atcmd_info("INIT_DEV_MODE_%d: %s", vif_id, str_dev_mode[dev_mode[vif_id]]);
+		else
+			_atcmd_info("INIT_DEV_MODE_%d: NONE", vif_id);
 	}
 
-	return mode;
+	
+
+	switch (dev_mode[0])
+	{
+		case MODE_AP:
+			if (dev_mode[1] == MODE_STA)
+			{
+				wifi_api_set_if_mode(IF_MODE_RELAY);			
+				wifi_api_add_network(true);
+				wifi_api_add_network(false);
+				break;
+			}
+
+			wifi_api_set_if_mode(IF_MODE_AP);
+			wifi_api_add_network(true);
+			break;
+
+		default:
+			wifi_api_set_if_mode(IF_MODE_STA);
+			wifi_api_add_network(false);
+	}			
 }
 
-int wifi_api_set_if_mode (int mode)
+int wifi_api_get_if_mode (void)
 {
-	switch (mode)
+	int if_mode = -1;
+	int vif_id;
+	uint8_t dev_mode[VIF_MAX];
+
+	for (vif_id = 0 ; vif_id < VIF_MAX ; vif_id++)
+		dev_mode[vif_id] = get_device_mode(vif_id);
+
+	if (vif_id_max == 1 && vif_id_ap == 0 && vif_id_sta == 0)
 	{
-		case IF_MODE_APSTA:
+		if (dev_mode[1] == MODE_MAX)
+		{
+			if (dev_mode[0] == MODE_AP)
+				if_mode = IF_MODE_AP;
+			else if (dev_mode[0] == MODE_STA)
+				if_mode = IF_MODE_STA;				
+		}
+
+		if (if_mode < 0)
+			_atcmd_error("invalid device mode (APSTA), wlan0=%d wlan1=%d", dev_mode[0], dev_mode[1]);
+	}
+	else if (vif_id_max == 2 && vif_id_ap == 0 && vif_id_sta == 1)
+	{
+		if (dev_mode[0] == MODE_AP && dev_mode[1] == MODE_STA)
+			if_mode = IF_MODE_RELAY;
+		else
+			_atcmd_error("invalid device mode (RELAY), wlan0=%d wlan1=%d", dev_mode[0], dev_mode[1]);
+	}
+	else
+		_atcmd_error("unknown if_mode, max=%d ap=%d sta=%d", vif_id_max, vif_id_ap, vif_id_sta);
+
+	switch (if_mode)
+	{
+		case IF_MODE_AP:
+		case IF_MODE_STA:
+		case IF_MODE_RELAY:
+			_atcmd_info("GET_IF_MODE: %s", str_if_mode[if_mode]);
+	}
+
+	return if_mode;
+}
+
+int wifi_api_set_if_mode (int if_mode)
+{
+	switch (if_mode)
+	{
+		case IF_MODE_AP:
+		case IF_MODE_STA:
+			_atcmd_info("SET_IF_MODE: %s", str_if_mode[if_mode]);
+
 			vif_id_max = 1;
 			vif_id_ap = WLAN0_INTERFACE;
 			vif_id_sta = WLAN0_INTERFACE;
 			vif_id_br = WLAN0_INTERFACE;
 
-			system_modem_api_set_mode(WLAN0_INTERFACE, MAC_STA_TYPE_STA);
+			system_modem_api_set_mode(WLAN0_INTERFACE, (if_mode == IF_MODE_AP) ? MAC_STA_TYPE_AP : MAC_STA_TYPE_STA);
 			system_modem_api_set_mode(WLAN1_INTERFACE, MAC_STA_TYPE_MAX);
 			break;
 
 		case IF_MODE_RELAY:
+			_atcmd_info("SET_IF_MODE: RELAY");
+
 			vif_id_max = 2;
 			vif_id_ap = WLAN0_INTERFACE;
 			vif_id_sta = WLAN1_INTERFACE;
@@ -211,7 +306,7 @@ int wifi_api_set_if_mode (int mode)
 			break;
 
 		default:
-			_atcmd_error("invalid if_mode, mode=%d", mode);
+			_atcmd_error("invalid if_mode (%d)", if_mode);
 			return -EINVAL;
 	}
 
@@ -662,6 +757,31 @@ int wifi_api_set_cca_threshold (int threshold)
 	return 0;
 }
 
+int wifi_api_scan_cca (int pref_bw, int dwell_time, cca_scan_results_t results)
+{
+	int cnt = sizeof(cca_scan_results_t) / sizeof(OPT_CH_RESULTS);
+
+	switch (pref_bw)
+	{
+		case 0:
+		case 1:
+		case 2:
+		case 4:
+			if (dwell_time > 0)
+				break;
+
+		default:
+			return -EINVAL;
+	}
+
+	memset(results, 0, sizeof(cca_scan_results_t));
+
+	if (nrc_wifi_softap_get_best_ch(pref_bw, dwell_time, results, &cnt, NULL, 0) != WIFI_SUCCESS)
+		return -1;
+
+	return cnt;
+}
+
 int wifi_api_get_tx_time (uint16_t *cs_time, uint32_t *pause_time)
 {
 	if (!cs_time || !pause_time)
@@ -723,6 +843,25 @@ int wifi_api_add_network (bool ap)
 
 	if (nrc_wifi_add_network(vif_id) != WIFI_SUCCESS)
 		return -1;
+	else
+	{
+		const char *str_mode = NULL;
+		tWIFI_DEVICE_MODE mode;
+		tWIFI_STATUS status;
+
+		str_mode = ap ? "AP" : "STA";
+		mode = ap ? WIFI_MODE_AP : WIFI_MODE_STATION;
+
+		status = nrc_wifi_set_device_mode(vif_id, mode);
+		if (status != WIFI_SUCCESS)
+		{
+			_atcmd_error("nrc_wifi_set_device_mode() failed, vif_id=%d mode=%s status=%d",
+						vif_id, str_mode, status);
+			return -1;
+		}
+
+		_atcmd_info("[%s] vif_id=%d mode=%s", __func__, vif_id, str_mode);
+	}
 
 	return 0;
 }
@@ -791,6 +930,25 @@ int wifi_api_get_listen_interval (uint16_t *listen_interval, uint32_t *listen_in
 int wifi_api_set_listen_interval (uint16_t listen_interval)
 {
 	if (nrc_wifi_set_listen_interval(vif_id_sta, listen_interval) != WIFI_SUCCESS)
+		return -1;
+
+	return 0;
+}
+
+int wifi_api_get_ndp_preq (bool *ndp_preq)
+{
+	if (!ndp_preq)
+		return -EINVAL;
+
+	if (nrc_wifi_get_ndp_preq(vif_id_sta, ndp_preq) != WIFI_SUCCESS)
+		return -1;
+
+	return 0;
+}
+
+int wifi_api_set_ndp_preq (bool ndp_preq)
+{
+	if (nrc_wifi_set_ndp_preq(vif_id_sta, ndp_preq) != WIFI_SUCCESS)
 		return -1;
 
 	return 0;
@@ -1006,6 +1164,27 @@ int wifi_api_get_ap_info (wifi_ap_info_t *info)
 
 	strcpy(info->security, str_sec_mode[ap.security]);
 /*	strcpy(info->password, ap.password); */
+
+	return 0;
+}
+
+int wifi_api_set_hostname (char *hostname)
+{
+	if (!hostname)
+		return -EINVAL;
+
+	netif_set_hostname(&br_netif, hostname);
+	netif_set_hostname(nrc_netif[0], hostname);
+	netif_set_hostname(nrc_netif[1], hostname);	
+
+	ASSERT(netif_get_hostname(&br_netif) == hostname);
+	ASSERT(netif_get_hostname(nrc_netif[0]) == hostname);
+	ASSERT(netif_get_hostname(nrc_netif[1]) == hostname);
+
+	_atcmd_info("wifi_hostname: %s", hostname);
+/*	_atcmd_debug(" - br   : %s", netif_get_hostname(&br_netif));
+	_atcmd_debug(" - wlan0: %s", netif_get_hostname(nrc_netif[0]));
+	_atcmd_debug(" - wlan1: %s", netif_get_hostname(nrc_netif[1])); */
 
 	return 0;
 }
@@ -1226,7 +1405,7 @@ int wifi_api_start_deep_sleep (uint32_t timeout, uint8_t gpio)
 		_atcmd_error("failed to set wakeup source");
 		return -1;
 	}
-
+	
 	if (timeout > 0)
 		err = nrc_ps_deep_sleep(timeout);
 	else
@@ -1464,7 +1643,7 @@ void wifi_api_set_relay_mode (bool enable)
 	{
 		_atcmd_debug("relay_mode: disable");
 
-		wifi_api_set_if_mode(IF_MODE_APSTA);
+		wifi_api_set_if_mode(IF_MODE_STA);
 		wifi_api_delete_bridge();
 	}
 }

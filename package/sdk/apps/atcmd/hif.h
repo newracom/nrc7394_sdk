@@ -101,6 +101,8 @@ typedef struct
 	enum uart_stop_bit stop_bits;
 	enum uart_parity_bit parity;
 	enum uart_hardware_flow_control hfc;
+	
+	bool hfc_rx_irq;
 } _hif_uart_t;
 
 typedef struct
@@ -169,6 +171,8 @@ extern int _hif_hspi_open (_hif_info_t *info);
 extern void _hif_hspi_close (void);
 extern int _hif_hspi_read (char *buf, int len);
 extern int _hif_hspi_write (char *buf, int len);
+extern void _hfi_hspi_eirq_boot_done (bool active_high);
+extern void _hif_hspi_enter_sleep (bool check_txq, bool check_rxq, uint32_t timeout);
 
 extern void _hif_set_type (enum _HIF_TYPE type);
 extern enum _HIF_TYPE _hif_get_type (void);

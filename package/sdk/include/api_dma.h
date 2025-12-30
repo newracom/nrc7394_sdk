@@ -23,14 +23,20 @@
  *
  */
 
-
 #ifndef __API_DMA_H__
 #define __API_DMA_H__
 /**********************************************************************************************/
 
-#define NRC_DMA_CHANNEL_MAX			8
-#define NRC_DMA_XFER_SIZE_MAX		4096
+#include <stdint.h>
+#include <stdbool.h>
 
+/* --------------------------------------------------------------------------------------------
+ * DMA core limits
+ * ------------------------------------------------------------------------------------------*/
+#define NRC_DMA_CHANNEL_MAX         8
+#define NRC_DMA_XFER_SIZE_MAX       4096   /* Max transfer units (see note below) */
+
+/* Error codes returned by API */
 enum DMA_ERROR {
 	NRC_DMA_OK = 0,
 	NRC_DMA_EPERM = -1,
@@ -38,6 +44,7 @@ enum DMA_ERROR {
 	NRC_DMA_EBUSY = -3
 };
 
+/* Burst sizes */
 enum DMA_BSIZE {
 	NRC_DMA_BSIZE_1 = 0,
 	NRC_DMA_BSIZE_4,
@@ -51,6 +58,7 @@ enum DMA_BSIZE {
 	NRC_DMA_BSIZE_MAX
 };
 
+/* Bus widths (per transfer element) */
 enum DMA_WIDTH {
 	NRC_DMA_WIDTH_8 = 0,
 	NRC_DMA_WIDTH_16,
@@ -59,6 +67,7 @@ enum DMA_WIDTH {
 	NRC_DMA_WIDTH_MAX
 };
 
+/* AHB Master select */
 enum DMA_AHBM {
 	NRC_DMA_AHB_M1 = 0,
 	NRC_DMA_AHB_M2,
@@ -66,6 +75,7 @@ enum DMA_AHBM {
 	NRC_DMA_AHB_MAX
 };
 
+/* Peripheral IDs (handshake sources/sinks) */
 enum DMA_PERI_ID {
 	NRC_DMA_PERI_SSP0_RX = 0,
 	NRC_DMA_PERI_SSP0_TX,
@@ -94,39 +104,56 @@ enum DMA_PERI_ID {
 	NRC_DMA_PERI_ID_MAX,
 };
 
+/* --------------------------------------------------------------------------------------------
+ * Peripheral descriptor (SW-only helper)
+ * NOTE: Struct size is 8 bytes (Addr + 32-bit bitfield).
+ * ------------------------------------------------------------------------------------------*/
 typedef struct {
 	uint32_t Addr;
 
-	uint32_t ID:5; // request peripheral
-	uint32_t Reserved:27;
-	uint32_t AddrInc:1; // address increment
-	uint32_t FlowCtrl:1; // flow controller
+	/* 32-bit bitfield */
+	uint32_t ID       : 5;         /* Peripheral request ID (enum DMA_PERI_ID) */
+	uint32_t Reserved : 25;
+	uint32_t AddrInc  : 1;         /* Auto-increment address (for memory usually 1) */
+	uint32_t FlowCtrl : 1;         /* 1 if peripheral is the flow controller */
 } dma_peri_t;
 
+/* --------------------------------------------------------------------------------------------
+ * DMA linked list item (descriptor)
+ *
+ * Alignment:
+ *  - Descriptors MUST be 4-byte aligned (Next must also be word-aligned).
+ *
+ * Size semantics:
+ *  - Hardware field XferSize is in UNITS OF SOURCE WIDTH.
+ *  - The API helper nrc_dma_desc_set_size() accepts BYTES and converts internally.
+ * ------------------------------------------------------------------------------------------*/
 typedef struct _dma_desc {
 	uint32_t SrcAddr;
 	uint32_t DestAddr;
 
-	struct _dma_desc *Next; // word-aligned
+	struct _dma_desc *Next;        /* Word-aligned pointer; can form rings */
 
 	/* Channel Control Information */
-	uint32_t XferSize:12; // Trasfer size
-	uint32_t SBSize:3; // Source burst size
-	uint32_t DBSize:3; // Destination burst size
-	uint32_t SWidth:3; // Source transfer widith
-	uint32_t DWidth:3; // Destination transfer width
-	uint32_t SAHBM:1; // Source AHB master
-	uint32_t DAHBM:1; // Destination AHB master
-	uint32_t SAInc:1; // Source address increment
-	uint32_t DAInc:1; // Destination address increment
-	uint32_t Privileged:1; // Protection: Privileged mode
-	uint32_t Bufferable:1; // Protection: Buffered access
-	uint32_t Cacheable:1; // Protection: Cached access
-	uint32_t IntTC:1; // Terminal count interrupt enable
+	uint32_t XferSize   : 12;      /* Transfer size (in units of SWidth) */
+	uint32_t SBSize     : 3;       /* Source burst size (enum DMA_BSIZE) */
+	uint32_t DBSize     : 3;       /* Destination burst size (enum DMA_BSIZE) */
+	uint32_t SWidth     : 3;       /* Source width (enum DMA_WIDTH) */
+	uint32_t DWidth     : 3;       /* Destination width (enum DMA_WIDTH) */
+	uint32_t SAHBM      : 1;       /* Source AHB master (enum DMA_AHBM) */
+	uint32_t DAHBM      : 1;       /* Destination AHB master (enum DMA_AHBM) */
+	uint32_t SAInc      : 1;       /* Auto-increment source address */
+	uint32_t DAInc      : 1;       /* Auto-increment destination address */
+	uint32_t Privileged : 1;       /* Protection: privileged */
+	uint32_t Bufferable : 1;       /* Protection: bufferable */
+	uint32_t Cacheable  : 1;       /* Protection: cacheable */
+	uint32_t IntTC      : 1;       /* Terminal count interrupt enable */
 } dma_desc_t __attribute__((aligned(4)));
 
 typedef void (*dma_isr_t) (int channel);
 
+/**********************************************************************************************/
+/* Power / global control                                                                     */
 /**********************************************************************************************/
 
 /**********************************************
@@ -165,7 +192,11 @@ void nrc_dma_disable (void);
  *
  * @return return true if DMA is enabled, false otherwise.
  ***********************************************/
-bool nrc_dma_is_enabled (void);
+bool nrc_dma_is_enabled(void);
+
+/**********************************************************************************************/
+/* Channel management                                                                         */
+/**********************************************************************************************/
 
 /**********************************************
  * @fn nrc_dma_get_channel (int highest)
@@ -183,7 +214,7 @@ bool nrc_dma_is_enabled (void);
  *
  * @return Free DMA channel that can be used.
  ***********************************************/
-int nrc_dma_get_channel (int highest);
+int nrc_dma_get_channel(int highest);
 
 /**********************************************
  * @fn nrc_dma_valid_channel (int channel)
@@ -194,7 +225,11 @@ int nrc_dma_get_channel (int highest);
  *
  * @return true if channel number if valid, otherwise false.
  ***********************************************/
-bool nrc_dma_valid_channel (int channel);
+bool nrc_dma_valid_channel(int channel);
+
+/**********************************************************************************************/
+/* Peripheral configuration helpers                                                           */
+/**********************************************************************************************/
 
 /**********************************************
  * @fn nrc_dma_peri_init (dma_peri_t *peri, int id, uint32_t addr, bool addr_inc, bool flow_ctrl)
@@ -210,6 +245,10 @@ bool nrc_dma_valid_channel (int channel);
  * @return 0 if successful, NRC_DMA_EINVAL if error occurs.
  ***********************************************/
 int nrc_dma_peri_init (dma_peri_t *peri, int id, uint32_t addr, bool addr_inc, bool flow_ctrl);
+
+/**********************************************************************************************/
+/* Transfer configuration                                                                     */
+/**********************************************************************************************/
 
 /**********************************************
  * @fn nrc_dma_config_m2m (int channel, dma_isr_t inttc_isr, dma_isr_t interr_isr)

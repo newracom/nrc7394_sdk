@@ -3,6 +3,9 @@
 
 #include <stdbool.h>
 #include "nrc_ps_type.h"
+#if defined(INCLUDE_FAST_CONNECT)
+#include "system_recovery.h"
+#endif
 
 //26B
 struct key_info {
@@ -12,7 +15,7 @@ struct key_info {
 	uint32_t	key[4]; //16B (128bit Key)
 	uint64_t	tsc; //8B (64bit)
 #if defined(INCLUDE_7393_7394_WORKAROUND)
-	uint16_t	hw_index;
+	uint16_t	reserved;
 #endif
 } __attribute__ ((packed));
 
@@ -45,12 +48,13 @@ struct seqnum_info {
 
 //20B
 struct ret_stainfo {
-	uint8_t 	sta_type;
+	uint8_t 	vif_id:2;
+	uint8_t 	bss_max_idle_opt:1;
+	uint8_t 	reserved:5;
 	uint8_t 	mac_addr[6];
 	uint8_t 	country[2];
 	uint16_t	aid;
 	uint16_t	listen_interval;
-	bool		bss_max_idle_opt;
 	uint16_t	bss_max_idle_period;
 	uint32_t	rts_threahold;
 } __attribute__ ((packed));
@@ -70,7 +74,7 @@ struct ucode_stats {
 	uint32_t	wake_margin_us;			//wakeup margin time in us
 } __attribute__ ((packed));
 
-//47B
+//47B -> 51B in case of INCLUDE_BOOT_NONCE_IE
 struct ret_apinfo {
 	uint8_t		bssid[6];
 	uint8_t		ssid[32];
@@ -83,7 +87,12 @@ struct ret_apinfo {
 	uint8_t		ctrl_resp_preamble_1m: 1;
 	uint8_t		ndp_1m_dup: 1;
 	uint8_t		sae_pwe:2;
-	uint8_t		reserved:4 ;
+	uint8_t		vif_id:2;
+	uint8_t		ie_rsnx_h2e:1;				//Having h2e field set in the RSNX IE
+	uint8_t		reserved:1;
+#if defined(INCLUDE_BOOT_NONCE_IE)
+	uint32_t	boot_nonce;
+#endif
 } __attribute__ ((packed));
 #define RET_APINFO_SIZE sizeof(struct ret_apinfo)
 
@@ -116,7 +125,8 @@ struct ret_s1ginfo {
 #define	KEK_MAX_LEN	(16)
 //137B
 struct ret_keyinfo {
-	uint8_t		security;
+	uint8_t		security : 1;
+	uint8_t		reserved : 7;
 	struct		key_info	cipher_info[4];
 	/* for GTK rekey offload */
 	uint8_t		kck[KCK_MAX_LEN];
@@ -276,7 +286,7 @@ struct ret_ucodeinfo {
 	uint32_t	ucode_test_mode:1;
 	uint32_t	execute_rf_init:1;
 	uint32_t	qos_null_pm1_ack:2;		// ack for qos_null frame with pm1 bit. (0: wait, 1: success, 2: fail)
-	uint32_t	reserved:1;
+	uint32_t	skip_qos_null_pm1:1;	//(1: skip sending null pm1 when entering PS, 0 : sending null pm1 when entering PS)
 	/* To calculate the deepsleep interval */
 	uint32_t	last_beacon_tsf_lower;	// last received beacon timestamp tsf lower
 	uint32_t	last_beacon_tsf_upper;	// last received beacon timestamp tsf upper
@@ -488,15 +498,48 @@ struct ret_twtinfo {
 #endif
 
 #if defined(INCLUDE_AUTH_CONTROL)
-//4Byte
+//17 Byte
 struct ret_authctrlinfo {
 	uint32_t	enable:1;
 	uint32_t	slot:7;
-	uint32_t	min:8;
+	uint32_t 	ps:1;
+	uint32_t	min:7;
 	uint32_t	max:8;
 	uint32_t	scale:8;
+	uint8_t		curr;
+	uint8_t		bo;
+	uint8_t		retry;
+	uint64_t	auth_before;
+#if	defined(NRC7394)
+	uint32_t	msg_cnt;
+#endif
 } __attribute__ ((packed));
 #endif
+
+struct ret_framemcs {
+	int8_t group;
+	int8_t dhcp;
+	int8_t null;
+} __attribute__ ((packed));
+
+struct ret_dppinfo {
+	uint8_t configurator_id : 4;
+	uint8_t pfs             : 1;
+	uint8_t reserved        : 3;
+	uint8_t akm;
+	uint8_t connector[512];
+	uint8_t net_access_key[128];
+	uint8_t net_access_key_len;
+	uint32_t net_access_key_expiry;
+	uint8_t csign[128];
+	uint8_t csign_len;
+	uint8_t ppkey[128];
+	uint8_t ppkey_len;
+	uint8_t pmkid[16];
+	uint8_t pmk[32];
+	uint8_t pmk_len;
+} __attribute__ ((packed));
+#define RET_DPP_INFO_SIZE sizeof(struct ret_dppinfo)
 
 struct retention_info {
 #if defined(NRC7394)
@@ -506,7 +549,7 @@ struct retention_info {
 #endif
 #endif
 	struct ret_stainfo		sta_info;		//station info (20B)
-	struct ret_apinfo		ap_info;		//ap info (47B)
+	struct ret_apinfo		ap_info;		//ap info (47B) -> (51B in case of INCLUDE_BOOT_NONCE_IE)
 	struct ret_s1ginfo		s1g_info;		//s1g info (16B)
 	struct ret_keyinfo		key_info;		//key info (105B)
 	struct ret_usrinfo		usr_conf_info;		//user config info (4B)
@@ -575,19 +618,30 @@ struct retention_info {
 #endif
 	uint32_t			wdt_flag:8;		//WDT Reset Flag (1B)
 	uint32_t			wdt_cnt: 24;		//WDT Reset Count (3B)
+
 	uint8_t				fota_in_progress:1;	//fota in progress flag(1bit) (1: in progress, 0: not in progress)
 	uint8_t				fota_done:1;		//fota done flag(1bit) (1: done, 0: not compeleted)
 	uint8_t				wake_by_usr:1;		//wakeup in ucode for user timer(1bit) (1: wakeup, 0: none)
 	uint8_t				xtal_status:2;		// 0(not checked), 1(working), 2(not working)
 	uint8_t				ps_null_pm0:1;		//0(nothing) 1(need to send null with PM0 after wakeup)
 	uint8_t				fast_connect:1;		//0(disable) 1(enable)
-	uint8_t				reserved:1;		//reserved 3 bits
-	bool				recovered;		//recovery status(1B) (true:recovered, false:not recovered)
-	bool				sleep_alone;		//sleep without connection(1B) (true:alone false:with AP)
+	uint8_t				disable_null_pm0:1;		//0(enable) 1(disable)
+	uint8_t				recovered:1;		//recovery status (true:recovered, false:not recovered)
+	uint8_t				sleep_alone:1;		//sleep without connection (true:alone false:with AP)
+	uint8_t				sub_xtal_bypass:1; //sub crystal bypass (true:bypass on false:bypass off)
+	uint8_t				reserved_0:5; //reserved
 	uint8_t				rc_mode:2;		// rate control(1B) for STA
 	uint8_t				rc_default_mcs:4;
-	uint8_t				rc_reserved:2;
+	struct ret_framemcs	mcs_per_frame;
 
+	uint8_t				sta_type[2];		//sta type(2B)
+#if defined(INCLUDE_FAST_CONNECT)
+	ap_recovery_t		ap_recovery;
+	ip_recovery_t		ip_recovery;
+#endif
+#if defined(CONFIG_DPP)
+	struct ret_dppinfo	dpp_info;			//dpp info
+#endif
 } __attribute__ ((packed));
 #define RET_TOTAL_SIZE 				sizeof(struct retention_info)
 
@@ -633,24 +687,6 @@ static inline bool PS_CHECK_SIG() {
 		return true;
 	return false;
 };
-
-#if defined (INCLUDE_STANDALONE) && (INCLUDE_FAST_CONNECT)
-#define PS_FILL_SIG_2() do { \
-    struct retention_info* ret_info;\
-    ret_info = nrc_ps_get_retention_info();\
-	ret_info->sig_a 	= PS_SIG_C; \
-	ret_info->sig_b 	= PS_SIG_D; \
-} while(0)
-
-static inline bool PS_CHECK_SIG_2() {
-	struct retention_info* ret_info;
-	ret_info = nrc_ps_get_retention_info();
-	if (ret_info->sig_a == PS_SIG_C
-		&& ret_info->sig_b == PS_SIG_D)
-		return true;
-	return false;
-};
-#endif /* defined (INCLUDE_STANDALONE) && (INCLUDE_FAST_CONNECT) */
 
 #if !defined(UCODE)
 void nrc_ps_init();
@@ -771,7 +807,6 @@ void ps_set_gpio_pullup(uint32_t mask);
 uint32_t ps_get_gpio_pullup(void);
 int nrc_ps_event_user_get(enum ps_event event);
 int nrc_ps_event_user_clear(enum ps_event event);
-bool nrc_ps_check_fast_connect(void);
 bool nrc_ps_set_user_data(void* data, uint16_t size);
 bool nrc_ps_get_user_data(void* data, uint16_t size);
 uint16_t nrc_ps_get_user_data_size(void);

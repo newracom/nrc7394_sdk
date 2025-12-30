@@ -178,6 +178,8 @@
 
 #define USF2SF(usf)	((usf == 0) ? 1 : (usf == 1) ? 10 : (usf == 2) ? 1000: 10000)
 
+#define BOOT_NONCE_IE_TYPE 0x64 /* 100 */
+
 typedef enum {
     MAC_STA_TYPE_STA = 0,
     MAC_STA_TYPE_AP,
@@ -610,6 +612,19 @@ typedef struct {
 
 #endif//#if 0
 #endif//#if defined(INCLUDE_IBSS)
+
+#if defined(INCLUDE_BOOT_NONCE_IE)
+/*
+ * EID 221 : WLAN_EID_VENDOR_SPECIFIC
+ */
+typedef struct {
+	uint8_t		eid;
+	uint8_t		length;
+	uint8_t		oui[3];
+	uint8_t		oui_type;
+	uint32_t	boot_nonce;
+} ie_boot_nonce;
+#endif /* defined(INCLUDE_BOOT_NONCE_IE) */
 
 // EID 12 : EDCA Parameter Set
 #define IE_LENGTH_EDCA_PARAMETER_SET	18
