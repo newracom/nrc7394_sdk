@@ -457,6 +457,32 @@ enum eapol_msg {
 	EAPOL_MSG_MAX
 };
 
+struct arphdr {                                                               
+	uint16_t ar_hrd;     /* format of hardware address   */                
+	uint16_t ar_pro;     /* format of protocol address   */                
+	uint8_t ar_hln;     /* length of hardware address   */            
+	uint8_t ar_pln;     /* length of protocol address   */            
+	uint16_t ar_op;      /* ARP opcode (command)     */                    
+
+	/*                                                                       
+	 *  Ethernet looks like this : This bit is variable sized however...     
+	 */                                                                      
+	uint8_t ar_sha[MAC_ADDR_LEN];   /* sender hardware address  */    
+	uint8_t ar_sip[4];      /* sender IP address        */        
+	uint8_t ar_tha[MAC_ADDR_LEN];   /* target hardware address  */    
+	uint8_t ar_tip[4];      /* target IP address        */        
+};
+
+/* ARP protocol opcodes. */
+#define ARPOP_REQUEST   1       /* ARP request          */
+#define ARPOP_REPLY     2       /* ARP reply            */
+#define ARPOP_RREQUEST  3       /* RARP request         */
+#define ARPOP_RREPLY    4       /* RARP reply           */
+#define ARPOP_InREQUEST 8       /* InARP request        */
+#define ARPOP_InREPLY   9       /* InARP reply          */
+#define ARPOP_NAK       10      /* (ATM)ARP NAK         */
+
+
 int ieee80211_ver(void* frame);
 bool ieee80211_is_pv0(void* frame);
 bool ieee80211_is_pv1(void* frame);
@@ -502,7 +528,7 @@ bool ieee80211_is_dhcp(GenericMacHeader* gmh);
 #if defined (INCLUDE_AVOID_FRAG_ATTACK_TEST)
 bool ieee80211_is_icmp(GenericMacHeader *gmh);
 #endif
-bool ieee80211_is_robust(GenericMacHeader* gmh,uint32_t mpdu_len);
+bool ieee80211_is_robust(GenericMacHeader *gmh, uint32_t mpdu_len, int *mcs);
 bool ieee80211_is_ip(GenericMacHeader* gmh);
 
 bool ieee80211_has_fromds(GenericMacHeader* gmh);

@@ -647,7 +647,7 @@ int _hif_hspi_write (char *buf, int len)
 
 /**********************************************************************************************/
 
-#if defined(NRC7394)
+#if !defined(NRC7292)
 
 #if 1 /* Need to define in hal/nrc739x/hal_gpio.h */
 #define UIO_SEL_HSPI	UIO_SEL_SPI2
@@ -816,7 +816,7 @@ static void _hif_hspi_pin_disable (void)
 	_hif_hspi_pin_info("GPIO_DIR: 0x%08X\n", gpio.word);
 }
 
-#endif /* #if defined(NRC7394) */
+#endif /* #if !defined(NRC7292) */
 
 static void _hif_hspi_fifo_delete (void)
 {
@@ -947,7 +947,7 @@ int _hif_hspi_open (_hif_info_t *info)
 		}
 	}
 
-#if defined(NRC7394)
+#if !defined(NRC7292)
 	_hif_hspi_pin_enable();
 #endif
 
@@ -982,11 +982,12 @@ void _hif_hspi_close (void)
 
 	_hif_hspi_fifo_delete();
 
-#if defined(NRC7394)
+#if !defined(NRC7292)
 	_hif_hspi_pin_disable();
 #endif
 }
 
+#if !defined(NRC7292)
 static void _hif_hspi_eirq_pin_config (bool enable)
 {
 #define UIO_SEL_EIRQ    UIO_SEL_SPI3
@@ -1036,14 +1037,14 @@ static void _hif_hspi_eirq_pin_config (bool enable)
 #define _hif_hspi_eirq_pin_enable()		_hif_hspi_eirq_pin_config(true)
 #define _hif_hspi_eirq_pin_disable()	_hif_hspi_eirq_pin_config(false)
 
-void _hfi_hspi_eirq_boot_done (bool active_high)
+void _hif_hspi_eirq_boot_done (bool active_high)
 {
 	NRC_GPIO_CONFIG hspi_eirq =
 	{
 		.gpio_pin = 30, /* HSPI_EIRQ */
 		.gpio_alt = GPIO_FUNC,
 		.gpio_dir = GPIO_OUTPUT,
-		.gpio_mode = GPIO_PULL_DOWN,
+		.gpio_mode = GPIO_FLOATING,
 	};
 
 	_hif_info("HSPI_EIRQ_BOOT_DONE: GP%d", hspi_eirq.gpio_pin);
@@ -1073,6 +1074,7 @@ void _hfi_hspi_eirq_boot_done (bool active_high)
 
 	_hif_hspi_eirq_pin_enable();
 }
+#endif /* #if !defined(NRC7292) */
 
 static void _hif_hspi_delay_ms (int ms)
 {

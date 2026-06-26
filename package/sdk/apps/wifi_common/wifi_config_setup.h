@@ -103,6 +103,8 @@ typedef struct  {
 	char broker_addr[MAX_STATIC_IP_LENGTH+1];
 	uint16_t broker_port;
 	uint8_t ap_optimal_channel_enable;
+	int8_t loc_1m_prim_ch;
+	int8_t bw_4m_2m_prim_loc;
 }WIFI_CONFIG;
 #define WIFI_CONFIG_SIZE	sizeof (WIFI_CONFIG)
 

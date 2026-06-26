@@ -595,7 +595,7 @@ void eloop_run(void)
 			wpa_printf(MSG_DEBUG, "eloop: %s, xQueueReceive() failed", __func__);
 		} else {
 			if (eloop_msg.wait_rsp) {
-				ctrl_iface_resp_t *resp = ctrl_iface_receive_response(eloop_msg.vif_id, eloop_msg.buf);
+				ctrl_iface_resp_t *resp = ctrl_iface_receive_response(eloop_msg.vif_id, "%s", eloop_msg.buf);
 				if (resp) {
 					if (xQueueSend(eloop_message_queue_rsp, resp, 0) == pdPASS) {
 						os_free(resp);

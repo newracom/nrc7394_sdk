@@ -1,4 +1,5 @@
 #include "system_common.h"
+#include "nrc_sdk_log.h"
 #include "lmac_common.h"
 #include "lmac_ps_common.h"
 #include "driver_nrc_ps.h"
@@ -67,6 +68,27 @@ static void ps_callback_task(void *arg)
 }
 #endif /* INCLUDE_PS_SCHEDULE */
 
+#ifdef SUPPORT_LFS
+bool fc_use_lfs(void)
+{
+	return true;
+}
+#endif
+
+#ifdef FC_REMOVE_WRITE_CLEARED_FILE
+bool fc_should_recreate_file_after_remove(void)
+{
+	return true;
+}
+#endif
+
+#ifdef SUPPORT_OV5640
+bool use_ov5640(void)
+{
+	return true;
+}
+#endif
+
 int standalone_main()
 {
 	bool net_init = true;
@@ -120,6 +142,7 @@ int standalone_main()
 	}
 #endif /* INCLUDE_PS_SCHEDULE */
 
+	nrc_sdk_log_init(SDK_LOG_INFO);
 	nrc_user_app_main();
 
 	return 0;
@@ -232,6 +255,13 @@ void get_standalone_macaddr(int vif_id, uint8_t *mac) {
 void set_standalone_ipaddr(int vif_id, uint32_t ipaddr, uint32_t netmask, uint32_t gwaddr)
 {
 	lmac_ps_set_ip_addr(ipaddr, netmask, gwaddr);
+}
+
+void set_standalone_dns_ipaddr(int vif_id, uint32_t ipaddr1, uint32_t ipaddr2)
+{
+#if !defined(NRC7292)
+	system_modem_api_set_dns(ipaddr1, ipaddr2);
+#endif
 }
 
 int set_standalone_hook_dhcp(int vif_id)

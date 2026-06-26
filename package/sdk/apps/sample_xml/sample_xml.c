@@ -32,22 +32,22 @@
 static void parsing_xml_data(char *data)
 {
 	mxml_node_t *tree;
-	tree = mxmlLoadString(NULL, data, MXML_TEXT_CALLBACK);
+	tree = mxmlLoadString(NULL, NULL, data);
 
 	mxml_node_t *node;
-	for (node = tree; node != NULL; node = mxmlWalkNext(node, tree, MXML_DESCEND)) {
+	for (node = tree; node != NULL; node = mxmlWalkNext(node, tree, MXML_DESCEND_ALL)) {
 		int type = mxmlGetType(node);
 		switch(type) {
-			case MXML_ELEMENT:
+			case MXML_TYPE_ELEMENT:
 			nrc_usr_print("[ELEMENT] %s\n", mxmlGetElement(node));
 			break;
-			case MXML_INTEGER:
-			nrc_usr_print("[INEGER] %d\n", mxmlGetInteger(node));
+			case MXML_TYPE_INTEGER:
+			nrc_usr_print("[INEGER] %ld\n", mxmlGetInteger(node));
 			break;
-			case MXML_OPAQUE:
+			case MXML_TYPE_OPAQUE:
 			nrc_usr_print("[OPAQUE] %s\n", mxmlGetOpaque(node));
 			break;
-			case MXML_TEXT:
+			case MXML_TYPE_TEXT:
 			nrc_usr_print("[TEXT] %s\n", mxmlGetText(node, NULL));
 			break;
 			default:
@@ -91,7 +91,7 @@ static void create_xml_objects(char *buffer, int buffer_size)
 	node = mxmlNewElement(data, "node");
 	mxmlNewText(node, 0, "val8");
 
-	int len = mxmlSaveString(xml, buffer, buffer_size, MXML_NO_CALLBACK);
+	int len = (int)mxmlSaveString(xml, NULL, buffer, buffer_size);
 	nrc_usr_print("[%s] %s\nlen=%d\n", __func__, buffer, len);
 }
 

@@ -24,31 +24,6 @@ extern "C" {
 
 #include "nrc_types.h"
 
-/* ===== Tunables ===== */
-#ifndef NRC_EVENT_MGR_MAX_VIF
-#define NRC_EVENT_MGR_MAX_VIF					2
-#endif
-
-#ifndef NRC_EVENT_MGR_DISPATCH_QUEUE_LEN
-#define NRC_EVENT_MGR_DISPATCH_QUEUE_LEN		512
-#endif
-
-#ifndef NRC_EVENT_MGR_PRIO_DISPATCHER
-#define NRC_EVENT_MGR_PRIO_DISPATCHER			28
-#endif
-
-#ifndef NRC_EVENT_MGR_DISPATCHER_STACK
-#define NRC_EVENT_MGR_DISPATCHER_STACK			2560
-#endif
-
-#ifndef NRC_EVENT_MGR_VENDOR_IE_SIZE
-#define NRC_EVENT_MGR_VENDOR_IE_SIZE			252		/* CMD(1) + DATA(<=251) */
-#endif
-
-#ifndef NRC_EVENT_MGR_CMD_PREFIX_LEN
-#define NRC_EVENT_MGR_CMD_PREFIX_LEN			1		/* 1 byte sub-command */
-#endif
-
 /* ===== Event model ===== */
 typedef struct {
 	int			vif;

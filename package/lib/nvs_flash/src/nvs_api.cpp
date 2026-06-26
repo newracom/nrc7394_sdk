@@ -753,8 +753,12 @@ static nvs_err_t nvs_get_str_or_blob(nvs_handle_t c_handle, nvs::ItemType type, 
         vPortFree(encrypted_value);
         NVS_LOGD(TAG, "[%s] decrypted length: %d", __func__, (int)decrypted_value_len);
 
-        // For a string, we expect a null-terminated result.
-        size_t reqLen = decrypted_value_len + 1; // include null terminator
+        size_t reqLen = decrypted_value_len;
+        if(effectiveType == nvs::ItemType::SZ) {
+            // For a string, we expect a null-terminated result.
+            reqLen += 1; // include null terminator
+        }
+
         if (out_value == NULL) {
             *length = reqLen;
             vPortFree(decrypted_value);
@@ -766,7 +770,9 @@ static nvs_err_t nvs_get_str_or_blob(nvs_handle_t c_handle, nvs::ItemType type, 
             return NVS_ERR_NVS_INVALID_LENGTH;
         }
         memcpy(out_value, decrypted_value, decrypted_value_len);
-        ((char *)out_value)[decrypted_value_len] = '\0';
+        if(effectiveType == nvs::ItemType::SZ) {
+            ((char *)out_value)[decrypted_value_len] = '\0';
+        }
         *length = reqLen;
         vPortFree(decrypted_value);
         return NVS_OK;

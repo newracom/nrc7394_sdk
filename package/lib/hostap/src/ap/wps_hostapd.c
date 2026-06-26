@@ -37,6 +37,11 @@ static int hostapd_wps_upnp_init(struct hostapd_data *hapd,
 static void hostapd_wps_upnp_deinit(struct hostapd_data *hapd);
 #endif /* CONFIG_WPS_UPNP */
 
+#ifdef CONFIG_WPS_REGISTRAR_MULTI_SELECT
+#include "crypto/dh_groups.h"
+#include "crypto/dh_group5.h"
+#endif
+
 static int hostapd_wps_probe_req_rx(void *ctx, const u8 *addr, const u8 *da,
 				    const u8 *bssid,
 				    const u8 *ie, size_t ie_len,
@@ -1094,6 +1099,31 @@ static void hostapd_free_wps(struct wps_context *wps)
 }
 
 
+#ifdef CONFIG_WPS_REGISTRAR_MULTI_SELECT
+/**
+ * hostapd_wps_ms_pbc_restart_cb - Restart PBC for Multi-Select waiting STAs
+ * @ctx: Pointer to struct hostapd_data
+ * @timeout_ctx: Unused (required by eloop callback signature)
+ *
+ * Called via an eloop timeout (registered by ms_pbc_restart_cb in
+ * wps_registrar.c) after a PBC session ends and at least one other Enrollee
+ * is still present in the pbc_sessions list.
+ *
+ * Calls hostapd_wps_button_pushed() directly instead of going through the
+ * wpa_supplicant control interface, avoiding unnecessary round-trips.
+ * Whichever STA sends M1 first after PBC is re-enabled wins the next session.
+ */
+static void hostapd_wps_ms_pbc_restart_cb(void *ctx, void *timeout_ctx)
+{
+	struct hostapd_data *hapd = ctx;
+
+	wps_ms_printf(MSG_INFO,
+		   "WPS MS: auto-restarting PBC for waiting Enrollee");
+	hostapd_wps_button_pushed(hapd, NULL);
+}
+#endif /* CONFIG_WPS_REGISTRAR_MULTI_SELECT */
+
+
 int hostapd_init_wps(struct hostapd_data *hapd,
 		     struct hostapd_bss_config *conf)
 {
@@ -1114,6 +1144,9 @@ int hostapd_init_wps(struct hostapd_data *hapd,
 	wps->event_cb = hostapd_wps_event_cb;
 	wps->rf_band_cb = hostapd_wps_rf_band_cb;
 	wps->cb_ctx = hapd;
+#ifdef CONFIG_WPS_REGISTRAR_MULTI_SELECT
+	wps->pbc_restart_cb = hostapd_wps_ms_pbc_restart_cb;
+#endif /* CONFIG_WPS_REGISTRAR_MULTI_SELECT */
 
 	os_memset(&cfg, 0, sizeof(cfg));
 	wps->wps_state = hapd->conf->wps_state;
@@ -1591,6 +1624,22 @@ static int wps_button_pushed(struct hostapd_data *hapd, void *ctx)
 
 	if (hapd->wps) {
 		data->count++;
+#ifdef CONFIG_WPS_REGISTRAR_MULTI_SELECT
+		/* Precompute DH keypair at PBC trigger */
+		if (!hapd->wps->dh_privkey || !hapd->wps->dh_pubkey) {
+			struct wpabuf *priv = NULL;
+			struct wpabuf *pub	= dh_init(dh_groups_get(5), &priv);
+			pub = wpabuf_zeropad(pub, 192);
+			if (pub && priv) {
+				wpabuf_clear_free(hapd->wps->dh_privkey);
+				wpabuf_free(hapd->wps->dh_pubkey);
+				hapd->wps->dh_privkey = priv;
+				hapd->wps->dh_pubkey  = pub;
+				wps_ms_printf(MSG_INFO,
+					"WPS MS: DH keypair precomputed at PBC");
+			}
+		}
+#endif
 		return wps_registrar_button_pushed(hapd->wps->registrar,
 						   data->p2p_dev_addr);
 	}

@@ -199,7 +199,7 @@ nrc_err_t nrc_ps_wakeup_reason(uint8_t *reason);
 nrc_err_t nrc_ps_wakeup_gpio_ext(uint8_t *reason);
 
 /**********************************************
- * @fn void nrc_ps_set_gpio_mask(uint32_t mask)
+ * @fn void nrc_ps_set_gpio_direction(uint32_t bitmask)
  *
  * @brief   Set the gpio direction mask in deep sleep
  *
@@ -225,11 +225,23 @@ void nrc_ps_set_gpio_out(uint32_t bitmask);
  *
  * @brief   Set the gpio pullup mask in deep sleep
  *
- * @param bitmask: set bitmask of GPIO pullup value, as bits 0-31 (pulldown:0, pullup:1)
+ * @param bitmask: set bitmask of GPIO pullup value, as bits 0-31 (floating:0, pullup:1)
  *
  * @return N/A
  ***********************************************/
 void nrc_ps_set_gpio_pullup(uint32_t bitmask);
+
+/**********************************************
+ * @fn void nrc_ps_set_gpio_preserve(uint32_t bitmask)
+ *
+ * @brief	Set the gpio preserve mask in deep sleep
+ *
+ * @param bitmask: set bitmask of GPIOs to preserve their current state during deep sleep,
+ *		   as bits 0-31 (apply configured mask:0, preserve current state:1)
+ *
+ * @return	N/A
+ ***********************************************/
+void nrc_ps_set_gpio_preserve(uint32_t bitmask);
 
 /***********************************************
  * @fn nrc_err_t nrc_ps_add_schedule(uint32_t timeout, bool net_init, scheduled_callback func);

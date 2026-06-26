@@ -353,7 +353,8 @@ void user_init(void)
 			/* Call wifi_station_dhcpc_start with vif set to 0 */
 			/* vif will be ignored by below call if the network mode is bridge */
 			/* API name is set to _station_, but it is applicable for AP as well */
-			wifi_station_dhcpc_start(0);
+			extern struct netif br_netif;
+			dhcp_start(&br_netif);
 		}
 
 		/* set DHCP server */

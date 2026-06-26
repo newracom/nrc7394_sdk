@@ -66,11 +66,8 @@ struct nrc_wpa;
 #define WLAN_ACTION_S1G_TWT_TEARDOWN		7
 #define WLAN_ACTION_S1G_TWT_INFO			11
 
-#if defined(INCLUDE_BD_SUPPORT)
 #define NRC_WPA_BD_HEADER_LENGTH	16
 #define NRC_WPA_BD_MAX_DATA_LENGTH	546
-#endif /* defined(INCLUDE_BD_SUPPORT) */
-
 
 extern uint8_t g_standalone_addr[6];
 
@@ -409,16 +406,17 @@ struct nrc_driver_event {
 	union wpa_event_data data;
 } STRUCT_PACKED;
 
-#if defined(INCLUDE_BD_SUPPORT_TARGET_VERSION)
-#define NRC_DRIVER_BD_MAX_CH_LIST		45
+/* Raised from 45 to 63 to accommodate the 18 US Op35/Op36 extended channels
+ * (12 BW_2M + 6 BW_4M) that are included as regular entries in the US BDF
+ * and read by wpa_driver_nrc_set_supp_ch_list().
+ */
+#define NRC_DRIVER_BD_MAX_CH_LIST		63
 struct wpa_bd_supp_param {
 	uint8_t num_ch;
 	uint8_t s1g_ch_index[NRC_DRIVER_BD_MAX_CH_LIST];
 	uint16_t nons1g_ch_freq[NRC_DRIVER_BD_MAX_CH_LIST];
 };
-#endif /* defined(INCLUDE_BD_SUPPORT_TARGET_VERSION) */
 
-#if defined(INCLUDE_BD_SUPPORT)
 struct nrc_wpa_bdf {
 	uint8_t	ver_major;
 	uint8_t	ver_minor;
@@ -430,7 +428,6 @@ struct nrc_wpa_bdf {
 
 	uint8_t data[];
 };
-#endif /* defined(INCLUDE_BD_SUPPORT) */
 
 struct nrc_app_event {
 	int8_t vif_id;
@@ -518,8 +515,18 @@ void nrc_set_route_timeout(uint32_t value);
 uint32_t nrc_get_route_timeout(void);
 void nrc_set_ap_dhcp_forward_block(bool value);
 bool nrc_get_ap_dhcp_forward_block(void);
+#if defined(INCLUDE_SA_QUERY_UNPROT_DISCONNECT)
+void nrc_set_sa_query_unprot(bool value);
+bool nrc_get_sa_query_unprot(void);
+#endif
+#if defined(INCLUDE_SA_QUERY_TEST_INJECT)
+void nrc_set_sa_query_noresp(bool value);
+bool nrc_get_sa_query_noresp(void);
+#endif
 void nrc_set_scan_max_interval(uint32_t interval);
 uint32_t nrc_get_scan_max_interval();
+bool nrc_set_filter_beacon_scan(int vif, bool value);
+bool nrc_get_filter_beacon_scan();
 void nrc_set_backoff_start_count(uint32_t count);
 uint32_t nrc_get_backoff_start_count();
 int generateRandomBackoff(int retry_count) ;

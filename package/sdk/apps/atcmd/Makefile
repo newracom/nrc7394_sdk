@@ -25,7 +25,8 @@ CSRCS += \
 	atcmd_param.c \
 	atcmd_basic.c \
 	atcmd_wifi.c \
-	atcmd_socket.c
+	atcmd_socket.c \
+	atcmd_retinfo.c
 
 ifeq ($(CONFIG_ATCMD_FOTA),y)
 CSRCS += \

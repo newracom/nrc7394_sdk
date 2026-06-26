@@ -10,9 +10,14 @@
 #include "protocol_11ah.h"
 #include "lmac_11ah.h"
 
-#if defined(INCLUDE_BD_SUPPORT_TARGET_VERSION)
 #define	MAX_AVAILABLE_HW_VERSION	2047
 #define	DEFAULT_HW_VERSION	65535
+
+#if defined(NRC7394) && !defined(LMAC_TEST) && !defined(INCLUDE_RF_NRC7292RFE) && defined(INCLUDE_LO_LEAKAGE_COMP)
+//RF Register for NRC7394
+#define RF_REG_DIGTOP_DPD_CTRL_SET 0x4004F6B4
+#define RF_REG_DIGTOP_TX_IQ_PARA_0 0x4004F6BC
+#define RF_REG_DIGTOP_TX_IQ_PARA_1 0x4004F6C0
 #endif
 
 /* Semaphore Definition */
@@ -21,6 +26,17 @@ enum {
     MODEM_SEMAPHORE_ISR         = 1,
     MODEM_SEMAPHORE_REC         = 2,
     MODEM_SEMAPHORE_REC_ISR     = 3,
+};
+
+enum {
+	MANUAL_MCS_GROUP = 0, //mcs for BC/MC frames
+	MANUAL_MCS_DHCP, 	//mcs for DHCP frames
+	MANUAL_MCS_NULL,	//mcs for NULL frames
+	MANUAL_MCS_MGMT,	//mcs for MGMT frames
+	MANUAL_MCS_EAPOL,	//mcs for EAPOL frames
+	MANUAL_MCS_ARP,	//mcs for ARP frames
+	MANUAL_MCS_PROBE_RESP,	//mcs for probe resp frame
+	MANUAL_MCS_MAX,	//mcs for ALL frames
 };
 
 typedef struct _CCA_RESULT_4M
@@ -80,8 +96,8 @@ typedef struct _CCA_RESULT_4M
 #define lmac_get_frequency(x)			get_frequency()
 #define lmac_set_mac80211_frequency(x, y)	set_mac80211_frequency(y)
 #define lmac_get_mac80211_frequency(x)		get_mac80211_frequency()
-#define lmac_set_phy_txgain(x, y)		set_phy_txgain(y)
-#define lmac_get_phy_txgain(x)			get_phy_txgain()
+#define lmac_set_phy_txgain(x, y)		set_phy_txgain(x, y)
+#define lmac_get_phy_txgain(x)			get_phy_txgain(x)
 #define lmac_set_phy_rxgain(x, y)		set_phy_rxgain(y)
 #define lmac_get_phy_rxgain(x)			get_phy_rxgain()
 #define lmac_set_country(x, y)			set_country(y)
@@ -118,21 +134,8 @@ typedef struct _CCA_RESULT_4M
 #define lmac_set_frag_threshold(x)             set_frag_threshold(x)
 #define lmac_get_frag_threshold()              get_frag_threshold()
 
-#define lmac_set_group_mcs(x)		set_group_mcs(x)
-#define lmac_get_group_mcs()		get_group_mcs()
-#define lmac_set_dhcp_mcs(x)		set_dhcp_mcs(x)
-#define lmac_get_dhcp_mcs()		get_dhcp_mcs()
-#define lmac_set_null_mcs(x)		set_null_mcs(x)
-#define lmac_get_null_mcs()		get_null_mcs()
-#define lmac_set_probe_resp_mcs(x)		set_probe_resp_mcs(x)
-#define lmac_get_probe_resp_mcs()		get_probe_resp_mcs()
-
-void set_group_mcs(int8_t mcs);
-
-int8_t get_group_mcs();
-
-void set_dhcp_mcs(int8_t mcs);
-int8_t get_dhcp_mcs();
+#define lmac_set_manual_mcs(x, y)		set_manual_mcs(x, y)
+#define lmac_get_manual_mcs(x)		get_manual_mcs(x)
 
 #else
 void        lmac_set_pv1(int vif_id, bool en);
@@ -294,9 +297,11 @@ bool 		get_sig_rx_ndp_ind (LMAC_RXHDR *rxhdr);
 void        lmac_set_bpn_register(uint8_t bpn);
 void        lmac_show_test_config_modem_recovery();
 #if defined(NRC7292)
-uint8_t     lmac_set_txpwr_resp_frame(uint8_t bandwidth);
+uint8_t     lmac_set_txpwr_resp_frame(int vif_id, uint8_t bandwidth);
+uint32_t    lmac_get_txpwr_resp_frame();
 #else
-void        lmac_set_txpwr_resp_frame(void);
+void        lmac_set_txpwr_resp_frame(int vif_id);
+uint32_t    lmac_get_txpwr_resp_frame();
 #endif
 uint32_t    lmac_get_idle_hook_count();
 #if defined (DEBUG_MAC_STATS)
@@ -316,11 +321,8 @@ void        lmac_set_rf_kill(bool kill);
 bool        lmac_get_bd_use();
 void        lmac_set_bd_use(bool bd_on);
 void lmac_auto_tx_gain_enable(bool enable);
-#if defined(INCLUDE_BD_SUPPORT)
-void lmac_tx_power_init(uint8_t ch_index, uint8_t* data);
-#else
-void lmac_tx_power_init();
-#endif /* defined(INCLUDE_BD_SUPPORT) */
+void lmac_tx_power_init(int vif_id, uint8_t ch_index, uint8_t* data);
+
 #if !defined(NRC7292)
 void lmac_set_rx_buffer_lookup(bool v);
 #endif /* !defined(NRC7292) */

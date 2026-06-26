@@ -43,6 +43,39 @@ struct mqtt_ret_info {
 ATTR_RETENTION_INFO struct mqtt_ret_info mqtt_ret_info;
 #endif
 
+#if defined(INCLUDE_MQTT_RECOVERY)
+static int mqtt_topic_bounded_len(const char *topic, int max_len)
+{
+	int i;
+
+	for (i = 0; i < max_len; i++) {
+		if (topic[i] == '\0') {
+			return i;
+		}
+	}
+
+	return max_len;
+}
+
+static int mqtt_retained_topic_is_valid(const char *topic, int max_len)
+{
+	int i;
+	int len = mqtt_topic_bounded_len(topic, max_len);
+
+	if (len <= 0 || len >= max_len) {
+		return 0;
+	}
+
+	for (i = 0; i < len; i++) {
+		if ((unsigned char)topic[i] < 0x20 || (unsigned char)topic[i] > 0x7e) {
+			return 0;
+		}
+	}
+
+	return 1;
+}
+#endif /* INCLUDE_MQTT_RECOVERY */
+
 static int MQTTUpdateSubscription(MQTTClient* c, const char* topicFilter, messageHandler messageHandler)
 {
     int rc = FAILURE;
@@ -65,6 +98,17 @@ static int MQTTUpdateSubscription(MQTTClient* c, const char* topicFilter, messag
         rc = SUCCESS;
     } else {
         for (i = 0; i < MAX_MQTT_RETENT_TOPICS; ++i) {
+            if (mqtt_ret_info.messageHandlers[i].fp &&
+                !mqtt_retained_topic_is_valid(
+                    mqtt_ret_info.messageHandlers[i].topicFilter,
+                    sizeof(mqtt_ret_info.messageHandlers[i].topicFilter))) {
+                mqtt_ret_info.messageHandlers[i].topicFilter[0] = '\0';
+                mqtt_ret_info.messageHandlers[i].fp = NULL;
+                nrc_usr_print("MQTT SUBS slot %d dropped (invalid retained topic)\n", i);
+            }
+        }
+
+        for (i = 0; i < MAX_MQTT_RETENT_TOPICS; ++i) {
             if (strncmp(mqtt_ret_info.messageHandlers[i].topicFilter, topicFilter,
                 sizeof(mqtt_ret_info.messageHandlers[i].topicFilter)) == 0 &&
                 mqtt_ret_info.messageHandlers[i].fp == messageHandler) {
@@ -75,9 +119,11 @@ static int MQTTUpdateSubscription(MQTTClient* c, const char* topicFilter, messag
         for (i = 0; i < MAX_MQTT_RETENT_TOPICS; ++i) {
             if (mqtt_ret_info.messageHandlers[i].fp == NULL) {
                 strncpy(mqtt_ret_info.messageHandlers[i].topicFilter, topicFilter,
-                    sizeof(mqtt_ret_info.messageHandlers[i].topicFilter));
+                    sizeof(mqtt_ret_info.messageHandlers[i].topicFilter) - 1);
+                mqtt_ret_info.messageHandlers[i].topicFilter[
+                    sizeof(mqtt_ret_info.messageHandlers[i].topicFilter) - 1] = '\0';
                 mqtt_ret_info.messageHandlers[i].fp = (void *) messageHandler;
-                nrc_usr_print("MQTT SUBS[%s] retented\n", topicFilter);
+//                nrc_usr_print("MQTT SUBS[%s] retented\n", topicFilter);
                 rc = SUCCESS;
                 break;
             }
@@ -115,6 +161,15 @@ static int MQTTRecoverSubscription(MQTTClient* c)
 
     for (int i = 0; i < MAX_MQTT_RETENT_TOPICS; ++i) {
         if (mqtt_ret_info.messageHandlers[i].fp) {
+            if (!mqtt_retained_topic_is_valid(
+                mqtt_ret_info.messageHandlers[i].topicFilter,
+                sizeof(mqtt_ret_info.messageHandlers[i].topicFilter))) {
+                mqtt_ret_info.messageHandlers[i].topicFilter[0] = '\0';
+                mqtt_ret_info.messageHandlers[i].fp = NULL;
+                nrc_usr_print("MQTT SUBS slot %d dropped (invalid retained topic)\n", i);
+                continue;
+            }
+
             if (!MQTTIsSubscribed(c, mqtt_ret_info.messageHandlers[i].topicFilter,
                 mqtt_ret_info.messageHandlers[i].fp)) {
                 rc = MQTTSetMessageHandler(c, mqtt_ret_info.messageHandlers[i].topicFilter,
@@ -140,7 +195,7 @@ static int MQTTUpdateConnection(MQTTClient* c)
 #if defined(INCLUDE_MQTT_RECOVERY)
     if (MQTTIsConnected(c)) {
         if (!mqtt_ret_info.isconnected) {
-            nrc_usr_print("MQTT connection retented\n");
+//            nrc_usr_print("MQTT connection retented\n");
         }
         mqtt_ret_info.ping_outstanding = c->ping_outstanding;
         mqtt_ret_info.isconnected = c->isconnected;
@@ -148,9 +203,6 @@ static int MQTTUpdateConnection(MQTTClient* c)
         mqtt_ret_info.keepAliveInterval = c->keepAliveInterval;
         mqtt_ret_info.next_packetid = c->next_packetid;
         mqtt_ret_info.command_timeout_ms = c->command_timeout_ms;
-		nrc_usr_print("%d %d %d %d %d %d \n",
-			c->ping_outstanding, c->isconnected, c->cleansession,
-			c->keepAliveInterval, c->next_packetid, c->command_timeout_ms);
     } else {
         if (mqtt_ret_info.isconnected) {
             nrc_usr_print("MQTT connection cleared\n");
@@ -161,9 +213,6 @@ static int MQTTUpdateConnection(MQTTClient* c)
         mqtt_ret_info.keepAliveInterval = 0;
         mqtt_ret_info.next_packetid = 1;
         mqtt_ret_info.command_timeout_ms = 0;
-		nrc_usr_print("%d %d %d %d %d %d \n",
-			c->ping_outstanding, c->isconnected, c->cleansession,
-			c->keepAliveInterval, c->next_packetid, c->command_timeout_ms);
     }
     rc = SUCCESS;
 #endif /* INCLUDE_MQTT_RECOVERY */
@@ -188,13 +237,15 @@ static int MQTTRecoverConnection(MQTTClient* c)
         c->keepAliveInterval = mqtt_ret_info.keepAliveInterval;
         c->next_packetid = mqtt_ret_info.next_packetid;
         c->command_timeout_ms = mqtt_ret_info.command_timeout_ms;
-        TimerCountdown(&c->last_sent, c->keepAliveInterval);
-        TimerCountdown(&c->last_received, c->keepAliveInterval);
+        /*
+         * After deep-sleep recovery, we do not have valid elapsed-time history for
+         * last_sent/last_received. Arming full keepalive here can defer ping too long
+         * across repeated recoveries and trigger broker timeout. Force near-term check.
+         */
+        TimerCountdown(&c->last_sent, 1);
+        TimerCountdown(&c->last_received, 1);
         rc = SUCCESS;
-        nrc_usr_print("\nMQTT connection recovered\n");
-		nrc_usr_print("%d %d %d %d %d %d \n",
-			c->ping_outstanding, c->isconnected, c->cleansession,
-			c->keepAliveInterval, c->next_packetid,	c->command_timeout_ms);
+        nrc_usr_print("MQTT connection recovered\n");
     }
 #endif /* INCLUDE_MQTT_RECOVERY */
 
@@ -600,6 +651,16 @@ int MQTTStartTask(MQTTClient* client)
 		nrc_usr_print("[%s] MQTTRecoverConnection fail\n", __func__);
 
 	return ThreadStart(&client->thread, &MQTTRun, client);
+}
+
+int MQTTStopTask(MQTTClient* client)
+{
+	if (client == NULL || client->thread.task == NULL)
+		return FAILURE;
+
+	vTaskDelete(client->thread.task);
+	client->thread.task = NULL;
+	return SUCCESS;
 }
 #endif
 

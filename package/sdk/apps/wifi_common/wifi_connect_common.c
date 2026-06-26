@@ -151,54 +151,26 @@ static void wifi_event_handler(int vif, tWIFI_EVENT_ID event, int data_len, void
 
 			break;
 		case WIFI_EVT_AP_STA_CONNECTED:
+			{
+				STA_INFO sta;
+				memset(&sta, 0, sizeof(STA_INFO));
 #if !defined(INCLUDE_MEASURE_AIRTIME)
-			nrc_usr_print("[%s] Receive STA CONNECT Event ("MACSTR")\n",
-				__func__, MAC2STR((uint8_t *)data));
+				nrc_usr_print("[%s] Receive STA CONNECT Event ("MACSTR")\n",
+					__func__, MAC2STR((uint8_t *)data));
 #endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
-			/* Check STA Info */
-			STA_INFO *sta = nrc_mem_malloc(sizeof(STA_INFO));
-			if (sta) {
-				nrc_wifi_softap_get_sta_by_addr(vif, (uint8_t *)data, sta);
-				nrc_usr_print("STA  - state:%d aid:%d addr:"MACSTR" rssi:%d snr:%u\n",
-					sta->state, sta->aid, MAC2STR(sta->addr), sta->rssi, sta->snr);
-				nrc_mem_free(sta);
+
+				/* Check STA Info */
+				if (nrc_wifi_softap_get_sta_by_addr(vif, (uint8_t *)data, &sta) == WIFI_SUCCESS) {
+					nrc_usr_print("STA - state:%d aid:%d addr:"MACSTR" rssi:%d snr:%u\n",
+						sta.state, sta.aid, MAC2STR(sta.addr), sta.rssi, sta.snr);
+				}
+				break;
 			}
-			break;
 		case WIFI_EVT_AP_STA_DISCONNECTED:
 #if !defined(INCLUDE_MEASURE_AIRTIME)
 			nrc_usr_print("[%s] Receive STA DISCONNECT Event ("MACSTR")\n",
 				__func__, MAC2STR((uint8_t *)data));
 #endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
-#if 0 //for api test. need to remove
-			/* Check remained STA info */
-			STA_LIST *sta_list = nrc_mem_malloc(sizeof(STA_LIST));
-			tWIFI_STATUS ret;
-
-			if (sta_list) {
-				ret = nrc_wifi_softap_get_sta_list(0, sta_list, sizeof(STA_LIST));
-				if (ret != WIFI_SUCCESS) {
-					if(ret == WIFI_FAIL_SOFTAP_NOSTA)
-						nrc_usr_print("[%s] No station is connected\n", __func__);
-					else
-						nrc_usr_print("[%s] Fail to get sta info\n", __func__);
-					nrc_mem_free(sta_list);
-					return;
-				}
-				nrc_usr_print("[%s] number of sta:%d (max_sta:%d size:%d)\n", __func__,
-					sta_list->total_num, MAX_STA_CONN_NUM, sizeof(STA_LIST));
-				for (int i=0; i < sta_list->total_num; i++) {
-					if (sta_list->sta[i].aid && sta_list->sta[i].state == WIFI_STA_ASSOC) {
-						nrc_usr_print("STA[%d] - state:%d aid:%d addr:"MACSTR" rssi:%d snr:%u\n",
-							i, sta_list->sta[i].state, sta_list->sta[i].aid, MAC2STR(sta_list->sta[i].addr),
-							sta_list->sta[i].rssi,sta_list->sta[i].snr);
-					}
-				}
-			} else {
-				nrc_usr_print("[%s] Fail to alloc mem\n", __func__);
-				return;
-			}
-			nrc_mem_free(sta_list);
-#endif
 			break;
 		case WIFI_EVT_VENDOR_IE:
 #if !defined(INCLUDE_MEASURE_AIRTIME)
@@ -220,14 +192,102 @@ static void wifi_event_handler(int vif, tWIFI_EVENT_ID event, int data_len, void
 static bool init_flag[NRC_WPA_NUM_INTERFACES] = {false, false};
 tWIFI_STATUS wifi_init_with_vif(int vif, WIFI_CONFIG *param)
 {
-	uint8_t txpower = 0, txpower_type = 0;
-
 	if (init_flag[vif]) {
 		return WIFI_SUCCESS;
 	}
 
+	if (nrc_wifi_get_state(vif) == WIFI_STATE_CONNECTED ||
+		nrc_wifi_get_state(vif) >= WIFI_STATE_SOFTAP_START) {
+		A("[%s] Wi-Fi already connected\n", __func__);
+		init_flag[vif] = true;
+		return WIFI_SUCCESS;
+	}
+
+	switch(param->device_mode) {
+		case WIFI_MODE_STATION:
+		case WIFI_MODE_AP:
+			break;
+
+		default:
+			return WIFI_FAIL_INIT;
+	}
+
+	if (nrc_wifi_add_network(vif) < 0) {
+		nrc_usr_print("[%s] Fail to init \n", __func__);
+		return WIFI_FAIL_INIT;
+	}
+
+	/* Set Country Code */
+	if(nrc_wifi_set_country(vif, nrc_wifi_country_from_string((char *)param->country)) != WIFI_SUCCESS) {
+		nrc_usr_print("[%s] Fail to set Country\n", __func__);
+		return WIFI_FAIL;
+	}
+
+	/* Set Device Mode */
+	if (nrc_wifi_set_device_mode(vif, param->device_mode) != WIFI_SUCCESS) {
+		nrc_usr_print("[%s] Fail to set Device Mode\n", __func__);
+		return WIFI_FAIL;
+	}
+
+	if(param->device_mode == WIFI_MODE_STATION) {
+		if(param->scan_freq_num > 0){
+			if (param->bw > 0) {
+				if (nrc_wifi_set_scan_freq_bw(vif, param->scan_freq_list, param->scan_freq_num, param->bw) != WIFI_SUCCESS) {
+					nrc_usr_print("[%s] Fail to set Scan Freq\n", __func__);
+					return WIFI_FAIL;
+				}
+			} else {
+				if (nrc_wifi_set_scan_freq(vif, param->scan_freq_list, param->scan_freq_num) != WIFI_SUCCESS) {
+					nrc_usr_print("[%s] Fail to set Scan Freq\n", __func__);
+					return WIFI_FAIL;
+				}
+			}
+		}
+
+		if (param->scan_period > 0) {
+			if(nrc_wifi_set_scan_dwell_time(vif, param->scan_period) != WIFI_SUCCESS) {
+				nrc_usr_print("[%s] Fail to set scan period %u ms\n", __func__, param->scan_period);
+				return WIFI_FAIL;
+			} else {
+				nrc_usr_print("[%s] Success to set scan period %u ms\n", __func__,param->scan_period);
+			}
+		}
+	}
+
+	/* Set rate control */
+	if(nrc_wifi_set_rate_control(vif, !!param->rc) != WIFI_SUCCESS) {
+		nrc_usr_print("[%s] Fail to set rate control\n", __func__);
+		return WIFI_FAIL;
+	}
+
+	/* Set CCA threshold */
+	if(nrc_wifi_set_cca_threshold(vif, param->cca_thres) != WIFI_SUCCESS) {
+		nrc_usr_print("[%s] Fail to set cca threshold\n", __func__);
+		return WIFI_FAIL;
+	}
+
 	/* Register Wi-Fi Event Handler */
 	if (nrc_wifi_register_event_handler(vif, wifi_event_handler) != WIFI_SUCCESS) {
+		return WIFI_FAIL;
+	}
+
+	if (!init_flag[0] && !init_flag[1]) {
+		/* Set default mcs */
+		if(nrc_wifi_set_mcs (param->mcs) != WIFI_SUCCESS) {
+			nrc_usr_print("[%s] Fail to set mcs\n", __func__);
+			return WIFI_FAIL;
+		}
+
+		/* Set guard interval */
+		if(nrc_wifi_set_gi(param->gi) != WIFI_SUCCESS) {
+			nrc_usr_print("[%s] Fail to set guard interval\n", __func__);
+			return WIFI_FAIL;
+		}
+	}
+
+	/* Set TX Power and types */
+	if(nrc_wifi_set_tx_power(vif, param->tx_power,param->tx_power_type) != WIFI_SUCCESS) {
+		nrc_usr_print("[%s] Fail set TX Power\n", __func__);
 		return WIFI_FAIL;
 	}
 
@@ -254,76 +314,6 @@ tWIFI_STATUS wifi_init_with_vif(int vif, WIFI_CONFIG *param)
 		netif_ip6_addr_set_state(nrc_netif[vif], index, IP6_ADDR_PREFERRED);
 	}
 #endif
-
-	if (nrc_wifi_get_state(vif) == WIFI_STATE_CONNECTED ||
-		nrc_wifi_get_state(vif) >= WIFI_STATE_SOFTAP_START) {
-		A("[%s] Wi-Fi already connected\n", __func__);
-		init_flag[vif] = true;
-		return WIFI_SUCCESS;
-	}
-
-	/* Set Country Code */
-	if(nrc_wifi_set_country(vif, nrc_wifi_country_from_string((char *)param->country)) != WIFI_SUCCESS) {
-		nrc_usr_print("[%s] Fail to set Country\n", __func__);
-		return WIFI_FAIL;
-	}
-
-	/* Set TX Power and types */
-	txpower = param->tx_power;
-	txpower_type = param->tx_power_type;
-
-	if(nrc_wifi_set_tx_power(txpower,txpower_type) != WIFI_SUCCESS)
-	{
-		nrc_usr_print("[%s] Fail set TX Power\n", __func__);
-		return WIFI_FAIL;
-	}
-
-	if (nrc_wifi_add_network(vif) < 0) {
-		nrc_usr_print("[%s] Fail to init \n", __func__);
-		return WIFI_FAIL_INIT;
-	}
-
-	/* Set Device Mode */
-	if (nrc_wifi_set_device_mode(vif, param->device_mode) != WIFI_SUCCESS) {
-		nrc_usr_print("[%s] Fail to set Device Mode\n", __func__);
-		return WIFI_FAIL;
-	}
-
-	if(param->scan_freq_num > 0){
-		if (nrc_wifi_set_scan_freq(vif, param->scan_freq_list, param->scan_freq_num) != WIFI_SUCCESS) {
-			nrc_usr_print("[%s] Fail to set Scan Freq\n", __func__);
-			return WIFI_FAIL;
-		}
-	}
-
-	if(nrc_wifi_set_rate_control(vif, (bool)param->rc) != WIFI_SUCCESS) {
-		nrc_usr_print("[%s] Fail to set rate control\n", __func__);
-		return WIFI_FAIL;
-	}
-
-	if(nrc_wifi_set_mcs (param->mcs) != WIFI_SUCCESS) {
-		nrc_usr_print("[%s] Fail to set mcs\n", __func__);
-		return WIFI_FAIL;
-	}
-
-	if(nrc_wifi_set_gi(param->gi) != WIFI_SUCCESS) {
-		nrc_usr_print("[%s] Fail to set guard interval\n", __func__);
-		return WIFI_FAIL;
-	}
-
-	if (param->scan_period > 0) {
-		if(nrc_wifi_set_scan_dwell_time(vif, param->scan_period) != WIFI_SUCCESS) {
-			nrc_usr_print("[%s] Fail to set scan period %u ms\n", __func__, param->scan_period);
-			return WIFI_FAIL;
-		} else {
-			nrc_usr_print("[%s] Success to set scan period %u ms\n", __func__,param->scan_period);
-		}
-	}
-
-	if(nrc_wifi_set_cca_threshold(vif, param->cca_thres) != WIFI_SUCCESS) {
-		nrc_usr_print("[%s] Fail to set cca threshold\n", __func__);
-		return WIFI_FAIL;
-	}
 
 	init_flag[vif] = true;
 
@@ -352,13 +342,13 @@ tWIFI_STATUS wifi_connect_with_vif(int vif, WIFI_CONFIG *param)
 		//enable or disable fast connect. (if disabled, remove fast connect info in flash only when exit)
 		if (nrc_wifi_get_recovered_by_fast_connect(vif) &&
 			(param->fast_connect == WIFI_DISABLE_FAST_CONNECT)) {
-			CPA("[%s] Wi-Fi already connected by fc but fc is disabled now\n", __func__);
+			nrc_usr_print("[%s] Wi-Fi already connected by fc but fc is disabled now\n", __func__);
 			nrc_wifi_set_fast_connect(false);
 			if (nrc_wifi_disconnect(0, 5000) != WIFI_SUCCESS) {
 				nrc_usr_print ("[%s] Fail for Wi-Fi disconnection \n", __func__);
 			}
 		} else {
-			CPA("[%s] Wi-Fi already connected\n", __func__);
+			nrc_usr_print("[%s] Wi-Fi already connected\n", __func__);
 			return WIFI_SUCCESS;
 		}
 	}
@@ -387,7 +377,10 @@ tWIFI_STATUS wifi_connect_with_vif(int vif, WIFI_CONFIG *param)
 
 	/* Set Non-S1G channel */
 	if(param->channel != 0) {
-		status = nrc_wifi_set_channel_freq(vif, param->channel);
+		if (param->bw > 0)
+			status = nrc_wifi_set_channel_freq_bw(vif, param->channel, param->bw);
+		else
+			status = nrc_wifi_set_channel_freq(vif, param->channel);
 		if(status != WIFI_SUCCESS) {
 			nrc_usr_print("[%s] Fail to set S1G channel %d\n", __func__, status);
 			return WIFI_FAIL;
@@ -497,6 +490,15 @@ tWIFI_STATUS wifi_connect_with_vif(int vif, WIFI_CONFIG *param)
 		}
 		nrc_usr_print("[%s] Ready to Push Button\n", __func__);
 		return WIFI_SUCCESS;
+	}
+
+	/* STA: enable 1M suppression before connecting; effective once associated to a 4/2 AP */
+	if (param->bw_4m_2m_prim_loc > -1) {
+		if (nrc_wifi_set_bw_4m_2m_prim_loc(param->bw_4m_2m_prim_loc) != WIFI_SUCCESS) {
+			nrc_usr_print("[%s] Fail to set bw_4m_2m_prim_loc\n", __func__);
+			return WIFI_FAIL;
+		}
+		nrc_usr_print("[%s] Set bw_4m_2m_prim_loc %d (STA, no 1M on 4/2 AP)\n", __func__, param->bw_4m_2m_prim_loc);
 	}
 
 	status = nrc_wifi_connect(vif, param->conn_timeout);
@@ -611,6 +613,26 @@ tWIFI_STATUS wifi_start_softap_with_vif(int vif, WIFI_CONFIG *param)
 			return WIFI_FAIL;
 		} else {
 			nrc_usr_print("[%s] Set fast connect\n", __func__);
+		}
+	}
+
+	if (param->loc_1m_prim_ch > -1) {
+		if (param->bw == WIFI_1M || param->loc_1m_prim_ch > 3 || (param->bw == WIFI_2M && param->loc_1m_prim_ch > 2) ||
+			nrc_wifi_softap_set_loc_1m_prim_ch(param->loc_1m_prim_ch ) != WIFI_SUCCESS) {
+			nrc_usr_print("[%s] Fail to set location of 1m primary channel\n", __func__);
+			return WIFI_FAIL;
+		} else {
+			nrc_usr_print("[%s] Set location of 1m primary ch %d\n", __func__, param->loc_1m_prim_ch);
+		}
+	}
+
+	if (param->bw_4m_2m_prim_loc > -1) {
+		if (param->bw != WIFI_4M ||
+			nrc_wifi_set_bw_4m_2m_prim_loc(param->bw_4m_2m_prim_loc) != WIFI_SUCCESS) {
+			nrc_usr_print("[%s] Fail to set bw_4m_2m_prim_loc (needs 4M BW)\n", __func__);
+			return WIFI_FAIL;
+		} else {
+			nrc_usr_print("[%s] Set bw_4m_2m_prim_loc %d (4/2, no 1M)\n", __func__, param->bw_4m_2m_prim_loc);
 		}
 	}
 

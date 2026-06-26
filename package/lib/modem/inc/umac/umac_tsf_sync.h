@@ -12,4 +12,8 @@ uint32_t umac_rx_tsf_last_beacon();
 uint32_t umac_get_next_beacon(int vif_id);
 bool umac_rx_tsf_sync_long_beacon();
 
+#if defined(INCLUDE_MONITOR_ABNORMAL_TSF)
+void umac_init_monitor_abnormal_tsf(int vif_id);
+#endif /* INCLUDE_MONITOR_ABNORMAL_TSF */
+
 #endif /* UMAC_TSF_SYNC_H */

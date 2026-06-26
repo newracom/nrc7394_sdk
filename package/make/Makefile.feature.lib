@@ -276,6 +276,23 @@ ifeq ($(CONFIG_ZLIB), y)
 	DEFINE	+= -DSUPPORT_ZLIB
 endif
 
+#// --------------------------------------------------
+#// minizip-ng (ZIP read/write with WinZip AES + ZipCrypto support)
+#// Requires CONFIG_ZLIB=y and CONFIG_MBEDTLS=y
+#// --------------------------------------------------
+MINIZIP_NG_ROOT = $(LIB_PATH)/minizip-ng
+
+ifeq ($(CONFIG_MINIZIP), y)
+	CONFIG_MINIZIP_ZIPCRYPTO ?= y
+	CONFIG_MINIZIP_WZAES     ?= y
+	include $(MINIZIP_NG_ROOT)/module.mk
+	INCLUDE	+= -I$(MBEDTLS_BASE)/include
+	DEFINE	+= -DSUPPORT_MINIZIP
+	DEFINE	+= -DZLIB_COMPAT=1
+	DEFINE	+= -DMZ_EMBEDDED
+	DEFINE	+= -DZ_PREFIX
+endif
+
 #// WEBSOCKET_CLIENT
 #// --------------------------------------------------
 ifeq ($(CONFIG_WEBSOCKET_CLIENT), y)
@@ -298,6 +315,7 @@ endif
 #// --------------------------------------------------
 ifeq ($(CONFIG_FATFS), y)
 	FATFS_BASE = $(LIB_PATH)/fatfs
+	DEFINE	+= -DSUPPORT_FATFS
 	include $(FATFS_BASE)/module.mk
 endif
 
@@ -306,13 +324,45 @@ endif
 #// --------------------------------------------------
 ifeq ($(CONFIG_DISKIO), y)
 	DISKIO_BASE = $(LIB_PATH)/diskio
+	DEFINE	+= -DSUPPORT_DISKIO
 	include $(DISKIO_BASE)/module.mk
 endif
 
 #// --------------------------------------------------
 #// LittleFS
 #// --------------------------------------------------
+LITTLEFS_BASE = $(LIB_PATH)/littlefs
+INCLUDE += -I$(LITTLEFS_BASE) -I$(LITTLEFS_BASE)/port
 ifeq ($(CONFIG_LITTLEFS), y)
-        LITTLEFS_BASE = $(LIB_PATH)/littlefs
+        DEFINE	+= -DSUPPORT_LFS
+        DEFINE	+= -DLFS_THREADSAFE
         include $(LITTLEFS_BASE)/module.mk
+endif
+
+#// --------------------------------------------------
+#// LIB
+#// nanopb
+#// --------------------------------------------------
+ifeq ($(CONFIG_NANOPB), y)
+	DEFINE	+= -DSUPPORT_NANOPB
+	NANOPB_BASE = $(LIB_PATH)/nanopb
+	include $(NANOPB_BASE)/module.mk
+endif
+
+#// --------------------------------------------------
+#// LIB
+#// SC16IS750
+#// --------------------------------------------------
+ifeq ($(CONFIG_SC16IS750), y)
+	SC16IS750_BASE = $(LIB_PATH)/sc16is750
+	include $(SC16IS750_BASE)/module.mk
+endif
+
+#// --------------------------------------------------
+#// iperf3
+#// --------------------------------------------------
+IPERF3_ROOT    = $(LIB_PATH)/iperf3
+
+ifeq ($(CONFIG_IPERF3), y)
+	include $(IPERF3_ROOT)/module.mk
 endif

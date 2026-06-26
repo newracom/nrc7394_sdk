@@ -254,7 +254,11 @@ dhcp_event_disable (struct netif *netif)
 {
 	struct dhcp *dhcp = netif_dhcp_data(netif);
 
-	LWIP_ERROR("dhcp_event_disable: dhcp != NULL", (dhcp != NULL), return;);
+	if (dhcp == NULL) {
+		LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE,
+				("dhcp_event_disable: dhcp == NULL\n"));
+		return;
+	}
 
 	LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("dhcp_event_disable()\n"));
 

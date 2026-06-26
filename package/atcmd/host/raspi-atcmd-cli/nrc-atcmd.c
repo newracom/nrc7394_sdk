@@ -78,7 +78,7 @@ static struct
 
 	.ret =
 	{
-		.val = 1,
+		.val = ATCMD_RET_NONE,
 		.mutex = PTHREAD_MUTEX_INITIALIZER,
 		.cond  = PTHREAD_COND_INITIALIZER,
 	},
@@ -158,11 +158,11 @@ void nrc_atcmd_set_ready (bool ready)
 	g_atcmd_info.ready = ready;
 }
 
-static void nrc_atcmd_init_return (void)
+static void nrc_atcmd_init_return (enum ATCMD_RET_TYPE ret)
 {
 	pthread_mutex_lock(&g_atcmd_info.ret.mutex);
 
-	g_atcmd_info.ret.val = ATCMD_RET_NONE;
+	g_atcmd_info.ret.val = ret;
 
 	pthread_mutex_unlock(&g_atcmd_info.ret.mutex);
 }
@@ -192,14 +192,27 @@ static void nrc_atcmd_set_return (int ret)
 
 static void nrc_atcmd_wait_return (char *cmd)
 {
+	static bool fw_update = false;
 	uint8_t timeout = 0;
 	int ret = 0;
 
 	if (strcmp(cmd, "ATZ\r\n") == 0)
 	{
 		nrc_atcmd_set_ready(false);
-		timeout = 5;
+
+		/*
+		 * ATZ command is used to reset the module, so host application should
+		 * wait for a longer time to receive the response from the module. 
+		 * The default timeout is 5 seconds, but it will be set to 20 seconds 
+		 * for firmware update.
+		 */
+		timeout = fw_update ? 20 : 5;
+		fw_update = false;
+
+		log_info("WAIT: timeout %d sec\n", timeout);
 	}
+	else if (strcmp(cmd, "AT+FWUPDATE\r\n") == 0)
+		fw_update = true;
 	else if (strlen(cmd) > 8 && memcmp(cmd, "AT+UART=", 8) == 0)
 		timeout = 1;
 	else if (strlen(cmd) > 14 && memcmp(cmd, "AT+WDEEPSLEEP=", 14) == 0)
@@ -317,7 +330,7 @@ int nrc_atcmd_send_cmd (const char *fmt, ...)
 
 	len += snprintf(cmd + len, sizeof(cmd) - len, "\r\n");
 
-	nrc_atcmd_init_return();
+	nrc_atcmd_init_return(ATCMD_RET_WAIT);
 
 	ret = nrc_atcmd_send(cmd, len);
 	if (ret < 0)
@@ -328,6 +341,8 @@ int nrc_atcmd_send_cmd (const char *fmt, ...)
 	nrc_atcmd_wait_return(cmd);
 
 	ret = nrc_atcmd_get_return();
+
+	nrc_atcmd_init_return(ATCMD_RET_NONE);
 
 	return ret;
 }
@@ -382,6 +397,7 @@ static atcmd_rxd_t *nrc_atcmd_alloc_rxd (enum ATCMD_DATA_TYPE type)
 
 static int nrc_atcmd_recv_boot (char *msg, int len)
 {
+	bool event = true;
 	int reason = 0;
 
 	if (!msg || !len)
@@ -395,10 +411,6 @@ static int nrc_atcmd_recv_boot (char *msg, int len)
 		len -= 6;
 	}
 
-	nrc_atcmd_set_return(ATCMD_RET_NONE);
-
-	nrc_atcmd_set_ready(true);
-
 	if (strstr(msg, "POR"))
 		reason |= ATCMD_BOOT_POR;
 	
@@ -410,11 +422,23 @@ static int nrc_atcmd_recv_boot (char *msg, int len)
 	
 	if (strstr(msg, "HSPI"))
 		reason |= ATCMD_BOOT_HSPI;
+
+/*	log_debug("BOOT: ready=%d ret=%d reason=0x%X (%s)\n", 
+			nrc_atcmd_get_ready(), nrc_atcmd_get_return(), reason, msg); */
+
+	if (!nrc_atcmd_get_ready())
+	{
+		nrc_atcmd_set_ready(true);
+		nrc_atcmd_set_return(ATCMD_RET_NONE);
+	}
+	else if (nrc_atcmd_get_return() == ATCMD_RET_WAIT)
+		event = false;
 	
-/*	log_debug("reason: 0x%X (%s)\n", reason, msg); */
+/*	log_debug("BOOT: ready=%d ret=%d event=%d\n", 
+			nrc_atcmd_get_ready(), nrc_atcmd_get_return(), event); */
 
 	if (g_atcmd_info.cb.boot)
-		g_atcmd_info.cb.boot(reason);
+		g_atcmd_info.cb.boot(reason, event);
 
 	return 0;
 }

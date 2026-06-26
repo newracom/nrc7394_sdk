@@ -105,7 +105,11 @@ static _hif_uart_t g_hif_uart =
 {
 	.channel = -1,
 	.baudrate = -1,
-	.hfc = false
+	.data_bits = UART_DB8,
+	.stop_bits = UART_SB1,
+	.parity = UART_PB_NONE,
+	.hfc = UART_HFC_DISABLE,
+	.hfc_rx_irq = false
 };
 
 static void _hif_uart_init_info (_hif_uart_t *info)
@@ -116,6 +120,7 @@ static void _hif_uart_init_info (_hif_uart_t *info)
 	info->stop_bits = UART_SB1;
 	info->parity = UART_PB_NONE;
 	info->hfc = UART_HFC_DISABLE;
+	info->hfc_rx_irq = false;
 }
 
 static void _hif_uart_set_info (_hif_uart_t *info)
@@ -132,8 +137,106 @@ void _hif_uart_get_info (_hif_uart_t *info)
 
 /*********************************************************************************************/
 
+static struct
+{
+	SemaphoreHandle_t rx;
+	SemaphoreHandle_t tx;
+} g_hif_uart_lock = 
+{
+	.rx = NULL,
+	.tx = NULL
+};
+
+static bool _hif_uart_rx_lock (void)
+{
+	const int timeout_msec = 1000;
+
+	if (!g_hif_uart_lock.rx)
+	{
+		g_hif_uart_lock.rx = xSemaphoreCreateMutex();
+		ASSERT(g_hif_uart_lock.rx);
+	}
+
+	if (!xSemaphoreTake(g_hif_uart_lock.rx, pdMS_TO_TICKS(timeout_msec)))
+	{
+		_hif_error("timeout, %dms", timeout_msec);
+		return false;
+	}
+
+	return true;
+}
+
+static void _hif_uart_rx_unlock (void)
+{
+	ASSERT(g_hif_uart_lock.rx);
+		
+	if (!xSemaphoreGive(g_hif_uart_lock.rx))
+		_hif_error("xSemaphoreGive() failed");
+}
+
+static bool _hif_uart_tx_lock (void)
+{
+	const int timeout_msec = 1000;
+
+	if (!g_hif_uart_lock.tx)
+	{
+		g_hif_uart_lock.tx = xSemaphoreCreateMutex();
+		ASSERT(g_hif_uart_lock.tx);
+	}
+
+	if (!xSemaphoreTake(g_hif_uart_lock.tx, pdMS_TO_TICKS(timeout_msec)))
+	{
+		_hif_error("timeout, %dms", timeout_msec);
+		return false;
+	}
+
+	return true;
+}
+
+static void _hif_uart_tx_unlock (void)
+{
+	ASSERT(g_hif_uart_lock.tx);
+		
+	if (!xSemaphoreGive(g_hif_uart_lock.tx))
+		_hif_error("xSemaphoreGive() failed");
+}
+
+static bool _hif_uart_lock (void)
+{
+	_hif_info("UART Lock");
+
+	if (_hif_uart_rx_lock())
+	{
+		if (_hif_uart_tx_lock())
+			return true;
+
+		_hif_uart_rx_unlock();
+	}
+
+	return false;
+}
+
+static void _hif_uart_unlock (void)
+{
+	_hif_info("UART Unlock");
+
+	_hif_uart_rx_unlock();
+	_hif_uart_tx_unlock();
+}
+
+/*********************************************************************************************/
+
 static _hif_fifo_t *g_hif_uart_rx_fifo = NULL;
 static _hif_fifo_t *g_hif_uart_tx_fifo = NULL;
+
+static void _hif_uart_fifo_reset (void)
+{
+	if (g_hif_uart_rx_fifo)
+		_hif_fifo_reset(g_hif_uart_rx_fifo);
+
+	if (g_hif_uart_tx_fifo)
+		_hif_fifo_reset(g_hif_uart_tx_fifo);
+}
 
 static void _hif_uart_fifo_delete (void)
 {
@@ -491,7 +594,7 @@ static int _hif_uart_channel_to_vector (int channel)
 /*********************************************************************************************/
 
 #if 0
-int _hif_uart_getc (char *data)
+static int _hif_uart_getc (char *data)
 {
 	if (g_hif_uart.channel < 0)
 		return -1;
@@ -512,7 +615,7 @@ int _hif_uart_getc (char *data)
 	return 0;
 }
 
-int _hif_uart_putc (char data)
+static int _hif_uart_putc (char data)
 {
 	if (g_hif_uart.channel < 0)
 		return -1;
@@ -534,7 +637,7 @@ int _hif_uart_putc (char data)
 }
 #endif
 
-int _hif_uart_read (char *buf, int len)
+static int _hif_uart_read (char *buf, int len)
 {
 	int rx_cnt = 0;
 
@@ -571,7 +674,7 @@ int _hif_uart_read (char *buf, int len)
 	return rx_cnt;
 }
 
-int _hif_uart_write (char *buf, int len)
+static int _hif_uart_write (char *buf, int len)
 {
 	int tx_cnt = 0;
 
@@ -723,7 +826,7 @@ static int _hif_uart_pin_enable(int channel, enum uart_hardware_flow_control hfc
 	int8_t cts = uart_pin->cts;
 	int uio_sel_uart = UIO_SEL_UART0 + channel;
 
-	// Validate TX/RX pins
+	/* Validate TX/RX pins */
 	if (tx == -1 || rx == -1) {
 		_hif_info("Invalid UART pins: TX:%d RX:%d", tx, rx);
 		return -1;
@@ -746,17 +849,17 @@ static int _hif_uart_pin_enable(int channel, enum uart_hardware_flow_control hfc
 	}
 #endif
 
-	// Retrieve current GPIO and UIO settings
+	/* Retrieve current GPIO and UIO settings */
 	nrc_gpio_get_alt(&gpio);
 	nrc_gpio_get_uio_sel(uio_sel_uart, &uio);
 	_hif_uart_pin_info("GPIO_ALT0: 0x%08X, UIO_SEL_UART%d: 0x%08X\n", gpio.word, channel, uio.word);
 
-	// Configure TX/RX pins
+	/* Configure TX/RX pins */
 	gpio.word |= (1 << tx) | (1 << rx);
 	uio.bit.sel7_0 = tx;
 	uio.bit.sel15_8 = rx;
 
-	// Configure RTS/CTS if hardware flow control is enabled
+	/* Configure RTS/CTS if hardware flow control is enabled */
 	if (hfc) {
 		if (rts == -1 || cts == -1) {
 			_hif_info("Invalid UART pins: RTS:%d CTS:%d", rts, cts);
@@ -770,16 +873,16 @@ static int _hif_uart_pin_enable(int channel, enum uart_hardware_flow_control hfc
 		uio.bit.sel31_24 = 0xFF;
 	}
 
-	// Apply updated settings
+	/* Apply the updated settings */ 
 	nrc_gpio_set_alt(&gpio);
 	nrc_gpio_set_uio_sel(uio_sel_uart, &uio);
 
-	// Enable RX pull-up
+	/* Enable RX pull-up */
 	nrc_gpio_get_pullup(&pd_pullup);
 	pd_pullup.word |= (1 << rx);
 	nrc_gpio_config_pullup(&pd_pullup);
 
-	// Log final GPIO and UIO state
+	/* Retrieve the updated GPIO and UIO settings */ 
 	nrc_gpio_get_alt(&gpio);
 	nrc_gpio_get_uio_sel(uio_sel_uart, &uio);
 	_hif_uart_pin_info("GPIO_ALT0: 0x%08X, UIO_SEL_UART%d: 0x%08X\n", gpio.word, channel, uio.word);
@@ -790,28 +893,32 @@ static int _hif_uart_pin_enable(int channel, enum uart_hardware_flow_control hfc
 
 static void _hif_uart_pin_disable (int channel)
 {
-	const _hif_uart_pin_t *uart_pin = &g_hif_uart_pin[channel];
+	int uio_sel_uart = UIO_SEL_UART0 + channel;
+	int8_t *uart_pins = (int8_t *)&g_hif_uart_pin[channel];
 	gpio_io_t gpio;
 	uio_sel_t uio;
-	int uio_sel_uart = UIO_SEL_UART0 + channel;
+	int i;
 
-	// Retrieve current GPIO and UIO settings
+	/* Retrieve current GPIO and UIO settings */
 	nrc_gpio_get_alt(&gpio);
 	nrc_gpio_get_uio_sel(uio_sel_uart, &uio);
 	_hif_uart_pin_info("GPIO_ALT0: 0x%08X, UIO_SEL_UART%d: 0x%08X\n", gpio.word, channel, uio.word);
 
-	uint8_t sel_values[] = { uio.bit.sel7_0, uio.bit.sel15_8, uio.bit.sel23_16, uio.bit.sel31_24 };
-	for (int i = 0; i < 4; i++) {
-		if (sel_values[i] != 0xFF) {
-			gpio.word &= ~(1 << sel_values[i]);
-			sel_values[i] = 0xFF;
-		}
-	}
+	/* Disable UART pins */
+	for (i = 0 ; i < 4 ; i++)
+	{
+		if (uart_pins[i] == -1)
+			continue;
 
-	// Apply the updated settings
+		gpio.word &= ~(1 << uart_pins[i]);
+	}
+	uio.word = 0xFFFFFFFF;
+
+	/* Apply the updated settings */
 	nrc_gpio_set_alt(&gpio);
 	nrc_gpio_set_uio_sel(uio_sel_uart, &uio);
 
+	/* Retrieve the updated GPIO and UIO settings */ 
 	nrc_gpio_get_alt(&gpio);
 	nrc_gpio_get_uio_sel(uio_sel_uart, &uio);
 	_hif_uart_pin_info("GPIO_ALT0: 0x%08X, UIO_SEL_UART%d: 0x%08X\n", gpio.word, channel, uio.word);
@@ -825,14 +932,27 @@ static int _hif_uart_enable (_hif_uart_t *uart)
 	if (!uart)
 		return -1;
 
+	switch (uart->hfc)
+	{
+		case UART_HFC_DISABLE:
+		case UART_HFC_CTS_ENABLE:
+		case UART_HFC_RTS_ENABLE:
+			break;
+
+		case UART_HFC_ENABLE:
+			if (!uart->hfc_rx_irq)
+				uart->hfc = UART_HFC_CTS_ENABLE;
+			break;
+
+		default:
+			_hif_error("invalid hfc (%d)", uart->hfc);
+			return -1;
+	}
+
 	_hif_info("UART Enable: channel=%d badurate=%d data=%d stop=%d parity=%s fifo=%d,%d hfc=%s",
 			uart->channel, uart->baudrate, uart->data_bits + 5, uart->stop_bits + 1,
 			uart->parity == UART_PB_ODD ? "odd" : (uart->parity == UART_PB_EVEN ? "even" : "none"),
-			_HIF_UART_RX_HW_FIFO_LEVEL, _HIF_UART_TX_HW_FIFO_LEVEL,
-			uart->hfc == UART_HFC_ENABLE ? "on" : "off");
-
-	if (uart->hfc == UART_HFC_ENABLE && !uart->hfc_rx_irq)
-		uart->hfc = UART_HFC_CTS_ENABLE;
+			_HIF_UART_RX_HW_FIFO_LEVEL, _HIF_UART_TX_HW_FIFO_LEVEL,	str_hif_uart_hfc(uart->hfc));
 
 #if 0
 	nrc_hsuart_init(uart->channel, uart->data_bits, uart->baudrate, uart->stop_bits, uart->parity,
@@ -861,7 +981,7 @@ static int _hif_uart_enable (_hif_uart_t *uart)
 		system_irq_unmask(_hif_uart_channel_to_vector(uart->channel));
 	}
 
-	if(_hif_uart_pin_enable(uart->channel ,uart->hfc) < 0){
+	if(_hif_uart_pin_enable(uart->channel, uart->hfc) < 0){
 		_hif_info("Failed to configure UART pins");
 		return -1;
 	}
@@ -893,40 +1013,40 @@ static void _hif_uart_disable (void)
 
 /*********************************************************************************************/
 
-int _hif_uart_open (_hif_info_t *info)
+static int _hif_uart_open (_hif_info_t *info)
 {
 	if (info)
 	{
 		switch (info->type)
 		{
-	 		case _HIF_TYPE_UART:
-	 		case _HIF_TYPE_UART_HFC:
-			{
-				_hif_uart_t *uart = &info->uart;
-
-				_hif_info("UART Open: channel=%d baudrate=%d hfc=%s",
-							uart->channel, uart->baudrate,
-							uart->hfc == UART_HFC_ENABLE ? "on" : "off");
-
-				if (!_hif_uart_channel_valid(uart->channel))
-					goto uart_open_fail;
-
-				if (!_hif_uart_baudrate_valid(uart->baudrate))
-					goto uart_open_fail;
-
-				if (_hif_uart_fifo_create(info) != 0 || _hif_uart_enable(uart) != 0)
-					goto uart_open_fail;
-
-				if (uart->hfc == UART_HFC_DISABLE || !uart->hfc_rx_irq)
+			case _HIF_TYPE_UART:
+			case _HIF_TYPE_UART_HFC:
 				{
-					if (_hif_uart_dma_register(uart->channel, g_hif_uart_rx_fifo, g_hif_uart_tx_fifo) != 0)
+					_hif_uart_t *uart = &info->uart;
+
+					_hif_info("UART Open: channel=%d baudrate=%d hfc=%s rx_irq=%s",
+							uart->channel, uart->baudrate, 
+							str_hif_uart_hfc(uart->hfc), uart->hfc_rx_irq ? "on" : "off");
+
+					if (!_hif_uart_channel_valid(uart->channel))
 						goto uart_open_fail;
+
+					if (!_hif_uart_baudrate_valid(uart->baudrate))
+						goto uart_open_fail;
+
+					if (_hif_uart_fifo_create(info) != 0 || _hif_uart_enable(uart) != 0)
+						goto uart_open_fail;
+
+					if (uart->hfc == UART_HFC_DISABLE || !uart->hfc_rx_irq)
+					{
+						if (_hif_uart_dma_register(uart->channel, g_hif_uart_rx_fifo, g_hif_uart_tx_fifo) != 0)
+							goto uart_open_fail;
+					}
+
+					_hif_info("UART Open: success");
+
+					return 0;
 				}
-
-				_hif_info("UART Open: success");
-
-				return 0;
-			}
 
 			default:
 				break;
@@ -936,27 +1056,25 @@ int _hif_uart_open (_hif_info_t *info)
 uart_open_fail:
 
 	_hif_info("UART Open: fail");
-
+				
 	return -1;
 }
 
-void _hif_uart_close (void)
+static void _hif_uart_close (void)
 {
 	if (_hif_uart_channel_valid(g_hif_uart.channel))
 	{
 		_hif_info("UART Close: channel=%d", g_hif_uart.channel);
 
-	   	_hif_uart_dma_unregister();
+		_hif_uart_dma_unregister();
 
 		_hif_uart_disable();
 
 		_hif_uart_fifo_delete();
-
-		_hif_uart_init_info(&g_hif_uart);
 	}
 }
 
-int _hif_uart_change (_hif_uart_t *new)
+static int _hif_uart_change (_hif_uart_t *new)
 {
 	_hif_uart_t old;
 
@@ -977,33 +1095,30 @@ int _hif_uart_change (_hif_uart_t *new)
 			_hif_info(" - stop  bits: %d->%d", old.stop_bits, new->stop_bits);
 			_hif_info(" - parity: %d->%d", old.parity, new->parity);
 			_hif_info(" - hfc: %d->%d", old.hfc, new->hfc);
+			_hif_info(" - rx_irq: %d->%d", old.hfc_rx_irq, new->hfc_rx_irq);
 
 			if (old.hfc == UART_HFC_DISABLE || !old.hfc_rx_irq)
 				_hif_uart_dma_unregister();
 
 			_hif_uart_disable();
+			_hif_uart_fifo_reset();
 
 			if (_hif_uart_enable(new) == 0)
 			{
 				int ret = 0;
 
 				if (new->hfc == UART_HFC_DISABLE || !new->hfc_rx_irq)
-				{
-					_hif_fifo_reset(g_hif_uart_rx_fifo);
-					_hif_fifo_reset(g_hif_uart_tx_fifo);
-
 					ret = _hif_uart_dma_register(new->channel, g_hif_uart_rx_fifo, g_hif_uart_tx_fifo);
-				}
 
 				if (ret == 0)
 				{
-					if (new->hfc == UART_HFC_ENABLE)
+					if (new->hfc & UART_HFC_ENABLE)
 						_hif_set_type(_HIF_TYPE_UART_HFC);
 					else
 						_hif_set_type(_HIF_TYPE_UART);
 
 					_hif_info("UART Change: success");
-
+	
 					return 0;
 				}
 
@@ -1022,6 +1137,91 @@ int _hif_uart_change (_hif_uart_t *new)
 	}
 
 	return -2; /* invalid */
+}
+
+/*********************************************************************************************/
+
+const char *str_hif_uart_hfc (enum uart_hardware_flow_control hfc)
+{
+	switch (hfc)
+	{
+		case UART_HFC_DISABLE: return "off";
+		case UART_HFC_CTS_ENABLE: return "cts";
+		case UART_HFC_RTS_ENABLE: return "rts";
+		case UART_HFC_ENABLE: return "rts/cts";
+		default: return "?";
+	}
+};
+
+void hif_uart_get_info (_hif_uart_t *info)
+{
+	_hif_uart_get_info(info);
+}
+
+int hif_uart_open (_hif_info_t *info)
+{
+	int ret = -1;
+
+	if (_hif_uart_lock())
+	{
+		ret = _hif_uart_open(info);
+
+		_hif_uart_unlock();
+	}
+
+	return ret;
+}
+
+void hif_uart_close (void)
+{
+	if (_hif_uart_lock())
+	{
+		_hif_uart_close();
+
+		_hif_uart_unlock();
+	}
+}
+
+int hif_uart_change (_hif_uart_t *new)
+{
+	int ret = -1;
+
+	if (_hif_uart_lock())
+	{
+		ret = _hif_uart_change(new);
+
+		_hif_uart_unlock();
+	}
+
+	return ret;
+}
+
+int hif_uart_read (char *buf, int len)
+{
+	int ret = 0;
+
+	if (_hif_uart_rx_lock())
+	{
+		ret = _hif_uart_read(buf, len);
+
+		_hif_uart_rx_unlock();
+	}
+
+	return ret;
+}
+
+int hif_uart_write (char *buf, int len)
+{
+	int ret = 0;
+
+	if (_hif_uart_tx_lock())
+	{
+		ret = _hif_uart_write(buf, len);
+
+		_hif_uart_tx_unlock();
+	}
+
+	return ret;
 }
 
 /*********************************************************************************************/

@@ -269,6 +269,11 @@ void ping_thread(void *arg)
 			ping_mutex_unlock();
 		}
 
+		if (ping_info->stop_on_success && ping_info->success > 0) {
+			printf("ping: stop after first success\r\n");
+			break;
+		}
+
 		if((++ping_info->count  ==  ping_info->target_count) || \
 			(ping_info->force_stop == true)){
 			break;

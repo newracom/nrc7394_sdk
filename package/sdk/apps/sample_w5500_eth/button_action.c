@@ -75,7 +75,7 @@ void init_reset_button()
 
 	gpio_conf.gpio_pin = RESET_BUTTON;
 	gpio_conf.gpio_dir = GPIO_INPUT;
-	gpio_conf.gpio_mode = GPIO_PULL_DOWN;
+	gpio_conf.gpio_mode = GPIO_FLOATING;
 	gpio_conf.gpio_alt = GPIO_FUNC;
 	nrc_gpio_config(&gpio_conf);
 

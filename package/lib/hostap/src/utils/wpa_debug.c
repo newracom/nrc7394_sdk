@@ -269,7 +269,6 @@ void wpa_printf(int level, const char *fmt, ...)
 #endif /* CONFIG_DEBUG_LINUX_TRACING */
 }
 
-
 static void _wpa_hexdump(int level, const char *title, const u8 *buf,
 			 size_t len, int show, int only_syslog)
 {
@@ -939,7 +938,21 @@ void hostapd_logger(void *ctx, const u8 *addr, unsigned int module, int level,
 }
 #endif /* CONFIG_NO_HOSTAPD_LOGGER */
 
+#ifdef CONFIG_WPS_REGISTRAR_MULTI_SELECT
+void wps_ms_printf(int level, const char *fmt, ...)
+{
+	va_list ap;
 
+	if (level >= wpa_debug_level) {
+#ifdef _FREERTOS
+	va_start(ap, fmt);
+	system_vprintf(fmt, ap);
+	system_printf("\n");
+	va_end(ap);
+#endif
+	}
+}
+#endif
 const char * debug_level_str(int level)
 {
 	switch (level) {

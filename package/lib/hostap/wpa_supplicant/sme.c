@@ -33,6 +33,10 @@
 #if defined (CONFIG_SAE) || defined (CONFIG_OWE)
 #include "driver_nrc_ps.h"
 #endif
+#if defined(INCLUDE_SA_QUERY_TEST_INJECT)
+/* Implemented in lib/hostap/src/drivers/driver_nrc.c */
+bool nrc_get_sa_query_noresp(void);
+#endif
 
 #if 1//!defined(INCLUDE_WLAN_STABLE_CONN)
 #define SME_AUTH_TIMEOUT 8
@@ -2928,6 +2932,17 @@ static void sme_process_sa_query_request(struct wpa_supplicant *wpa_s,
 {
 	u8 resp[2 + WLAN_SA_QUERY_TR_ID_LEN + OCV_OCI_EXTENDED_LEN];
 	u8 resp_len = 2 + WLAN_SA_QUERY_TR_ID_LEN;
+
+#if defined(INCLUDE_SA_QUERY_TEST_INJECT)
+	/* TEST: drop our SA Query Response to force the peer (AP) to time out
+	 * and remove this STA (Case 4). */
+	if (nrc_get_sa_query_noresp()) {
+		wpa_msg(wpa_s, MSG_INFO,
+			"TEST: suppress SA Query Response to " MACSTR,
+			MAC2STR(wpa_s->bssid));
+		return;
+	}
+#endif
 
 	wpa_dbg(wpa_s, MSG_DEBUG, "SME: Sending SA Query Response to "
 		MACSTR, MAC2STR(wpa_s->bssid));

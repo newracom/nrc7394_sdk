@@ -65,8 +65,12 @@ static WIFI_CONFIG* g_wifi_config;
 	nrc_set_default_scan_channel(wifi_config);
 	wifi_config->channel = NRC_WIFI_CHANNEL;
 	wifi_config->ap_optimal_channel_enable = WIFI_AP_OPTIMAL_CHANNEL_ENABLE;
-	wifi_config->nons1g_freq = STAGetNonS1GFreq(wifi_config->channel);
 	wifi_config->bw = NRC_AP_SET_CHANNEL_BW;
+	if (wifi_config->bw)
+		wifi_config->nons1g_freq = STAGetNonS1GFreqWithBw(wifi_config->channel,
+			BW_TO_BW_ENUM(wifi_config->bw));
+	else
+		wifi_config->nons1g_freq = STAGetNonS1GFreq(wifi_config->channel);
 	wifi_config->bcn_interval =  NRC_WIFI_BCN_INTERVAL;
 	wifi_config->dtim_period = NRC_WIFI_DTIM_PERIOD_DEFAULT;
 	wifi_config->short_beacon = NRC_WIFI_SHORT_BEACON_DEFAULT;
@@ -118,6 +122,8 @@ static WIFI_CONFIG* g_wifi_config;
 	wifi_config->scan_period = NRC_WIFI_SCAN_PERIOD;
 	memcpy(wifi_config->broker_addr,  NRC_BROKER_ADDRESS, sizeof(NRC_BROKER_ADDRESS));
 	wifi_config->broker_port = NRC_BROKER_PORT;
+	wifi_config->loc_1m_prim_ch = NRC_AP_SET_LOC_1M_PRIMARY_CH;
+	wifi_config->bw_4m_2m_prim_loc = NRC_AP_SET_BW_4M_2M_PRIM_LOC;
 
 	return NRC_SUCCESS;
 }
@@ -320,7 +326,7 @@ void print_settings(WIFI_CONFIG* wifi_config)
 	nrc_usr_print("bss_max_idle %d\n", wifi_config->bss_max_idle);
 	nrc_usr_print("bss_retry_cnt %d\n", wifi_config->bss_retry_cnt);
 	nrc_usr_print("device_mode %d [%s]\n",wifi_config->device_mode,
-		( wifi_config->device_mode == 0) ? "STA" : "AP");
+		( wifi_config->device_mode == WIFI_MODE_STATION) ? "STA" : "AP");
 	nrc_usr_print("network_mode %d [%s]\n",wifi_config->network_mode,
 		( wifi_config->network_mode == 0) ? "Bridge" : "NAT");
 	nrc_usr_print("rate control %d [%s]\n",wifi_config->rc,

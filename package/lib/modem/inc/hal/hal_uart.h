@@ -1,7 +1,7 @@
 #ifndef __HAL_UART_NRC7394_H__
 #define __HAL_UART_NRC7394_H__
 
-#define PRINT_BUFFER_SIZE		512
+#define PRINT_BUFFER_SIZE		1024
 #define INT_CONSOLE_BUFFER_MAX  8192
 #define CLK_RESET_UART0		(0x00000001L << 8)
 #define CONSOLE_UART_BAUDRATE 115200
@@ -28,8 +28,8 @@ enum uart_parity_bit {
 
 enum uart_hardware_flow_control {
     UART_HFC_DISABLE = 0,
-	UART_HFC_CTS_ENABLE = (1 << 0),
-	UART_HFC_RTS_ENABLE = (1 << 1),
+    UART_HFC_CTS_ENABLE = (1 << 0),
+    UART_HFC_RTS_ENABLE = (1 << 1),
     UART_HFC_ENABLE = (UART_HFC_CTS_ENABLE | UART_HFC_RTS_ENABLE),
 };
 

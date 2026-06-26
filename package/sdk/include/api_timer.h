@@ -123,7 +123,7 @@ nrc_err_t nrc_hw_timer_clear_irq(int ch);
 /**********************************************
  * @fn int nrc_hw_timer_get_channel(int vector)
  *
- * @brief Ger hardware timer number from event vector id
+ * @brief Get hardware timer number from event vector id
  *
  * @param vector: event vector id
  *

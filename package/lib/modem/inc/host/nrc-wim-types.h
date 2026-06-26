@@ -564,7 +564,7 @@ struct wim_channel_param {
 } __packed;
 
 
-#define WIM_MAX_BD_DATA_LEN		(540)
+#define WIM_MAX_BD_DATA_LEN		(768)
 struct wim_bd_param {
 	uint16_t type;
 	uint16_t length;
@@ -575,7 +575,7 @@ struct wim_bd_param {
 
 #define WIM_MAX_SCAN_SSID       (5)
 #define WIM_MAX_SCAN_BSSID      (2)
-#define WIM_MAX_SCAN_CHANNEL    (55)
+#define WIM_MAX_SCAN_CHANNEL    (70)
 #ifndef IEEE80211_MAX_SSID_LEN
 #define IEEE80211_MAX_SSID_LEN  (32)
 #endif
@@ -770,6 +770,7 @@ struct wim_drv_info_param {
 	uint8_t auth_control_slot;
 	uint8_t auth_control_ti_min;
 	uint8_t auth_control_ti_max;
+	int8_t loc_1m_prim_ch;
 } __packed;
 WIM_DECLARE(wim_drv_info);
 

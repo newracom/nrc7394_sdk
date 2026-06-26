@@ -648,6 +648,44 @@ static bool _lwip_socket_fds_mutex_give (lwip_socket_info_t *info)
 }
 #define LWIP_SOCKET_FDS_UNLOCK(info)	ASSERT(_lwip_socket_fds_mutex_give(info))
 
+
+static uint32_t _lwip_socket_fds_mask (const fd_set *fds, int nfds)
+{
+	uint32_t mask = 0;
+	int fd;
+
+	if (!fds || nfds <= 0)
+		return 0;
+
+	if (nfds > 32)
+		nfds = 32;
+
+	for (fd = 0 ; fd < nfds ; fd++)
+	{
+		if (FD_ISSET(fd, fds))
+			mask |= (1U << fd);
+	}
+
+	return mask;
+}
+
+static bool _lwip_socket_fds_any (const fd_set *fds, int nfds)
+{
+	int fd;
+
+	if (!fds || nfds <= 0)
+		return false;
+
+	for (fd = 0 ; fd < nfds ; fd++)
+	{
+		if (FD_ISSET(fd, fds))
+			return true;
+	}
+
+	return false;
+}
+
+
 static int _lwip_socket_fds_get (lwip_socket_info_t *info, fd_set *read, fd_set *write)
 {
 	bool set_fd;
@@ -725,6 +763,7 @@ static void _lwip_socket_task (void *arg)
 	lwip_socket_info_t *info = (lwip_socket_info_t *)arg;
 	fd_set fds_read, fds_write;
 	struct timeval timeout;
+	uint32_t read_mask, write_mask;
 	int nfds;
 	int ret;
 	int fd;
@@ -749,16 +788,19 @@ static void _lwip_socket_task (void *arg)
 
 		if (info->log.task)
 		{
+			read_mask = _lwip_socket_fds_mask(&fds_read, nfds);
+			write_mask = _lwip_socket_fds_mask(&fds_write, nfds);
+
 			_lwip_socket_log("SOCK_TASK: get, nfds=%d read=0x%X write=0x%X",
-					nfds, fds_read.__fds_bits[0], fds_write.__fds_bits[0]);
+						nfds, read_mask, write_mask);
 		}
 
 		timeout.tv_sec = info->timeout.task / 1000000;
 		timeout.tv_usec = info->timeout.task % 1000000;
 
 		ret = select(nfds,
-					(fds_read.__fds_bits[0]) ? &fds_read : NULL,
-					(fds_write.__fds_bits[0]) ? &fds_write : NULL,
+					_lwip_socket_fds_any(&fds_read, nfds) ? &fds_read : NULL,
+					_lwip_socket_fds_any(&fds_write, nfds) ? &fds_write : NULL,
 					NULL,
 					&timeout);
 
@@ -776,8 +818,11 @@ static void _lwip_socket_task (void *arg)
 			default:
 				if (info->log.task)
 				{
+					read_mask = _lwip_socket_fds_mask(&fds_read, nfds);
+					write_mask = _lwip_socket_fds_mask(&fds_write, nfds);
+
 					_lwip_socket_log("SOCK_TASK: set, nfds=%d read=0x%X write=0x%X",
-							nfds, fds_read.__fds_bits[0], fds_write.__fds_bits[0]);
+							nfds, read_mask, write_mask);
 				}
 		}
 
@@ -1667,6 +1712,7 @@ static int cmd_atcmd_addrinfo (cmd_tbl_t *t, int argc, char *argv[])
 static int cmd_atcmd_lwip_fds (cmd_tbl_t *t, int argc, char *argv[])
 {
 	lwip_socket_info_t *info = g_lwip_socket_info;
+	int nfds = FD_SETSIZE;
 
 	if (!info)
 		return CMD_RET_FAILURE;
@@ -1674,9 +1720,9 @@ static int cmd_atcmd_lwip_fds (cmd_tbl_t *t, int argc, char *argv[])
 	switch (argc)
 	{
 		case 0:
-			_atcmd_printf("read: %X\n", info->fds.read.__fds_bits[0]);
-			_atcmd_printf("write: %X\n", info->fds.write.__fds_bits[0]);
-			_atcmd_printf("listen: %X\n", info->fds.listen.__fds_bits[0]);
+			_atcmd_printf("read: %X\n", _lwip_socket_fds_mask(&info->fds.read, nfds));
+			_atcmd_printf("write: %X\n", _lwip_socket_fds_mask(&info->fds.write, nfds));
+			_atcmd_printf("listen: %X\n", _lwip_socket_fds_mask(&info->fds.listen, nfds));
 			break;
 
 		default:

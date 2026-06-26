@@ -131,6 +131,7 @@ bool wifi_ifconfig(int argc, char *argv[]);
 enum dhcp_status wifi_softap_dhcps_status(void);
 
 bool wifi_get_ip_address(int vif_id, char **ip_addr);
+bool wifi_get_dns_address(int vif_id, char **dns1_addr, char **dns2_addr);
 uint8_t wifi_get_vif_id(ip_addr_t* dest);
 bool get_dhcp_status(int vif_id);
 bool wifi_dhcps(int argc, char *argv[]);

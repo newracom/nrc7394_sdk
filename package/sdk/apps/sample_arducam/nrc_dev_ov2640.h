@@ -42,7 +42,7 @@
 #define OV2640_SPI_CLOCK 6000000
 
 #ifdef NRC7394
-#define OV2640_I2C_SCL          24
+#define OV2640_I2C_SCL          25
 #define OV2640_I2C_SDA          18
 #else
 #define OV2640_I2C_SCL          16

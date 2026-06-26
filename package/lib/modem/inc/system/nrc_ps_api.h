@@ -134,15 +134,15 @@ struct ret_keyinfo {
 } __attribute__ ((packed));
 #define RET_KEYINFO_SIZE sizeof(struct ret_keyinfo)
 
-//4B
+//6B
 struct ret_usrinfo {
-	uint32_t	txpwr:8;		//tx power (dBm)
-	uint32_t	rxgain:8;		//rx gain (dBm)
-	uint32_t	gi:8;			//guard interval (0:long, 1:short, 2:capa(auto))
-	uint32_t	ucode_wake_src:4;	//ucode wake interval source (0:DTIM/1:TBTT/2:LI/3:USR)
-	uint32_t	ucode_wake_by_group:1;	//ucode wake by DTIM BC/MC (0:disable, 1:enable)
-	uint32_t	txpwr_type:2;		//tx power type (0:auto, 1:limit, 2:fixed)
-	uint32_t	reserved:1;
+	uint8_t	txpwr[2];		//tx power (dBm)
+	uint8_t	txpwr_type[2];		//tx power type (0:auto, 1:limit, 2:fixed)
+	uint8_t	rxgain;		//rx gain (dBm)
+	uint8_t	gi:2;			//guard interval (0:long, 1:short, 2:capa(auto))
+	uint8_t	ucode_wake_src:4;	//ucode wake interval source (0:DTIM/1:TBTT/2:LI/3:USR)
+	uint8_t	ucode_wake_by_group:1;	//ucode wake by DTIM BC/MC (0:disable, 1:enable)
+	uint8_t	reserved:1;
 } __attribute__ ((packed));
 #define RET_USRINFO_SIZE sizeof(struct ret_usrinfo)
 
@@ -196,6 +196,7 @@ struct ret_ipinfo {
 		uint8_t		_pad[2];
 	} arp[MAX_RETAINED_ARP_ENTRIES];
 	uint8_t		arp_count;
+	uint32_t	dns_addr[2];
 	uint8_t		dhcp_renew:1;
 #endif
 } __attribute__ ((packed));
@@ -291,11 +292,14 @@ struct ret_ucodeinfo {
 	uint32_t	last_beacon_tsf_lower;	// last received beacon timestamp tsf lower
 	uint32_t	last_beacon_tsf_upper;	// last received beacon timestamp tsf upper
 #if defined(INCLUDE_UCODE_TX)
-	uint32_t	qos_null_tx_time;		// [31~12] = tsf_upper[10:0], [11:0] = tsf_lower[31:20], 
+	uint32_t	qos_null_tx_time;		// [31~12] = tsf_upper[10:0], [11:0] = tsf_lower[31:20],
 #endif
 	uint16_t	ucode_beacon_timer_expire_cont;
 	uint16_t	ucode_beacon_timer_expire_accum;
 	struct 		ucode_stats	 stats;	//Ucode Statistics
+#if defined(INCLUDE_MONITOR_ABNORMAL_TSF)
+	uint32_t	last_beacon_tsf_ms; // last received beacon timestamp tsf in ms
+#endif
 } __attribute__ ((packed));
 #define RET_UCODE_INFO_SIZE sizeof(struct ret_ucodeinfo)
 
@@ -312,6 +316,8 @@ struct ret_drvinfo {
 	uint8_t supported_ch_width:1; //supported CH width (0:1/2MHz, 1:1/2/4Mhz)
 	uint8_t ps_pretend_flag:1;
 	uint32_t vendor_oui;
+	int8_t loc_1m_prim_ch;
+	int8_t bw_4m_2m_prim_loc;		// 4M op as 2M prim, no 1M (-1:off)
 } __attribute__ ((packed));
 #define RET_DRV_INFO_SIZE sizeof(struct ret_drvinfo)
 
@@ -400,15 +406,22 @@ struct ethertype_filter {
 	uint16_t entry[MAX_ETHERTYPE_FILTER];
 };
 
+struct mac_filter_entry {
+	uint8_t addr[6];		/* MAC_ADDR_LEN */
+	uint8_t prefix_len;
+};
+
 struct mac_filter {
 	uint8_t num;
-	uint8_t entry[MAX_MAC_FILTER][6]; /* MAC_ADDR_LEN */
+	struct mac_filter_entry entry[MAX_MAC_FILTER];
 };
 
 struct ret_bcmc_filter_info
 {
 	struct ethertype_filter ef;
 	struct mac_filter mf;
+	uint8_t my_ip[4];
+	bool all_mc;
 };
 
 #define MAX_BCMC_SIZE			2048
@@ -593,6 +606,7 @@ struct retention_info {
 	uint32_t sleep_gpio_dir_mask;
 	uint32_t sleep_gpio_out_mask;
 	uint32_t sleep_gpio_pullup_mask;
+	uint32_t sleep_gpio_preserve_mask;
 #if defined (INCLUDE_AVOID_FRAG_ATTACK_TEST)
 	uint8_t 			prev_ptk[RET_PMK_SIZE];	//Previous PTK (32B)
 #endif
@@ -653,7 +667,8 @@ struct nrc_ps_ops {
 /* ============================================================================== */
 /* =================== Internal INTERFACE ======================================= */
 /* ============================================================================== */
-struct retention_info* nrc_ps_get_retention_info();
+struct retention_info* nrc_ps_get_retention_info(void);
+int nrc_ps_get_retention_info_size(void);
 struct nrc_ps_ops *nrc_ps_get_user(void);
 struct nrc_ps_ops *nrc_ps_get_vendor(void);
 struct nrc_ps_ops *nrc_ps_get(void);
@@ -687,6 +702,12 @@ static inline bool PS_CHECK_SIG() {
 		return true;
 	return false;
 };
+
+static inline uint32_t gpio_merge_preserve_mask(uint32_t base, uint32_t cur, uint32_t preserve_mask)
+{
+	/* Preserve bits in preserve_mask from current value, apply base for others */
+	return (base & ~preserve_mask) | (cur & preserve_mask);
+}
 
 #if !defined(UCODE)
 void nrc_ps_init();
@@ -798,13 +819,15 @@ bool nrc_ps_callback_run(uint32_t index);
 int nrc_ps_config_power_indication_pin(bool enable, int pin_number);
 int nrc_ps_get_power_indication_pin(bool *enable, int *pin_number);
 void ps_gpio_config_wakeup_pin();
-void ps_gpio_set_deepsleep(uint32_t pullup_mask, uint32_t gpio_out_mask, uint32_t gpio_dir_mask);
+void ps_gpio_set_deepsleep(uint32_t pullup_mask, uint32_t gpio_out_mask, uint32_t gpio_dir_mask, uint32_t preserve_mask);
 void ps_set_gpio_direction(uint32_t mask);
 uint32_t ps_get_gpio_direction(void);
 void ps_set_gpio_out(uint32_t mask);
 uint32_t ps_get_gpio_out(void);
 void ps_set_gpio_pullup(uint32_t mask);
 uint32_t ps_get_gpio_pullup(void);
+void ps_set_gpio_preserve(uint32_t mask);
+uint32_t ps_get_gpio_preserve(void);
 int nrc_ps_event_user_get(enum ps_event event);
 int nrc_ps_event_user_clear(enum ps_event event);
 bool nrc_ps_set_user_data(void* data, uint16_t size);

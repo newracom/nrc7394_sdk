@@ -40,10 +40,10 @@ uint32_t nrf_spi_read(uint32_t addr);
 void nrf_cfo_cal(double cfo_ppm, uint32_t *cfo_reg);
 
 void hal_rf_pll_frequency(uint32_t channel_freq);
-void hal_rf_update_txpwr(void);
-uint8_t hal_rf_set_txpwr(uint8_t txpwr);
-uint8_t hal_rf_get_txpwr(void);
-uint8_t hal_rf_recover_txpwr(uint8_t txpwr);
+void hal_rf_update_txpwr(int vif_id);
+uint8_t hal_rf_set_txpwr(int vif_id, uint8_t txpwr);
+uint8_t hal_rf_get_txpwr(int vif_id);
+uint8_t hal_rf_recover_txpwr(int vif_id, uint8_t txpwr);
 
 #if defined(INCLUDE_RF_DEBUG)
 //TBD will be removed

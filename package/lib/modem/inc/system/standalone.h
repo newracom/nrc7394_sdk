@@ -4,6 +4,7 @@
 int standalone_main();
 void get_standalone_macaddr(int vif_id, uint8_t *mac);
 void set_standalone_ipaddr(int vif_id, uint32_t ipaddr, uint32_t netmask, uint32_t gwaddr);
+void set_standalone_dns_ipaddr(int vif_id, uint32_t ipaddr1, uint32_t ipaddr2);
 int set_standalone_hook_dhcp(int vif_id);
 int set_standalone_hook_static(int vif_id);
 void update_sysconfig_location(void);

@@ -842,6 +842,92 @@ static int raspi_cli_run_script (raspi_cli_hif_t *hif, char *script, bool atcmd_
 					log_info("TIME: %s", c_time_string);
 			}
 		}
+		else if (memcmp(cmd, "DUMP", 4) == 0) /* DUMP <send> <recv>*/
+		{
+			argc = raspi_cli_parse_params(cmd + 4, argv, 2, ' ');
+
+			if (argc == 2)
+			{
+				int send = atoi(argv[0]);	
+				int recv = atoi(argv[1]);
+				int result = 0;
+
+				if (send != 0 && send != 1)
+					goto invalid_line;
+
+				if (recv != 0 && recv != 1)
+					goto invalid_line;
+
+				result = nrc_atcmd_data_print(send, recv);
+
+				log_info("DUMP: %d %d\n", !!(result & (1 << 0)), !!(result & (1 << 1)));
+			}
+		}
+		else if (memcmp(cmd, "FWDL", 4) == 0) /* FWDL <verify> <binary> */
+		{
+			argc = raspi_cli_parse_params(cmd + 4, argv, 2, ' ');
+
+			if (argc == 2)
+			{
+				int verify = atoi(argv[0]);
+
+				if (verify < 0 || verify > 2)
+					goto invalid_line;
+				else
+				{
+					char *pathname = argv[1];
+					int pathname_len = strlen(pathname);
+
+					log_info("FWDL: %s, verify=%d\n", pathname, verify);
+
+					if (pathname_len <= 4 || strcmp(pathname + pathname_len - 4, ".bin") != 0)
+					{
+						log_info("FWDL: Not binary file\n");
+						goto invalid_line;
+					}
+					else
+					{
+						struct stat st;
+						int fd = open(pathname, O_RDONLY);
+
+						if (fd < 0)
+						{
+							log_info("FWDL: open() failed, %s\n", strerror(errno));
+							goto invalid_line;
+						}
+
+						if (stat(pathname, &st) == 0)
+						{
+							uint32_t size = st.st_size;
+							uint32_t crc;
+							uint8_t *buf;
+
+							buf = malloc(size);
+							if (!buf)
+							{
+								log_info("FWDL: malloc() failed, %s\n", strerror(errno));
+								close(fd);
+								goto invalid_line;
+							}
+
+							if (read(fd, buf, size) != size)
+							{
+								log_info("FWDL: read() failed, %s\n", strerror(errno));
+								close(fd);
+								goto invalid_line;
+							}
+
+							crc = crc32(0L, Z_NULL, 0);
+							crc = crc32(crc, buf, size);
+
+							nrc_atcmd_firmware_download((char *)buf, size, crc, verify);
+						}
+
+						close(fd);
+					}
+				}
+			}
+		}
 		else if (memcmp(cmd, "HOLD", 4) == 0) /* HOLD */
 		{
 			log_info("HOLD: Press ENTER to continue.\n");

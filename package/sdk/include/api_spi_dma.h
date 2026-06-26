@@ -68,6 +68,20 @@ void spi_dma_write(uint8_t *data, uint32_t size);
  ***********************************************/
 void spi_dma_read(uint8_t *addr, uint8_t *data, uint32_t size);
 
+/**********************************************
+ * @fn spi_dma_transfer(uint8_t *tx_data, uint8_t *rx_data, uint32_t size)
+ *
+ * @brief Full-duplex SPI transfer using DMA.
+ *        Clocks 'size' bytes on SPI, transmits from 'tx_data' (MOSI)
+ *        while receiving into 'rx_data' (MISO)
+ *
+ * @param tx_data : TX buffer (>= size).
+ * @param rx_data : RX buffer (>= size).
+ * @param size : Number of bytes clocked on SPI.
+ *
+ * @return NONE
+ ***********************************************/
+void spi_dma_transfer(uint8_t *tx_data, uint8_t *rx_data, uint32_t size);
 
 /**********************************************
  * @fn nrc_spi_slave_dma_init(spi_device_t *spi)

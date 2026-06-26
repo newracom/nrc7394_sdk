@@ -233,7 +233,7 @@ NEED_DH_GROUPS=y
 NEED_DRAGONFLY=y
 endif
 
-ifdef CONFIG_DPP
+ifeq ($(CONFIG_DPP), y)
 CFLAGS += -DCONFIG_DPP
 WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/common/dpp.c
 WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/common/dpp_auth.c
@@ -258,10 +258,10 @@ NEED_JSON=y
 NEED_GAS_SERVER=y
 NEED_BASE64=y
 NEED_ASN1=y
-ifdef CONFIG_DPP2
+ifeq ($(CONFIG_DPP2), y)
 CFLAGS += -DCONFIG_DPP2
 endif
-ifdef CONFIG_DPP3
+ifeq ($(CONFIG_DPP3), y)
 CFLAGS += -DCONFIG_DPP3
 endif
 endif
@@ -809,6 +809,14 @@ ifdef CONFIG_WPS_REG_DISABLE_OPEN
 CFLAGS += -DCONFIG_WPS_REG_DISABLE_OPEN
 endif
 
+ifeq ($(CONFIG_WPS_REGISTRAR_MULTI_SELECT),y)
+CFLAGS += -DCONFIG_WPS_REGISTRAR_MULTI_SELECT
+endif
+
+ifeq ($(CONFIG_WPS_ENROLLEE_AUTO_RETRY),y)
+CFLAGS += -DCONFIG_WPS_ENROLLEE_AUTO_RETRY
+endif
+
 endif
 
 ifdef CONFIG_EAP_IKEV2
@@ -962,7 +970,7 @@ CFLAGS += -DEAP_SERVER_WSC
 WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/ap/wps_hostapd.c
 WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/eap_server/eap_server_wsc.c
 endif
-ifdef CONFIG_DPP
+ifeq ($(CONFIG_DPP), y)
 WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/ap/dpp_hostapd.c
 WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/ap/gas_query_ap.c
 NEED_AP_GAS_SERV=y

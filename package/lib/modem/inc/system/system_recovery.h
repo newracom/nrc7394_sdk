@@ -1,6 +1,40 @@
 #ifndef SYSTEM_RECOVERY_H
 #define SYSTEM_RECOVERY_H
+
+#if !defined (UCODE)
 #include "umac_info.h"
+#else
+/* S1G Capa Info */
+typedef struct _S1G_CAPA {
+	uint8_t s1g_long_support:1;
+	uint8_t pv1_frame_support:1;
+	uint8_t nontim_support:1;
+	uint8_t twtoption_activated:1;
+	uint8_t ampdu_support:1;
+	uint8_t ndp_pspoll_support:1;
+	uint8_t shortgi_1mhz_support:1;
+	uint8_t shortgi_2mhz_support:1;
+	uint8_t shortgi_4mhz_support:1;
+	uint8_t s1g_1mctrlresppreamble_support:1;
+	uint8_t traveling_pilot_support:1;
+	uint8_t maximum_mpdu_length:1;
+	uint8_t maximum_ampdu_length_exp: 2;
+	uint8_t supported_ch_width: 2;
+	uint8_t color:3;
+	uint8_t minimum_mpdu_start_spacing: 3;
+#if defined(INCLUDE_AUTH_CONTROL)
+	uint8_t centralized_auth_control: 1;
+	uint8_t distributed_auth_control: 1;
+#else
+	uint8_t reserved2: 2;
+#endif
+#if (dot11TWTGroupingSupport == 1)
+	uint8_t twtgrouping_support:1;
+	uint8_t reserved3: 7;
+#endif
+	uint8_t rx_s1gmcs_map:8;
+} __attribute__((packed)) S1G_CAPA;
+#endif
 
 #define MAX_RECOVERY_STA	MAX_STA
 #define PMKSA_CACHE_RECOVERY

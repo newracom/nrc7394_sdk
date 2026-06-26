@@ -364,6 +364,10 @@ static inline void wpa_debug_close_linux_tracing(void)
 #define WPA_ASSERT(a) do { } while (0)
 #endif
 
+#ifdef CONFIG_WPS_REGISTRAR_MULTI_SELECT
+void wps_ms_printf(int level, const char *fmt, ...);
+#endif
+
 const char * debug_level_str(int level);
 int str_to_debug_level(const char *s);
 

@@ -73,7 +73,7 @@ void umac_init_op_ch_info(uint8_t vif_id);
 void umac_deinit_op_ch_info(uint8_t vif_id);
 void umac_clear_all_op_ch_info(uint8_t vif_id);
 bool umac_add_op_ch_info(uint8_t vif_id, uint8_t *bssid, s1g_operation_information *op_info);
-op_ch_info *umac_get_op_ch_info(uint8_t *bssid, int prim_loc);
+op_ch_info *umac_get_op_ch_info(uint8_t vif_id, uint8_t *bssid, int prim_loc);
 #if defined (MATCH_OP_BW_PREQ_PRSP)
 bool umac_add_op_bw_info(uint8_t vif_id, uint8_t *peer_addr, uint8_t bw);
 int umac_get_op_bw_info(uint8_t vif_id, uint8_t *peer_addr);

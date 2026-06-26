@@ -47,6 +47,7 @@
  * Parameters   : count(test count), interval(test interval)
  * Returns      : 0 or -1 (0: success, -1: fail)
  *******************************************************************************/
+ #if defined(NRC7292)
 nrc_err_t run_sample_pwm(int count, int interval)
 {
 	int i = 0;
@@ -176,6 +177,208 @@ nrc_err_t run_sample_pwm(int count, int interval)
 	nrc_usr_print("[%s] exit \n",__func__);
 	return NRC_SUCCESS;
 }
+#else
+
+#define PWM_SAMPLE_MODE_PHASE 1
+#define BASE_CLK_HZ 32000000
+
+static void pwm_regout_demo(void)
+{
+	nrc_pwm_cfg_t cfg_ch0, cfg_ch1, cfg_ch2, cfg_ch3;
+
+	nrc_usr_print("[%s]\n",__func__);
+
+	/* CH0 */
+	memset(&cfg_ch0, 0, sizeof(cfg_ch0));
+	cfg_ch0.ch = PWM_CH0;
+	cfg_ch0.gpio_num = PWM_GPIO0;
+	cfg_ch0.mode = NRC_PWM_MODE_REGOUT;
+	cfg_ch0.clk_div = NRC_PWM_CLK_DIV_2;
+	cfg_ch0.inversion = false;
+	cfg_ch0.trigger = true;
+	cfg_ch0.u.regout.p0 = 0xffFF0000;
+	nrc_pwm_configure(&cfg_ch0, false);
+	nrc_pwm_set_enable_ex(PWM_CH0, true, false);
+
+	/* CH1 */
+	memset(&cfg_ch1, 0, sizeof(cfg_ch1));
+	cfg_ch1.ch = PWM_CH1;
+	cfg_ch1.gpio_num = PWM_GPIO1;
+	cfg_ch1.mode = NRC_PWM_MODE_REGOUT;
+	cfg_ch1.clk_div = NRC_PWM_CLK_DIV_2;
+	cfg_ch1.inversion = false;
+	cfg_ch1.trigger = true;
+	cfg_ch1.u.regout.p0 = 0xa55aa55a;
+	nrc_pwm_configure(&cfg_ch1, false);
+	nrc_pwm_set_enable_ex(PWM_CH1, true, false);
+
+	/* CH2 */
+	memset(&cfg_ch2, 0, sizeof(cfg_ch2));
+	cfg_ch2.ch = PWM_CH2;
+	cfg_ch2.gpio_num = PWM_GPIO2;
+	cfg_ch2.mode = NRC_PWM_MODE_REGOUT2;
+	cfg_ch2.clk_div = NRC_PWM_CLK_DIV_2;
+	cfg_ch2.inversion = false;
+	cfg_ch2.trigger = true;
+	cfg_ch2.u.regout.p0 = 0xffFF0000;
+	cfg_ch2.u.regout.p1 = 0xa55aa55a;
+	cfg_ch2.u.regout.p2 = 0x0f0f0f0f;
+	cfg_ch2.u.regout.p3 = 0xf0f0f0f0;
+	nrc_pwm_configure(&cfg_ch2, false);
+	nrc_pwm_set_enable_ex(PWM_CH2, true, false);
+
+	/* CH3 */
+	memset(&cfg_ch3, 0, sizeof(cfg_ch3));
+	cfg_ch3.ch = PWM_CH3;
+	cfg_ch3.gpio_num = PWM_GPIO3;
+	cfg_ch3.mode = NRC_PWM_MODE_REGOUT2;
+	cfg_ch3.clk_div = NRC_PWM_CLK_DIV_2;
+	cfg_ch3.inversion = false;
+	cfg_ch3.trigger = true;
+	cfg_ch3.u.regout.p0 = 0xa55aa55a;
+	cfg_ch3.u.regout.p1 = 0xffFF0000;
+	cfg_ch3.u.regout.p2 = 0xf0f0f0f0;
+	cfg_ch3.u.regout.p3 = 0x0f0f0f0f;
+	nrc_pwm_configure(&cfg_ch3, false);
+	nrc_pwm_set_enable_ex(PWM_CH3, true, false);
+
+	/* Apply */
+	nrc_pwm_apply(PWM_CH0);
+	nrc_pwm_apply(PWM_CH1);
+	nrc_pwm_apply(PWM_CH2);
+	nrc_pwm_apply(PWM_CH3);
+
+	while (1) {
+		_delay_ms(1000);
+	}
+}
+
+static bool pwm_phase_demo(void)
+{
+	nrc_pwm_cfg_t cfg_ch0, cfg_ch1, cfg_ch2, cfg_ch3;
+	uint32_t duty, freq;
+
+	nrc_usr_print("[%s]\n",__func__);
+
+	/* CH0 */
+	const uint32_t target_hz_ch0 =  4000000;
+	memset(&cfg_ch0, 0, sizeof(cfg_ch0));
+	cfg_ch0.ch = PWM_CH0;
+	cfg_ch0.gpio_num = PWM_GPIO0;
+	cfg_ch0.mode = NRC_PWM_MODE_PHASE;
+	cfg_ch0.clk_div = NRC_PWM_CLK_DIV_2;
+	cfg_ch0.inversion = false;
+	cfg_ch0.trigger = true;
+
+	if (nrc_pwm_calc_freq_duty(BASE_CLK_HZ, cfg_ch0.clk_div ,target_hz_ch0, 25, &freq, &duty) == NRC_SUCCESS) {
+		cfg_ch0.u.phase.frequency0 = freq;
+		cfg_ch0.u.phase.duty0 = (uint8_t)duty;
+	} else {
+		nrc_usr_print("[%s] Check the availabe parameters for PWM CH%d\n",__func__, cfg_ch0.ch);
+		return false;
+	}
+
+	/* (optional) deterministic: clear segment1 */
+	cfg_ch0.u.phase.duty1 = 0;
+	cfg_ch0.u.phase.frequency1 = 0;
+	nrc_pwm_configure(&cfg_ch0, false);
+	nrc_pwm_set_enable_ex(PWM_CH0, true, false);
+
+	/* CH1 */
+	const uint32_t target_hz_ch1 =  8000000;
+	memset(&cfg_ch1, 0, sizeof(cfg_ch1));
+	cfg_ch1.ch = PWM_CH1;
+	cfg_ch1.gpio_num = PWM_GPIO1;
+	cfg_ch1.mode = NRC_PWM_MODE_PHASE;
+	cfg_ch1.clk_div = NRC_PWM_CLK_DIV_2;
+	cfg_ch1.inversion = false;
+	cfg_ch1.trigger = true;
+	if (nrc_pwm_calc_freq_duty(BASE_CLK_HZ, cfg_ch1.clk_div ,target_hz_ch1, 50, &freq, &duty) == NRC_SUCCESS) {
+		cfg_ch1.u.phase.frequency0 = freq;
+		cfg_ch1.u.phase.duty0 = (uint8_t)duty;
+	} else {
+		nrc_usr_print("[%s] Check the availabe parameters for PWM CH%d\n",__func__, cfg_ch1.ch);
+		return false;
+	}
+
+	/* (optional) deterministic: clear segment1 */
+	cfg_ch1.u.phase.duty1 = 0;
+	cfg_ch1.u.phase.frequency1 = 0;
+	nrc_pwm_configure(&cfg_ch1, false);
+	nrc_pwm_set_enable_ex(PWM_CH1, true, false);
+
+	/* CH2 (PHASE2: duty0/frequency0 + duty1/frequency1) */
+	const uint32_t target_hz_ch2 =  4000000;
+	memset(&cfg_ch2, 0, sizeof(cfg_ch2));
+	cfg_ch2.ch = PWM_CH2;
+	cfg_ch2.gpio_num = PWM_GPIO2;
+	cfg_ch2.mode = NRC_PWM_MODE_PHASE2;
+	cfg_ch2.clk_div = NRC_PWM_CLK_DIV_2;
+	cfg_ch2.inversion = false;
+	cfg_ch2.trigger = true;
+	if (nrc_pwm_calc_freq_duty(BASE_CLK_HZ, cfg_ch2.clk_div ,target_hz_ch2, 50, &freq, &duty) == NRC_SUCCESS) {
+		cfg_ch2.u.phase.frequency0 = freq;
+		cfg_ch2.u.phase.duty0 = (uint8_t)duty;
+	} else {
+		nrc_usr_print("[%s] Check the availabe parameters for PWM CH%d\n",__func__, cfg_ch2.ch);
+		return false;
+	}
+
+	if (nrc_pwm_calc_freq_duty(BASE_CLK_HZ, cfg_ch2.clk_div ,target_hz_ch2, 25, &freq, &duty) == NRC_SUCCESS) {
+		cfg_ch2.u.phase.frequency1 = freq;
+		cfg_ch2.u.phase.duty1 = (uint8_t)duty;
+	} else {
+		nrc_usr_print("[%s] Check the availabe parameters for PWM CH%d\n",__func__, cfg_ch2.ch);
+		return false;
+	}
+
+	nrc_pwm_configure(&cfg_ch2, false);
+	nrc_pwm_set_enable_ex(PWM_CH2, true, false);
+
+	/* CH3 (PHASE2) */
+	const uint32_t target_hz_ch3 =  2000000;
+	memset(&cfg_ch3, 0, sizeof(cfg_ch3));
+	cfg_ch3.ch = PWM_CH3;
+	cfg_ch3.gpio_num = PWM_GPIO3;
+	cfg_ch3.mode = NRC_PWM_MODE_PHASE2;
+	cfg_ch3.clk_div = NRC_PWM_CLK_DIV_2;
+	cfg_ch3.inversion = false;
+	cfg_ch3.trigger = true;
+
+
+	if (nrc_pwm_calc_freq_duty(BASE_CLK_HZ, cfg_ch3.clk_div ,target_hz_ch3, 75, &freq, &duty) == NRC_SUCCESS) {
+		cfg_ch3.u.phase.frequency0 = freq;
+		cfg_ch3.u.phase.duty0 = (uint8_t)duty;
+	} else {
+		nrc_usr_print("[%s] Check the availabe parameters for PWM CH%d\n",__func__, cfg_ch3.ch);
+		return false;
+	}
+
+	if (nrc_pwm_calc_freq_duty(BASE_CLK_HZ, cfg_ch3.clk_div ,target_hz_ch3, 25, &freq, &duty) == NRC_SUCCESS) {
+		cfg_ch3.u.phase.frequency1 = freq;
+		cfg_ch3.u.phase.duty1 = (uint8_t)duty;
+	} else {
+		nrc_usr_print("[%s] Check the availabe parameters for PWM CH%d\n",__func__, cfg_ch3.ch);
+		return false;
+	}
+
+	nrc_pwm_configure(&cfg_ch3, false);
+	nrc_pwm_set_enable_ex(PWM_CH3, true, false);
+
+	/* Apply */
+	nrc_pwm_apply(PWM_CH0);
+	nrc_pwm_apply(PWM_CH1);
+	nrc_pwm_apply(PWM_CH2);
+	nrc_pwm_apply(PWM_CH3);
+
+	/* Keep initial waveform as-is */
+	while (1) {
+		_delay_ms(1000);
+	}
+	return true;
+}
+
+#endif
 
 /******************************************************************************
  * FunctionName : user_init
@@ -187,6 +390,13 @@ void user_init(void)
 {
 	//Enable Console for Debugging
 	nrc_uart_console_enable(true);
-
+#if defined(NRC7292)
 	run_sample_pwm(TEST_COUNT, TEST_INTERVAL);
+#else
+#if PWM_SAMPLE_MODE_PHASE
+	pwm_phase_demo();
+#else
+	pwm_regout_demo();
+#endif
+#endif
 }

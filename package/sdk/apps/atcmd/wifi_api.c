@@ -597,7 +597,7 @@ int wifi_api_set_tx_power (enum TX_POWER_TYPE type, uint8_t power)
 			return -EINVAL;
 	}
 
-	if (nrc_wifi_set_tx_power(power, _type) != WIFI_SUCCESS)
+	if (nrc_wifi_set_tx_power(0, power, _type) != WIFI_SUCCESS)
 		return -1;
 
 	return 0;
@@ -699,13 +699,16 @@ int wifi_api_set_mcs (uint8_t index)
 	return 0;
 }
 
-int wifi_api_get_duty_cycle (uint32_t *window, uint32_t *duration, uint32_t *margin)
+int wifi_api_get_duty_cycle (uint32_t *window, uint32_t *duration, uint32_t *margin, uint32_t *remain_duration)
 {
 	if (!window || !duration || !margin)
 		return -EINVAL;
 
 	if (system_modem_api_get_duty_cycle(window, duration, margin))
+	{
+		system_modem_api_tx_available_duty_cycle(remain_duration);
 		return 0;
+	}
 
 	return -1;
 }
@@ -1881,3 +1884,78 @@ int wifi_api_disable_wps (void)
 
 	return 0;
 }
+
+#if defined(INCLUDE_MANUAL_CONT_TX_SUPPORT)
+int wifi_api_continuous_tx_enable (wifi_ctx_params_t *params)
+{
+	char str_bw[2+1];
+
+	if (!params)
+		return -EINVAL;
+
+	snprintf(str_bw, sizeof(str_bw), "%cm", '0' + params->bw);
+
+	if (!system_modem_api_set_cont_tx(true, params->freq, str_bw, 
+			params->mcs, params->txpwr, params->type, params->interval))
+		return -1;
+
+	return 0;
+}
+
+int wifi_api_continuous_tx_disable (void)
+{
+	if (!system_modem_api_set_cont_tx(false, 0, NULL, 0, 0, 0, 0))
+		return -1;
+
+	return 0;
+}
+
+int wifi_api_sine_tx_enable (wifi_stx_params_t *params)
+{
+	char str_bw[2+1];
+
+	if (!params)
+		return -EINVAL;
+
+	snprintf(str_bw, sizeof(str_bw), "%cm", '0' + params->bw);
+
+	if (!system_modem_api_set_sine_tx(true, params->freq, str_bw, params->txpwr))
+		return -1;
+
+	return 0;
+}
+
+int wifi_api_sine_tx_disable (void)
+{
+	if (!system_modem_api_set_sine_tx(false, 0, NULL, 0))
+		return -1;
+
+	return 0;
+}
+
+int wifi_api_tx_data_count (wifi_data_count_t *count)
+{
+	bool ret;
+
+	if (!count)
+		ret = system_modem_api_clear_tx_count();
+	else
+		ret = system_modem_api_get_tx_data_count(&count->n_OK, &count->b_OK,
+												&count->n_RTX, &count->b_RTX);
+
+	return ret ? 0 : -1;
+}
+
+int wifi_api_rx_data_count (wifi_data_count_t *count)
+{
+	bool ret;
+
+	if (!count)
+		ret = system_modem_api_clear_rx_count();
+	else
+		ret = system_modem_api_get_rx_data_count(&count->n_OK, &count->b_OK,
+												&count->n_NOK, &count->b_NOK);
+
+	return ret ? 0 : -1;
+}
+#endif // INCLUDE_MANUAL_CONT_TX_SUPPORT

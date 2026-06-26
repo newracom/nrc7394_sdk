@@ -1,5 +1,5 @@
 <CURRENT VERSION>
-v6.5.0 / v7.4.0 (Multi)
+v6.5.1 / v7.4.2 (Multi)
 
 <VERSION HISTORY>
 v3.0.0
@@ -181,3 +181,12 @@ v6.5.0 (10/14/2025)
 v6.5.0 (12/24/2025)
 - Updated bootloader/firmware.
 - Support PY25Q16HB
+
+v6.5.1 / v7.4.2 (02/24/2026)
+- Updated bootloader/firmware.
+- Hidden FOTA write mode.
+- Support Winbond W77Q32JWXGIR
+
+v6.5.1 / v7.4.2 (05/07/2026)
+- Updated bootloader/firmware.
+- Support boot_config for J-Link in XIP bootloader

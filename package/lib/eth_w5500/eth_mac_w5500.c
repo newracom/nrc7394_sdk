@@ -766,13 +766,13 @@ static void emac_led_init(void)
     NRC_GPIO_CONFIG gpio_config;
     gpio_config.gpio_pin = GPIO_TX_LED;
     gpio_config.gpio_dir = GPIO_OUTPUT;
-    gpio_config.gpio_mode = GPIO_PULL_DOWN;
+    gpio_config.gpio_mode = GPIO_FLOATING;
     gpio_config.gpio_alt = GPIO_FUNC;
     nrc_gpio_config(&gpio_config);
 
     gpio_config.gpio_pin = GPIO_RX_LED;
     gpio_config.gpio_dir = GPIO_OUTPUT;
-    gpio_config.gpio_mode = GPIO_PULL_DOWN;
+    gpio_config.gpio_mode = GPIO_FLOATING;
     gpio_config.gpio_alt = GPIO_FUNC;
     nrc_gpio_config(&gpio_config);
 }

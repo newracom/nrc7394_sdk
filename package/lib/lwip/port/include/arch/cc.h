@@ -36,6 +36,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h> /* abort */
+#include "util_trace_stack.h"
 
 /* Types based on stdint.h */
 typedef uint8_t            u8_t;

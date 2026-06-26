@@ -17,10 +17,11 @@
 #include "mbedtls/sha1.h"
 #include "mbedtls/platform_util.h"
 #include "mbedtls/error.h"
-
-#include <string.h>
-
 #include "mbedtls/platform.h"
+
+#if defined(INCLUDE_HW_SECURITY_ACC_SHA)
+#include "drv_sec.h"
+#endif
 
 #if !defined(MBEDTLS_SHA1_ALT)
 
@@ -51,13 +52,20 @@ int mbedtls_sha1_starts(mbedtls_sha1_context *ctx)
 {
     ctx->total[0] = 0;
     ctx->total[1] = 0;
+#if defined(INCLUDE_HW_SECURITY_ACC_SHA)
+	//	  CPA("[%s]\n", __func__);
 
+    sha_init(ENDIAN_LE);
+    if(sha_configure(SHA_MODE_1, SHA_BIT_256, SHA_VERIANT_DIS, 1) != 0) {
+         return MBEDTLS_ERR_ERROR_CORRUPTION_DETECTED;
+    }
+#else
     ctx->state[0] = 0x67452301;
     ctx->state[1] = 0xEFCDAB89;
     ctx->state[2] = 0x98BADCFE;
     ctx->state[3] = 0x10325476;
     ctx->state[4] = 0xC3D2E1F0;
-
+#endif //#if defined(INCLUDE_HW_SECURITY_ACC_SHA)
     return 0;
 }
 
@@ -65,6 +73,37 @@ int mbedtls_sha1_starts(mbedtls_sha1_context *ctx)
 int mbedtls_internal_sha1_process(mbedtls_sha1_context *ctx,
                                   const unsigned char data[64])
 {
+#if defined(INCLUDE_HW_SECURITY_ACC_SHA)
+    // static unsigned char tmp[64];
+    int ret = 0;
+    int j;
+
+    // memcpy(tmp, data, 64);
+
+    // for(j=0;j<64;j+=4)
+    //   convert_endian((tmp + j), 4);
+
+    ret = sha_msg_update (data, 64);
+    if( ret != 0 )
+        goto fail_hw;
+
+    sha_start();
+    if( sha_is_done() ==0 ) {
+        ret = 1;
+        goto fail_hw;
+    }
+
+    ret = sha_get_result ((uint8_t*)ctx->state, 20);
+    if( ret != 0 )
+        goto fail_hw;
+
+    ret = sha_set_firstblk(0);
+    if(  ret != 0 )
+        goto fail_hw;
+
+fail_hw:
+    return ret;
+#else
     struct {
         uint32_t temp, W[16], A, B, C, D, E;
     } local;
@@ -228,6 +267,7 @@ int mbedtls_internal_sha1_process(mbedtls_sha1_context *ctx,
     mbedtls_platform_zeroize(&local, sizeof(local));
 
     return 0;
+#endif //#if defined(CONFIG_USE_HW_SECURITY_ACC_SHA)
 }
 
 #endif /* !MBEDTLS_SHA1_PROCESS_ALT */
@@ -330,6 +370,10 @@ int mbedtls_sha1_finish(mbedtls_sha1_context *ctx,
         goto exit;
     }
 
+#if defined(INCLUDE_HW_SECURITY_ACC_SHA)
+    memcpy(output, ctx->state, 20);
+    //bignum_init(0);
+#else
     /*
      * Output final state
      */
@@ -338,7 +382,7 @@ int mbedtls_sha1_finish(mbedtls_sha1_context *ctx,
     MBEDTLS_PUT_UINT32_BE(ctx->state[2], output,  8);
     MBEDTLS_PUT_UINT32_BE(ctx->state[3], output, 12);
     MBEDTLS_PUT_UINT32_BE(ctx->state[4], output, 16);
-
+#endif //#if defined(INCLUDE_HW_SECURITY_ACC_SHA)
     ret = 0;
 
 exit:

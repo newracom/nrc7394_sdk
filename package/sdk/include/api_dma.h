@@ -190,7 +190,7 @@ void nrc_dma_disable (void);
  *
  * @param NONE
  *
- * @return return true if DMA is enabled, false otherwise.
+ * @return true if DMA is enabled, false otherwise.
  ***********************************************/
 bool nrc_dma_is_enabled(void);
 
@@ -436,7 +436,7 @@ int nrc_dma_desc_link (dma_desc_t *desc, dma_desc_t *next);
  *
  * @param desc : dma_desc_t to be updated.
  * @param src_addr : source address to update to.
- * @param deset_addr : destination address to update to.
+ * @param dest_addr : destination address to update to.
  *
  * @return 0 if successful, NRC_DMA_EINVAL otherwise.
  ***********************************************/

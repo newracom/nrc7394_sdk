@@ -225,6 +225,7 @@ DLLExport int MQTTIsConnected(MQTTClient* client);
 *  @return success code
 */
 DLLExport int MQTTStartTask(MQTTClient* client);
+DLLExport int MQTTStopTask(MQTTClient* client);
 #endif
 
 DLLExport void MQTTCloseSession(MQTTClient* c);

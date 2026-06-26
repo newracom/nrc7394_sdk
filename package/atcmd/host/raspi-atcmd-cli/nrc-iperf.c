@@ -743,17 +743,6 @@ static int iperf_udp_server_run (iperf_opt_t *option)
 
 	info->stop_time = current_time;	
 
-	if (!info->done)
-	{
-		const int timeout = (3 * 1000); /* msec */
-
-		for (i = 0 ; i < timeout && !info->done ; i++)
-			usleep(1000);
-
-		if (i >= timeout)
-			iperf_log(" Last datagram from client: timeout %d sec\n", i / 1000); 
-	}
-			
 	elapse_time = info->stop_time - info->start_time;	
 
 	if (info->report_interval > 0 && elapse_time > (report_time - info->report_interval))
@@ -777,6 +766,17 @@ static int iperf_udp_server_run (iperf_opt_t *option)
 
 	iperf_log(" Done: %d/%d\n", info->datagram_cnt, info->datagram_seq);
 
+	if (!info->done)
+	{
+		const int timeout = (3 * 1000); /* msec */
+
+		for (i = 0 ; i < timeout && !info->done ; i++)
+			usleep(1000);
+
+		if (i >= timeout)
+			iperf_log(" Last datagram from client: timeout %d sec\n", i / 1000); 
+	}
+			
 	return 0;
 }
 
@@ -1282,17 +1282,6 @@ static int iperf_tcp_server_run (iperf_opt_t *option)
 
 	info->stop_time = current_time;	
 
-	if (!info->done)
-	{
-		const int timeout = (3 * 1000); /* msec */
-
-		for (i = 0 ; i < timeout && !info->done ; i++)
-			usleep(1000);
-
-		if (i >= timeout)
-			iperf_log(" Disconnection from client: timeout %d sec\n", i / 1000); 
-	}
-
 	elapse_time = info->stop_time - info->start_time;
 
 	if (info->report_interval > 0 && elapse_time > (report_time - info->report_interval))
@@ -1304,6 +1293,17 @@ static int iperf_tcp_server_run (iperf_opt_t *option)
 	iperf_tcp_server_report(0, elapse_time, info->recv_byte);
 
 	iperf_log(" Done\n");
+
+	if (!info->done)
+	{
+		const int timeout = (10 * 1000); /* msec */
+
+		for (i = 0 ; i < timeout && !info->done ; i++)
+			usleep(1000);
+
+		if (i >= timeout)
+			iperf_log(" Disconnection from client: timeout %d sec\n", i / 1000); 
+	}
 
 	return 0;
 }

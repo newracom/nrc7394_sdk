@@ -54,6 +54,7 @@ enum ATCMD_RET_TYPE
 	ATCMD_RET_TIMEOUT = -2,
 	ATCMD_RET_ERROR = -1,
 	ATCMD_RET_OK = 0,
+	ATCMD_RET_WAIT,
 	ATCMD_RET_NONE
 };
 
@@ -142,7 +143,7 @@ typedef struct
 	};
 } atcmd_rxd_t;
 
-typedef int (*atcmd_boot_cb_t) (int reason);
+typedef int (*atcmd_boot_cb_t) (int reason, bool event);
 typedef int (*atcmd_info_cb_t) (const char *cmd, int argc, char *argv[]);
 typedef int (*atcmd_event_cb_t) (enum ATCMD_EVENT event, int argc, char *argv[]);
 typedef void (*atcmd_rxd_cb_t) (atcmd_rxd_t *rxd, char *data);

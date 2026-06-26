@@ -36,6 +36,8 @@
 //#define WAKEUP_GPIO_PIN2 17
 #endif
 
+void ifconfig_display_all();
+
 static void user_operation(uint32_t delay_ms)
 {
 	_delay_ms(delay_ms);
@@ -143,6 +145,8 @@ check_again:
 	nrc_ps_set_gpio_out(0x0);
 	nrc_ps_set_gpio_pullup(0x0);
 #endif
+
+	ifconfig_display_all();
 
 	while (1) {
 		if(ps_mode){

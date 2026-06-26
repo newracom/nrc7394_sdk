@@ -321,6 +321,24 @@
 #endif /* NRC_AP_SET_CHANNEL_BW */
 
 /**
+ * This code sets the location of 1MHz primary channel for an 2M or 4M bandwidth access point (AP).
+ * The available options for location are 0 or 1 for 2MBW AP and 0, 1, 2, or 3 for 4MBW AP
+ * the default value of -1 means 0 for 2MBW AP and 1 for 4MBW AP
+ */
+#ifndef NRC_AP_SET_LOC_1M_PRIMARY_CH
+#define NRC_AP_SET_LOC_1M_PRIMARY_CH -1
+#endif /* NRC_AP_SET_LOC_1M_PRIMARY_CH */
+
+/**
+ * 4M op as 2M primary, forbid all 1MHz BW frames (AP/STA common).
+ * -1: off (default) / 0: lower 2M primary / 1: upper 2M primary.
+ * AP advertises 2M primary; STA suppresses 1M when associated to a 4/2 AP.
+ */
+#ifndef NRC_AP_SET_BW_4M_2M_PRIM_LOC
+#define NRC_AP_SET_BW_4M_2M_PRIM_LOC -1
+#endif /* NRC_AP_SET_BW_4M_2M_PRIM_LOC */
+
+/**
  * Controls whether the system attempts to automatically find
  * the best SoftAP operating channel when no fixed channel is set.
  *

@@ -429,6 +429,7 @@ int NetworkConnectTLS(Network *n, const char *addr, int po, Certs *certs)
 		nrc_usr_print("[%s] memory malloc error.\n", __func__);
 		return -10;
 	}
+	memset(ssl, 0, sizeof(*ssl));
 
 	/*
 	* Initialize the RNG and the session data
@@ -439,11 +440,14 @@ int NetworkConnectTLS(Network *n, const char *addr, int po, Certs *certs)
 	mbedtls_net_init(&ssl->net_ctx);
 	mbedtls_ssl_init(&ssl->ssl_ctx);
 	mbedtls_ssl_config_init(&ssl->ssl_conf);
+	mbedtls_ctr_drbg_init(&ssl->ctr_drbg);
+	mbedtls_entropy_init(&ssl->entropy);
 #if defined(MBEDTLS_X509_CRT_PARSE_C)
 	mbedtls_x509_crt_init(&ssl->cacert);
 	mbedtls_x509_crt_init(&ssl->clicert);
 	mbedtls_pk_init(&ssl->pkey);
 #endif
+	n->my_socket = (int)(ssl);
 
 	/*
 	* Initialize certificates
@@ -455,7 +459,7 @@ int NetworkConnectTLS(Network *n, const char *addr, int po, Certs *certs)
 		ret = mbedtls_x509_crt_parse(&ssl->cacert, (const unsigned char *)certs->ca_cert, certs->ca_cert_length);
 		if (ret != 0) {
 			nrc_usr_print(" failed! x509parse_crt returned -0x%04x\n\n", -ret);
-			return ret;
+			goto fail;
 		}
 #endif
 	}
@@ -479,7 +483,7 @@ int NetworkConnectTLS(Network *n, const char *addr, int po, Certs *certs)
 #endif
 		if ( ret != 0 ) {
 			nrc_usr_print(" failed! mbedtls_x509_crt_parse returned -0x%x\n\n", -ret);
-			return ret;
+			goto fail;
 		}
 #if !defined( RELEASE )
 		ssl_parse_crt(&ssl->clicert);
@@ -490,12 +494,10 @@ int NetworkConnectTLS(Network *n, const char *addr, int po, Certs *certs)
 		nrc_usr_print("  . Parsing the client private key[%s] ...", certs->client_pk_pwd);
 
 #if (MBEDTLS_VERSION_MAJOR >= 3)
-		mbedtls_ctr_drbg_init(&ssl->ctr_drbg);
-		mbedtls_entropy_init(&ssl->entropy);
 		if ((ret = mbedtls_ctr_drbg_seed(&ssl->ctr_drbg, mbedtls_entropy_func,
 			&ssl->entropy, NULL, 0)) != 0) {
 			nrc_usr_print(" failed! mbedtls_ctr_drbg_seed returned -0x%x\n", -ret);
-			return ret;
+			goto fail;
 		}
 
 		ret = mbedtls_pk_parse_key(&ssl->pkey,
@@ -515,7 +517,7 @@ int NetworkConnectTLS(Network *n, const char *addr, int po, Certs *certs)
 #endif
 		if ( ret != 0 ) {
 			nrc_usr_print(" failed! mbedtls_pk_parse_key returned -0x%x\n\n", -ret);
-			return ret;
+			goto fail;
 		}
 		nrc_usr_print(" ok\n");
 	}
@@ -527,7 +529,7 @@ int NetworkConnectTLS(Network *n, const char *addr, int po, Certs *certs)
 	nrc_usr_print("  . Connecting to tcp/%s/%s...", addr, port);
 	if (0 != (ret = mbedtls_net_connect(&ssl->net_ctx, addr, port, MBEDTLS_NET_PROTO_TCP))) {
 		nrc_usr_print(" failed! net_connect returned -0x%04x\n\n", -ret);
-		return ret;
+		goto fail;
 	}
 	nrc_usr_print(" ok\n");
 
@@ -540,7 +542,7 @@ int NetworkConnectTLS(Network *n, const char *addr, int po, Certs *certs)
 				MBEDTLS_SSL_TRANSPORT_STREAM,
 				MBEDTLS_SSL_PRESET_DEFAULT ) ) != 0 ) {
 		nrc_usr_print(" failed! mbedtls_ssl_config_defaults returned %d\n\n", ret);
-		return ret;
+		goto fail;
 	}
 	nrc_usr_print(" ok\n");
 
@@ -559,7 +561,7 @@ int NetworkConnectTLS(Network *n, const char *addr, int po, Certs *certs)
 
 	if ( ( ret = mbedtls_ssl_conf_own_cert(&ssl->ssl_conf, &ssl->clicert, &ssl->pkey ) ) != 0 ) {
 		nrc_usr_print(" failed! mbedtls_ssl_conf_own_cert returned %d\n\n", ret);
-		return ret;
+		goto fail;
 	}
 #endif
 	mbedtls_ssl_conf_rng(&ssl->ssl_conf, mqtt_ssl_random, NULL );
@@ -568,7 +570,7 @@ int NetworkConnectTLS(Network *n, const char *addr, int po, Certs *certs)
 
 	if ( ( ret = mbedtls_ssl_setup(&ssl->ssl_ctx, &ssl->ssl_conf) ) != 0 ) {
 		nrc_usr_print(" failed! mbedtls_ssl_setup returned %d\n\n", ret);
-		return ret;
+		goto fail;
 	}
 	mbedtls_ssl_set_hostname(&ssl->ssl_ctx, addr);
 	mbedtls_ssl_set_bio( &ssl->ssl_ctx, &ssl->net_ctx, mbedtls_net_send, mbedtls_net_recv, mbedtls_net_recv_timeout);
@@ -580,7 +582,7 @@ int NetworkConnectTLS(Network *n, const char *addr, int po, Certs *certs)
 	while ((ret = mbedtls_ssl_handshake(&ssl->ssl_ctx)) != 0) {
 		if ((ret != MBEDTLS_ERR_SSL_WANT_READ) && (ret != MBEDTLS_ERR_SSL_WANT_WRITE)) {
 			nrc_usr_print(" failed! mbedtls_ssl_handshake returned -0x%04x\n\n", -ret);
-			return ret;
+			goto fail;
 		}
 	}
 	nrc_usr_print(" ok\n");
@@ -592,7 +594,7 @@ int NetworkConnectTLS(Network *n, const char *addr, int po, Certs *certs)
 	nrc_usr_print("  . Verifying peer X.509 certificate...");
 	if (0 != (ret = mqtt_real_confirm(mbedtls_ssl_get_verify_result(&ssl->ssl_ctx)))) {
 		nrc_usr_print(" failed! verify result not confirmed.\n\n");
-		return ret;
+		goto fail;
 	}
 #else
 #if defined(MBEDTLS_X509_CRT_PARSE_C)
@@ -632,19 +634,44 @@ int NetworkConnectTLS(Network *n, const char *addr, int po, Certs *certs)
 	n->disconnect = mqtt_ssl_disconnect;
 
 	return 0;
+
+fail:
+	NetworkDisconnectTLS(n);
+	return ret;
 }
 
 int NetworkDisconnectTLS(Network* n)
 {
 	mqtt_ssl_t *ssl = (mqtt_ssl_t *)(n->my_socket);
-	int sock = n->my_socket;
+	int sock = -1;
 
-	shutdown(sock, SHUT_RDWR);
-	close(sock);
+	if (!n)
+		return -1;
 
 	if (ssl != NULL) {
+		sock = ssl->net_ctx.fd;
+
+		mbedtls_ssl_close_notify(&ssl->ssl_ctx);
+		if (sock >= 0) {
+			shutdown(sock, SHUT_RDWR);
+			close(sock);
+		}
+
+		mbedtls_ssl_free(&ssl->ssl_ctx);
+		mbedtls_ssl_config_free(&ssl->ssl_conf);
+		mbedtls_x509_crt_free(&ssl->cacert);
+		mbedtls_x509_crt_free(&ssl->clicert);
+		mbedtls_pk_free(&ssl->pkey);
+		mbedtls_ctr_drbg_free(&ssl->ctr_drbg);
+		mbedtls_entropy_free(&ssl->entropy);
+		mbedtls_net_free(&ssl->net_ctx);
 		vPortFree(ssl);
 	}
+
+	n->my_socket = 0;
+	n->mqttread = NULL;
+	n->mqttwrite = NULL;
+	n->disconnect = NULL;
 
 	return 0;
 }

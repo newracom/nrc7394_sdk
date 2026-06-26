@@ -61,13 +61,13 @@ int mbedtls_internal_sha1_process( mbedtls_sha1_context *ctx,
 
     // memcpy(tmp, data, 64);
 
-    // for(j=0;j<64;j+=4) 
+    // for(j=0;j<64;j+=4)
     //     convert_endian((tmp + j), 4);
 
     ret = sha_msg_update (data, 64);
     if( ret != 0 )
         goto fail_hw;
-    
+
     sha_start();
     if( sha_is_done() ==0 ) {
         ret = 1;

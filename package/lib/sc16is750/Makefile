@@ -1,0 +1,14 @@
+include $(CONFIG)
+
+PKG_NAME=sc16is750
+
+CSRCS += \
+	SC16IS750.c
+
+SC16IS750_BASE = $(CURDIR)
+
+INCLUDE	+= -I$(SC16IS750_BASE)
+
+VPATH	+= $(SC16IS750_BASE)
+
+include $(TOPDIR)/make/build-lib.mk

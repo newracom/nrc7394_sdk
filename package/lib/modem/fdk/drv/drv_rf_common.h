@@ -69,7 +69,7 @@ bool drv_rf_singen_on(int8_t freq_100khz);
 void drv_rf_singen_off();
 
 void rf_delay_us(uint32_t us);
-void drv_rf_trx_cal(cal_mode_t mode , bool dac_swap , int32_t *param0 , int32_t *param1 , bool debug);
+void drv_rf_trx_cal(cal_mode_t mode , bool dac_swap , int32_t *param0 , int32_t *param1 , bool debug , uint8_t tx_lo_tlpf);
 void drv_rf_set_cal_param(cal_mode_t mode , int32_t param0 , int32_t param1);
 void drv_rf_get_cal_param(cal_mode_t mode , int32_t *param0 , int32_t *param1);
 void drv_rf_cal_phy_setting(cal_mode_t mode , bool dac_swap);

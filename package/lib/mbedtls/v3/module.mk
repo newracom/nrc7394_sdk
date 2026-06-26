@@ -141,15 +141,10 @@ TLS_SRCS += \
 PORTING_SRCS += \
 	timing_alt.c
 
-ifeq ($(CONFIG_USE_HW_SECURITY_ACC_SHA),y)
-CRYPTO_SRCS += sha1_hw.c
-CRYPTO_SRCS += sha256_hw.c
-CRYPTO_SRCS += sha512_hw.c
-else
-CRYPTO_SRCS += sha1.c
-CRYPTO_SRCS += sha256.c
-CRYPTO_SRCS += sha512.c
-endif # CONFIG_USE_HW_SECURITY_ACC_SHA
+CRYPTO_SRCS += \
+    sha1.c \
+    sha256.c \
+    sha512.c
 
 ifeq ($(CONFIG_USE_HW_SECURITY_ACC_BN),y)
 CRYPTO_SRCS += bignum_hw.c

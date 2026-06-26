@@ -69,6 +69,8 @@ typedef struct {
     hal_modem_txpower_t txpower;
     uint8_t rxgain;
     uint8_t txgain;
+    int32_t lo_param_array[16][2];
+    bool    lo_param_array_valid;
 } hal_modem_info_t;
 
 typedef struct {
@@ -123,6 +125,7 @@ uint8_t hal_modem_set_txpwr(int16_t txpwr);
 #else
 uint8_t hal_modem_set_txpwr(int16_t txpwr, int16_t temp_power_offset);
 #endif
+void hal_modem_set_jtag(bool enable);
 
 void            hal_modem_set_rxgain(uint8_t rxgain, bool recovery);
 void            hal_modem_cfo_ppm(double cfo_ppm);

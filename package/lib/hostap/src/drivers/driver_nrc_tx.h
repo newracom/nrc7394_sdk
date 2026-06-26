@@ -53,6 +53,11 @@ int nrc_transmit_from_8023_mb(uint8_t vif_id, uint8_t **frames, uint16_t len[], 
 int nrc_raw_transmit(struct nrc_wpa_if* intf, uint8_t *frm, const uint16_t len,
 				const int ac);
 int nrc_send_deauth(struct nrc_wpa_if *intf, const uint8_t *addr, uint16_t reason_code, bool report_status);
+int nrc_send_disassoc(struct nrc_wpa_if *intf, const uint8_t *addr, uint16_t reason_code, bool report_status);
+#if defined(INCLUDE_SA_QUERY_TEST_INJECT)
+int nrc_send_forged_unprot_deauth(int vif, const uint8_t *peer,
+				uint16_t reason_code, bool disassoc);
+#endif
 int nrc_send_action(int vif, uint8_t *addr, uint8_t *payload, uint16_t payload_len);
 int nrc_send_action_tx_status(int vif, const uint8_t *dst, const uint8_t *src,
 		const uint8_t *bssid, const uint8_t *payload, uint16_t payload_len, uint32_t wait);

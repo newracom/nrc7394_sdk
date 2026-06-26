@@ -52,6 +52,9 @@ CONFIG_MQTT_RECOVERY=n
 # RELEASE FW
 CONFIG_LOG=n
 
+# Enable stack protector (strong)
+SP_CFLAGS = -fstack-protector-strong
+
 #// --------------------------------------------------
 #// Flash Memory size
 #// --------------------------------------------------
@@ -119,9 +122,17 @@ else
 CONFIG_IPV6=n
 endif
 
+# Little file system
+CONFIG_LITTLEFS=n
+
 # DPP (WiFi Easy Connect)
 ifeq ($(CONFIG_FLASH_SIZE), 4M)
 CONFIG_DPP=y
+else
+CONFIG_DPP=n
+CONFIG_DPP2=n
+CONFIG_DPP3=n
+CONFIG_NO_CONFIG_BLOBS=y
 endif
 
 #// --------------------------------------------------
@@ -156,7 +167,13 @@ endif
 ifneq ($(findstring extram, $(ALIAS)), )
 CONFIG_EXT_RAM = y
 else
-CONFIG_EXT_RAM = n
+CONFIG_EXT_RAM ?= n
+endif
+
+ifeq ($(CONFIG_OV5640), y)
+DEFINE  += -DSUPPORT_OV5640
+CONFIG_EXT_RAM = y
+CONFIG_RUNRAM = n
 endif
 
 ifeq ($(CONFIG_EXT_RAM),y)
@@ -407,6 +424,11 @@ else
   endif
 endif
 
+ifeq ($(CONFIG_OV5640), y)
+  LD_CM_FILE_NAME = cm3_common_ov5640.ld
+  LD_FILE_NAME = cm3_$(TARGET)_ov5640.ld
+endif
+
 LD_CM_FILE		=	$(LIB_MODEM_PATH)/$(LD_CM_FILE_NAME)
 LD_FILE			=	$(LIB_MODEM_PATH)/$(LD_FILE_NAME)
 
@@ -421,7 +443,9 @@ include make/configure-in.flash
 #// --------------------------------------------------
 VPATH	+= $(LIB_MODEM_SRC_PATH)
 CSRCS   += standalone.c
+CSRCS   += vendor_default.c
 CSRCS	+= bdf_api.c
+CSRCS	+= nrc_sdk_log.c
 
 #// --------------------------------------------------
 #// System/Target Dependent Define
@@ -435,8 +459,12 @@ else
 ifeq ($(CONFIG_IPV6),y)
 DEFINE	+= -DconfigTOTAL_HEAP_SIZE=220000
 else
+ifeq ($(CONFIG_OV5640), y)
 ifeq ($(CONFIG_EXT_RAM), y)
-DEFINE	+= -DconfigTOTAL_HEAP_SIZE=512000
+DEFINE	+= -DconfigTOTAL_HEAP_SIZE=220000
+else
+DEFINE	+= -DconfigTOTAL_HEAP_SIZE=511960
+endif
 else
 DEFINE	+= -DconfigTOTAL_HEAP_SIZE=320000
 endif
@@ -451,11 +479,6 @@ UNAME := "$(shell uname -a)"
 TIMEFMT := --format="- %e Seconds"
 
 #// --------------------------------------------------
-#// Vendor-Specific Config
-#//--------------------------------------------------
-#include make/Makefile.vendor
-
-#// --------------------------------------------------
 #// Build Flag
 #// --------------------------------------------------
 ARCH_FLAGS	= -mcpu=cortex-m3 -mthumb
@@ -468,6 +491,7 @@ CFLAGS	+= -Wno-address-of-packed-member
 CFLAGS	+= -fno-common -fno-exceptions -gdwarf-2 -ffunction-sections -fdata-sections
 CFLAGS	+= -Os
 CFLAGS	+= $(INCLUDE) $(ARCH_FLAGS) $(DEFINE)
+CFLAGS  += $(SP_CFLAGS)
 
 LFLAGS	= -nostartfiles -Wl,--gc-sections
 LFLAGS	+= $(ARCH_FLAGS) $(SYS_FLAGS)
@@ -484,6 +508,7 @@ NMFLAGS	= -S --demangle --size-sort -s -r
 #// --------------------------------------------------
 #// Others
 #//--------------------------------------------------
+include make/Makefile.source_map
 include make/Makefile.feature
 include make/Makefile.feature.lib
 include make/Makefile.common

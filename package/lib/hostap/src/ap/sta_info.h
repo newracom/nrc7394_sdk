@@ -217,6 +217,12 @@ struct sta_info {
 	int sa_query_count; /* number of pending SA Query requests;
 			     * 0 = no SA Query in progress */
 	int sa_query_timed_out;
+#if defined(INCLUDE_SA_QUERY_UNPROT_DISCONNECT)
+	int sa_query_unprot; /* SA Query was started because an unprotected
+			      * Deauth/Disassoc was received from this STA; on
+			      * SA Query timeout the STA is torn down (not just
+			      * marked timed-out). */
+#endif
 	u8 *sa_query_trans_id; /* buffer of WLAN_SA_QUERY_TR_ID_LEN *
 				* sa_query_count octets of pending SA Query
 				* transaction identifiers */

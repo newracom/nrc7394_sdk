@@ -89,6 +89,11 @@ clean: ucodeclean second_blclean
 	$(PREFIX).$(MAKEFILE) $(PARAM) ALIAS=$(ALIAS) clean
 	@rm -f $(BDFHDR)
 	@rm -f $(BDFDATA)
+ifneq ($(findstring lib,$(ALIAS)),)
+	@if [ -d "out/$(SYSTEM)/standalone_xip/library" ]; then \
+		rm -r "out/$(SYSTEM)/standalone_xip/library"; \
+	fi
+endif
 
 distclean: ucodeclean second_blclean
 	$(PREFIX).$(MAKEFILE) clean

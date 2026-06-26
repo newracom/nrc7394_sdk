@@ -84,13 +84,15 @@ tWIFI_STATUS nrc_wifi_get_tx_power (int vif_id, uint8_t *txpower);
  * @brief Set the transmit power level (in dBm) and type
  *        It should be invoked following the configuration of the country code.
  *
+ * @param vif_id: Network interface index
+ *
  * @param txpower: TX Power (in dBm) (1~30)
  *
  * @param type: Auto(0), Limit(1), Fixed(2)
  *
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-tWIFI_STATUS nrc_wifi_set_tx_power (uint8_t txpower, uint8_t type);
+tWIFI_STATUS nrc_wifi_set_tx_power (int vif_id, uint8_t txpower, uint8_t type);
 
 
 /**********************************************
@@ -276,13 +278,15 @@ tWIFI_STATUS nrc_wifi_disable_duty_cycle (void);
 
 
 /**********************************************
- * @fn bool nrc_wifi_tx_available_duty_cycle(void)
+ * @fn bool nrc_wifi_tx_available_duty_cycle(uint32_t *time_us)
  *
  * @brief check the tx is available in duty cycle
  *
+ * @param time_us: available duty cycle time (us)
+ *
  * @return If enabled, then true. Otherwise, false is returned.
  ***********************************************/
-bool nrc_wifi_tx_available_duty_cycle(void);
+bool nrc_wifi_tx_available_duty_cycle(uint32_t *time_us);
 
 /**********************************************
  * @fn tWIFI_STATUS nrc_wifi_enable_scan_random_delay(bool enable)
@@ -545,7 +549,7 @@ tWIFI_STATUS nrc_wifi_softap_get_ignore_broadcast_ssid(int vif_id, int *ignore_b
  * @param ignore_broadcast_ssid: ignore broadcast SSID type
  *   0: send full SSID in beacon
  *   1: send empty SSID (length=0) in beacon and ignore probe request for broadcast SSID
- *   2: send clear SSID (ASCII 0), but keep the original length and ignore probe reqeust for broadcast SSID
+ *   2: send clear SSID (ASCII 0), but keep the original length and ignore probe request for broadcast SSID
  *
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
@@ -717,6 +721,20 @@ void nrc_wifi_get_scan_freq_free(uint16_t *list);
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
 tWIFI_STATUS nrc_wifi_set_scan_freq (int vif_id, uint16_t *freq_list, uint8_t num_freq);
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_scan_freq_bw (int vif_id, uint16_t *freq_list, uint8_t num_freq, uint8_t bw)
+ *
+ * @brief Set scan frequency list with bandwidth hint for correct Op35/Op36 channel mapping.
+ *
+ * @param vif_id: Network interface index
+ * @param freq_list: S1G freq list to scan
+ * @param num_freq: num of freq
+ * @param bw: bandwidth in MHz (WIFI_1M=1, WIFI_2M=2, WIFI_4M=4). 0 falls back to default.
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_scan_freq_bw (int vif_id, uint16_t *freq_list, uint8_t num_freq, uint8_t bw);
 
 
 /**********************************************
@@ -956,7 +974,7 @@ tWIFI_STATUS nrc_wifi_wps_pbc(int vif_id);
 /**********************************************
  * @fn tWIFI_STATUS nrc_wifi_wps_cancel (int vif_id)
  *
- * @brief Cancels the pending WPS operaion
+ * @brief Cancels the pending WPS operation
  *
  * @param vif_id: Network interface index
  *
@@ -1041,7 +1059,7 @@ tWIFI_STATUS nrc_wifi_softap_set_max_num_sta(int vif_id, uint8_t max_sta_num);
  *
  * @param vif_id: Network interface index
  *
- * @param ip_addr: IP address
+ * @param ipaddr: IP address
  *
  * @param netmask: netmask for static IP
  *
@@ -1221,7 +1239,7 @@ uint16_t nrc_wifi_child_node_num(int vif_id);
  *
  * @param vif_id: Network interface index
  *
- * @param beacon_interval: beacon interval(TU). (1TU=1024us) (range range 15..65535)
+ * @param beacon_interval: beacon interval(TU). (1TU=1024us) (range 15..65535)
  *
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
@@ -1235,7 +1253,7 @@ tWIFI_STATUS nrc_wifi_softap_get_beacon_interval(int vif_id, uint16_t *beacon_in
  *
  * @param vif_id: Network interface index
  *
- * @param beacon_interval: beacon interval(TU). (1TU=1024us) (range range 15..65535)
+ * @param beacon_interval: beacon interval(TU). (1TU=1024us) (range 15..65535)
  *
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
@@ -1329,7 +1347,7 @@ tWIFI_STATUS nrc_wifi_get_ip_mode (int vif_id, tWIFI_IP_MODE* mode);
 /**********************************************
  * @fn tWIFI_STATUS nrc_wifi_set_ip_mode (int vif_id, tWIFI_IP_MODE mode, char* ip_addr)
  *
- * @brief Enable DHCP cient or set static IP
+ * @brief Enable DHCP client or set static IP
  *
  * @param vif_id: Network interface index
  *
@@ -1391,7 +1409,7 @@ tWIFI_STATUS nrc_wifi_stop_dhcp_client(int vif_id);
 
 
 /**********************************************
- * @fn tWIFI_STATUS nrc_wifi_set_dns_server (char* pri_dns, char *sec_dns)
+ * @fn tWIFI_STATUS nrc_wifi_set_dns (char* pri_dns, char *sec_dns)
  *
  * @brief Set DNS server
  *
@@ -1402,6 +1420,22 @@ tWIFI_STATUS nrc_wifi_stop_dhcp_client(int vif_id);
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
 tWIFI_STATUS nrc_wifi_set_dns (char* pri_dns, char *sec_dns);
+
+
+/**********************************************
+ * @fn  tWIFI_STATUS nrc_wifi_get_dns_address (int vif_id, char **dns1_addr, char **dns2_addr)
+ *
+ * @brief Get DNS server addresses. Start DHCP or set static IP (Sync: block until getting DNS addresses)
+ *
+ * @param vif_id: Network interface index
+ *
+ * @param dns1_addr: Primary DNS server address
+ *
+ * @param dns2_addr: Secondary DNS server address
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_dns_address (int vif_id, char **dns1_addr, char **dns2_addr);
 
 
 /**********************************************
@@ -1437,7 +1471,7 @@ tWIFI_STATUS nrc_wifi_send_addba(int vif_id, tWIFI_TID tid, char * mac_addr);
 
 
 /**********************************************
- * @fn  tWIFI_STATUS nrc_wifi_send_addba(int vif_id, tWIFI_TID tid, char * mac_addr)
+ * @fn  tWIFI_STATUS nrc_wifi_send_delba(int vif_id, tWIFI_TID tid, char * mac_addr)
  *
  * @brief Send DELBA action frame
  *
@@ -1455,15 +1489,15 @@ tWIFI_STATUS nrc_wifi_send_delba(int vif_id, tWIFI_TID tid, char * mac_addr);
 /**********************************************
  * @fn  tWIFI_STATUS nrc_wifi_set_tx_aggr_auto(int vif_id, tWIFI_TID tid, uint8_t max_agg_num)
  *
- * @brief Enable automatic tx aggreation
+ * @brief Enable automatic tx aggregation
  *
  * @param vif_id: Network interface index
  *
  * @param tid: traffic identifier(WIFI_TID_BE, WIFI_TID_BK, WIFI_TID_VI, WIFI_TID_VO) in tWIFI_TID
  *
  * @param max_agg_num: maximum number to aggregate frames
-                       max_agg_num is up to 8 when channel bandwith is 1MHz.
-                       max_agg_num is up to 16 when channel bandwith is 2MHz or 4MHz.
+                       max_agg_num is up to 8 when channel bandwidth is 1MHz.
+                       max_agg_num is up to 16 when channel bandwidth is 2MHz or 4MHz.
                        Even though you set 16 on 1MHz channel, it is set to 8.
  *
  * @return If success, then WIFI_SUCCESS. Otherwise, WIFI_FAIL is returned.
@@ -1766,7 +1800,7 @@ tWIFI_STATUS nrc_wifi_set_fast_connect(bool value);
  *
  * @param vif_id : vif_id
  *
- * @return If recovered, then true. Otherwise, fasle is returned.
+ * @return If recovered, then true. Otherwise, false is returned.
  ***********************************************/
 bool nrc_wifi_get_recovered_by_fast_connect(int vif_id);
 
@@ -2157,6 +2191,20 @@ tWIFI_STATUS nrc_wifi_get_probe_resp_mcs(int8_t *mcs);
 tWIFI_STATUS nrc_wifi_set_probe_resp_mcs(int8_t mcs);
 
 /**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_sta_set_filter_beacon_scan (bool on)
+ *
+ * @brief Enable or disable filtered beacon scan on current channel.
+ *
+ *        When enabled, only beacon frames with matching SSID and security
+ *        information will be considered for vendor IE parsing.(WIFI_EVT_VENDOR_IE)
+ *
+ * @param on : true to enable, false to disable
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_sta_set_filter_beacon_scan(int vif_id, bool on);
+
+/**********************************************
  * @fn  tWIFI_STATUS nrc_wifi_get_route_expire_time(uint32_t *time)
  *
  * @brief Get the current expiration timeout for Wi-Fi route entries.
@@ -2252,6 +2300,7 @@ void nrc_wifi_set_bi_offset(uint16_t offset);
  ***********************************************/
  int nrc_wifi_get_null_data_mcs(void);
 
+
 /**********************************************
  * @fn void nrc_wifi_set_null_data_mcs(int mcs)
  *
@@ -2268,6 +2317,41 @@ void nrc_wifi_set_bi_offset(uint16_t offset);
  ***********************************************/
 void nrc_wifi_set_null_data_mcs(int mcs);
 
+
+/**********************************************
+ * @fn int nrc_wifi_get_eapol_mcs(void)
+ *
+ * @brief Get the MCS (Modulation and Coding Scheme) used for eapol data frames.
+ *
+ * This function retrieves the current MCS setting used for transmitting eapol data.
+ *
+ * Special values:
+ *	 - `-1`: Use robust MCS 10 (Default)
+ *	 - `-2`: Use internal rate control
+ *	 - `0–7, 10`: Manual MCS setting
+ *
+ * @return Current Null data MCS value.
+ ***********************************************/
+int nrc_wifi_get_eapol_mcs(void);
+
+
+/**********************************************
+ * @fn void nrc_wifi_set_eapol_data_mcs(int mcs)
+ *
+ * @brief Set the MCS (Modulation and Coding Scheme) for eapol data frames.
+ *
+ * This function configures the MCS to be used when sending null eapol packets.
+ *
+ * Special values:
+ *	 - `-1`: Use robust MCS 10
+ *	 - `-2`: Use internal rate control
+ *	 - `0–7, 10`: Manual MCS setting
+ *
+ * @param mcs The MCS value to set for Null data.
+ ***********************************************/
+void nrc_wifi_set_eapol_data_mcs(int mcs);
+
+
 /**********************************************
  * @fn tWIFI_STATUS nrc_wifi_set_dpp_configurator(int vif_id, int configurator);
  *
@@ -2281,6 +2365,7 @@ void nrc_wifi_set_null_data_mcs(int mcs);
  ***********************************************/
 tWIFI_STATUS nrc_wifi_set_dpp_configurator(int vif_id, int configurator);
 
+
 /**********************************************
  * @fn tWIFI_STATUS nrc_wifi_dpp_push_button(int vif_id, int configurator);
  *
@@ -2293,6 +2378,7 @@ tWIFI_STATUS nrc_wifi_set_dpp_configurator(int vif_id, int configurator);
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
 tWIFI_STATUS nrc_wifi_dpp_push_button(int vif_id, int configurator);
+
 
 /**********************************************
  * @fn tWIFI_STATUS nrc_wifi_softap_add_vendor_ie_from_beacon (int vif_id, uint8_t subcmd, char *vendor_ie)
@@ -2326,6 +2412,7 @@ tWIFI_STATUS nrc_wifi_softap_add_vendor_ie_from_beacon (int vif_id, uint32_t oui
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
 tWIFI_STATUS nrc_wifi_softap_remove_vendor_ie_from_beacon (int vif_id, uint32_t oui, uint8_t subcmd);
+
 
 /**********************************************
  * @fn tWIFI_STATUS nrc_wifi_softap_get_best_ch(int pref_bw, int dwell_time, opt_ch_results *ch_info, int *cnt, uint16_t* scan_freq_list, uint8_t scan_freq_num)
@@ -2377,6 +2464,7 @@ tWIFI_STATUS nrc_wifi_softap_remove_vendor_ie_from_beacon (int vif_id, uint32_t 
  ***********************************************/
 tWIFI_STATUS nrc_wifi_softap_get_best_ch(int pref_bw, int dwell_time, OPT_CH_RESULTS *ch_info, int *cnt, uint16_t* scan_freq_list, uint8_t scan_freq_num);
 
+
 /**********************************************
  * @fn bool nrc_wifi_softap_get_ssid_match_probing(void)
  *
@@ -2392,6 +2480,7 @@ tWIFI_STATUS nrc_wifi_softap_get_best_ch(int pref_bw, int dwell_time, OPT_CH_RES
  * @return true if SSID Match Probing is enabled, false otherwise.
  **********************************************/
 bool nrc_wifi_softap_get_ssid_match_probing(void);
+
 
 /**********************************************
  * @fn void nrc_wifi_softap_set_ssid_match_probing(bool enable)
@@ -2410,6 +2499,63 @@ bool nrc_wifi_softap_get_ssid_match_probing(void);
  * @return void
  **********************************************/
 void nrc_wifi_softap_set_ssid_match_probing(bool enable);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_softap_get_loc_1m_prim_ch(uint8_t *loc);
+ *
+ * @brief Get current location of 1MHz primary channel for 2MBW or 4MBW SoftAP
+ *
+ * @param loc: location (0 or 1 for 2MBW SoftAP, 0, 1, 2, or 3 for 4MBW SoftAP)
+*
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ **********************************************/
+tWIFI_STATUS nrc_wifi_softap_get_loc_1m_prim_ch(uint8_t *loc);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_softap_set_loc_1m_prim_ch(uint8_t loc)
+ *
+ * @brief Configure location of 1MHz primary channel for 2MBW or 4MBW SoftAP
+ *
+ * @param loc: location (0 or 1 for 2MBW SoftAP, 0, 1, 2, or 3 for 4MBW SoftAP)
+ *
+ * Note:
+ *	  This setting must be applied before starting the SoftAP.
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ **********************************************/
+tWIFI_STATUS nrc_wifi_softap_set_loc_1m_prim_ch(uint8_t loc);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_get_bw_4m_2m_prim_loc(int8_t *loc)
+ *
+ * @brief Get "4M op as 2M primary, forbid 1M" location (AP/STA common)
+ *
+ * @param loc: -1 (off), 0 (lower 2M), 1 (upper 2M)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ **********************************************/
+tWIFI_STATUS nrc_wifi_get_bw_4m_2m_prim_loc(int8_t *loc);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_bw_4m_2m_prim_loc(int8_t loc)
+ *
+ * @brief Configure a 4MHz BW node to operate with a 2MHz primary and forbid all
+ *        1MHz BW frames (AP/STA common). On an AP this also advertises 2M primary
+ *        (S1G Op IE B0=0/B1-4=3/B7=1); on a STA it enables 1M suppression while the
+ *        STA is associated to a 4/2 AP (prim 2M from the AP IE).
+ *
+ * @param loc: -1 (off, default), 0 (lower 2M), 1 (upper 2M)
+ *
+ * Note:
+ *	  AP: apply before starting the SoftAP. STA: apply before connecting.
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ **********************************************/
+tWIFI_STATUS nrc_wifi_set_bw_4m_2m_prim_loc(int8_t loc);
 
 #ifdef __cplusplus
 }

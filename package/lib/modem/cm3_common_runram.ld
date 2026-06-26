@@ -2,13 +2,133 @@ SECTIONS
 {
 	.text :
 	{
-        __isr_vector_start = .;
+		__isr_vector_start = .;
 		KEEP(*(.isr_vector))
-        __isr_vector_end = .;
+		__isr_vector_end = .;
 		/* *(.text) */
 		/* *(.text*) */
-		*(EXCLUDE_FILE(*driver_nrc*.c.o *lmac*.c.o *umac_s1g*.c.o *bignum*.c.o).text)
-		*(EXCLUDE_FILE(*driver_nrc*.c.o *lmac*.c.o *umac_s1g*.c.o *bignum*.c.o).text*)
+		*(EXCLUDE_FILE(
+				/* Driver files */
+				*driver_nrc.c.o
+				*driver_nrc_debug.c.o
+				*driver_nrc_event_mgr.c.o
+				*driver_nrc_ps.c.o
+				*driver_nrc_rx_agg.c.o
+				*driver_nrc_rx.c.o
+				*driver_nrc_scan.c.o
+				*driver_nrc_tx_agg.c.o
+				*driver_nrc_tx.c.o
+				/* LMAC files */
+				*lmac_11ah.c.o
+				*lmac_cmd.c.o
+				*lmac_common.c.o
+				*lmac_config.c.o
+				*lmac_debug.c.o
+				*lmac_downlink.c.o
+				*lmac_drv.c.o
+				*lmac_duty_cycle.c.o
+				*lmac_lib-rom.c.o
+				*lmac_mic_scan.c.o
+				*lmac_modem_detection.c.o
+				*lmac_modem_recovery.c.o
+				*lmac_ps_common.c.o
+				*lmac_queue_manager_11ah.c.o
+				*lmac_queue_manager.c.o
+				*lmac_rate_control.c.o
+				*lmac_self_config.c.o
+				*lmac_stats.c.o
+				*lmac_test.c.o
+				*lmac_twt_common.c.o
+				*lmac_util.c.o
+				*lmac_apf.c.o
+				*lmac_apf_ps.c.o
+				*lmac_band.c.o
+				*util_cmd_lmac_indirect.c.o
+				*util_cmd_lmac_indirect-rom.c.o
+				/* UMAC files */
+				*umac_s1g_agent.c.o
+				*umac_s1g_channel.c.o
+				*umac_s1g_channel-rom.c.o
+				*umac_s1g_config.c.o
+				*umac_s1g_elementhook.c.o
+				*umac_s1g_framehook.c.o
+				*umac_s1g_hookmanager.c.o
+				*umac_s1g_ie_manager.c.o
+				*umac_s1g_join_handler.c.o
+				*umac_s1g_pv1.c.o
+				*umac_s1g_scan_handler.c.o
+				*umac_s1g_tim_handler.c.o
+				*umac_wim_builder.c.o
+				*umac_wim_builder-rom.c.o
+				/* Bignum files */
+				*bignum.c.o
+				*bignum_core.c.o
+				*bignum_hw.c.o
+				*bignum_mod.c.o
+				*bignum_mod_raw.c.o
+				*drv_sec.c.o
+		).text)
+		*(EXCLUDE_FILE(
+				/* Driver files */
+				*driver_nrc.c.o
+				*driver_nrc_debug.c.o
+				*driver_nrc_event_mgr.c.o
+				*driver_nrc_ps.c.o
+				*driver_nrc_rx_agg.c.o
+				*driver_nrc_rx.c.o
+				*driver_nrc_scan.c.o
+				*driver_nrc_tx_agg.c.o
+				*driver_nrc_tx.c.o
+				/* LMAC files */
+				*lmac_11ah.c.o
+				*lmac_cmd.c.o
+				*lmac_common.c.o
+				*lmac_config.c.o
+				*lmac_debug.c.o
+				*lmac_downlink.c.o
+				*lmac_drv.c.o
+				*lmac_duty_cycle.c.o
+				*lmac_lib-rom.c.o
+				*lmac_mic_scan.c.o
+				*lmac_modem_detection.c.o
+				*lmac_modem_recovery.c.o
+				*lmac_ps_common.c.o
+				*lmac_queue_manager_11ah.c.o
+				*lmac_queue_manager.c.o
+				*lmac_rate_control.c.o
+				*lmac_self_config.c.o
+				*lmac_stats.c.o
+				*lmac_test.c.o
+				*lmac_twt_common.c.o
+				*lmac_util.c.o
+				*lmac_apf.c.o
+				*lmac_apf_ps.c.o
+				*lmac_band.c.o
+				*util_cmd_lmac_indirect.c.o
+				*util_cmd_lmac_indirect-rom.c.o
+				/* UMAC files */
+				*umac_s1g_agent.c.o
+				*umac_s1g_channel.c.o
+				*umac_s1g_channel-rom.c.o
+				*umac_s1g_config.c.o
+				*umac_s1g_elementhook.c.o
+				*umac_s1g_framehook.c.o
+				*umac_s1g_hookmanager.c.o
+				*umac_s1g_ie_manager.c.o
+				*umac_s1g_join_handler.c.o
+				*umac_s1g_pv1.c.o
+				*umac_s1g_scan_handler.c.o
+				*umac_s1g_tim_handler.c.o
+				*umac_wim_builder.c.o
+				*umac_wim_builder-rom.c.o
+				/* Bignum files */
+				*bignum.c.o
+				*bignum_core.c.o
+				*bignum_hw.c.o
+				*bignum_mod.c.o
+				*bignum_mod_raw.c.o
+				*drv_sec.c.o
+		).text*)
 
 		. = ALIGN(4);
 		PROVIDE_HIDDEN (__preinit_array_start = .);
@@ -82,10 +202,65 @@ SECTIONS
 		. = ALIGN(4);
 
 		/* executed on ram (object unit) */
-		KEEP(*driver_nrc*.c.o(.text* .rodata*))
-		KEEP(*lmac*.c.o(.text* .rodata*))
-		KEEP(*umac_s1g*.c.o(.text* .rodata*))
-		KEEP(*bignum*.c.o(.text* .rodata*))
+		/* Driver files */
+		KEEP(*driver_nrc.c.o(.text* .rodata*))
+		KEEP(*driver_nrc_debug.c.o(.text* .rodata*))
+		KEEP(*driver_nrc_event_mgr.c.o(.text* .rodata*))
+		KEEP(*driver_nrc_ps.c.o(.text* .rodata*))
+		KEEP(*driver_nrc_rx_agg.c.o(.text* .rodata*))
+		KEEP(*driver_nrc_rx.c.o(.text* .rodata*))
+		KEEP(*driver_nrc_scan.c.o(.text* .rodata*))
+		KEEP(*driver_nrc_tx_agg.c.o(.text* .rodata*))
+		KEEP(*driver_nrc_tx.c.o(.text* .rodata*))
+		/* LMAC files */
+		KEEP(*lmac_11ah.c.o(.text* .rodata*))
+		KEEP(*lmac_cmd.c.o(.text* .rodata*))
+		KEEP(*lmac_common.c.o(.text* .rodata*))
+		KEEP(*lmac_config.c.o(.text* .rodata*))
+		KEEP(*lmac_debug.c.o(.text* .rodata*))
+		KEEP(*lmac_downlink.c.o(.text* .rodata*))
+		KEEP(*lmac_drv.c.o(.text* .rodata*))
+		KEEP(*lmac_duty_cycle.c.o(.text* .rodata*))
+		KEEP(*lmac_lib-rom.c.o(.text* .rodata*))
+		KEEP(*lmac_mic_scan.c.o(.text* .rodata*))
+		KEEP(*lmac_modem_detection.c.o(.text* .rodata*))
+		KEEP(*lmac_modem_recovery.c.o(.text* .rodata*))
+		KEEP(*lmac_ps_common.c.o(.text* .rodata*))
+		KEEP(*lmac_queue_manager_11ah.c.o(.text* .rodata*))
+		KEEP(*lmac_queue_manager.c.o(.text* .rodata*))
+		KEEP(*lmac_rate_control.c.o(.text* .rodata*))
+		KEEP(*lmac_self_config.c.o(.text* .rodata*))
+		KEEP(*lmac_stats.c.o(.text* .rodata*))
+		KEEP(*lmac_test.c.o(.text* .rodata*))
+		KEEP(*lmac_twt_common.c.o(.text* .rodata*))
+		KEEP(*lmac_util.c.o(.text* .rodata*))
+		KEEP(*lmac_apf.c.o(.text* .rodata*))
+		KEEP(*lmac_apf_ps.c.o(.text* .rodata*))
+		KEEP(*lmac_band.c.o(.text* .rodata*))
+		KEEP(*util_cmd_lmac_indirect.c.o(.text* .rodata*))
+		KEEP(*util_cmd_lmac_indirect-rom.c.o(.text* .rodata*))
+		/* UMAC files */
+		KEEP(*umac_s1g_agent.c.o(.text* .rodata*))
+		KEEP(*umac_s1g_channel.c.o(.text* .rodata*))
+		KEEP(*umac_s1g_channel-rom.c.o(.text* .rodata*))
+		KEEP(*umac_s1g_config.c.o(.text* .rodata*))
+		KEEP(*umac_s1g_elementhook.c.o(.text* .rodata*))
+		KEEP(*umac_s1g_framehook.c.o(.text* .rodata*))
+		KEEP(*umac_s1g_hookmanager.c.o(.text* .rodata*))
+		KEEP(*umac_s1g_ie_manager.c.o(.text* .rodata*))
+		KEEP(*umac_s1g_join_handler.c.o(.text* .rodata*))
+		KEEP(*umac_s1g_pv1.c.o(.text* .rodata*))
+		KEEP(*umac_s1g_scan_handler.c.o(.text* .rodata*))
+		KEEP(*umac_s1g_tim_handler.c.o(.text* .rodata*))
+		KEEP(*umac_wim_builder.c.o(.text* .rodata*))
+		KEEP(*umac_wim_builder-rom.c.o(.text* .rodata*))
+		/* Bignum files */
+		KEEP(*bignum.c.o(.text* .rodata*))
+		KEEP(*bignum_core.c.o(.text* .rodata*))
+		KEEP(*bignum_hw.c.o(.text* .rodata*))
+		KEEP(*bignum_mod.c.o(.text* .rodata*))
+		KEEP(*bignum_mod_raw.c.o(.text* .rodata*))
+		KEEP(*drv_sec.c.o(.text* .rodata*))
 		. = ALIGN(4);
 
 		/* executed on ram (function unit) */

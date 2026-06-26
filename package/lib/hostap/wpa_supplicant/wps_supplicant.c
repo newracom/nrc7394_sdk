@@ -22,6 +22,9 @@
 #include "eapol_supp/eapol_supp_sm.h"
 #include "rsn_supp/wpa.h"
 #include "wps/wps_attr_parse.h"
+#ifdef CONFIG_WPS_ENROLLEE_AUTO_RETRY
+#include "wps/wps_i.h"  /* for wps_ms_printf macro */
+#endif /* CONFIG_WPS_ENROLLEE_AUTO_RETRY */
 #include "config.h"
 #include "wpa_supplicant_i.h"
 #include "driver_i.h"
@@ -42,6 +45,10 @@
 #define NRC_WIFI_SEC_WPA3_SAE   3
 #define NRC_WIFI_SEC_UNKNOWN    4
 #endif
+#ifdef CONFIG_WPS_ENROLLEE_AUTO_RETRY
+#include "crypto/dh_groups.h"
+#include "crypto/dh_group5.h"
+#endif
 
 #ifndef WPS_PIN_SCAN_IGNORE_SEL_REG
 #define WPS_PIN_SCAN_IGNORE_SEL_REG 3
@@ -57,6 +64,96 @@
 
 static void wpas_wps_timeout(void *eloop_ctx, void *timeout_ctx);
 static void wpas_clear_wps(struct wpa_supplicant *wpa_s);
+
+#ifdef CONFIG_WPS_ENROLLEE_AUTO_RETRY
+/*
+ * wps_ar_printf - logging macro for Auto-Retry feature.
+ * Reuses wps_ms_printf defined in wps_i.h so all WPS MS log lines
+ * share a single "WPS MS:" prefix and can be filtered together.
+ */
+#define wps_ar_printf(level, fmt, ...) \
+	wps_ms_printf((level), fmt, ##__VA_ARGS__)
+
+static void wpas_ar_retry_cb(void *eloop_ctx, void *timeout_ctx);
+
+/*
+ * wpas_ar_clear - Cancel any pending retry timer and zero the AR context.
+ * Safe to call at any time including when AR is not active.
+ */
+static void wpas_ar_clear(struct wpa_supplicant *wpa_s)
+{
+	eloop_cancel_timeout(wpas_ar_retry_cb, wpa_s, NULL);
+	os_memset(&wpa_s->wps_ar, 0, sizeof(wpa_s->wps_ar));
+	wps_ar_printf(MSG_INFO, "WPS AR: state cleared");
+}
+
+/*
+ * wpas_ar_schedule - Schedule the next PBC retry using exponential backoff.
+ *
+ * Does nothing if:
+ *   - user has cancelled (cancelled=1)
+ *   - retry count has reached WPAS_AR_RETRY_MAX_COUNT
+ *
+ * Delay sequence: 10s, 20s, 40s, ... capped at WPAS_AR_RETRY_MAX_SEC.
+ */
+static void wpas_ar_schedule(struct wpa_supplicant *wpa_s)
+{
+	int delay;
+
+	if (wpa_s->wps_ar.cancelled) {
+		wps_ar_printf(MSG_INFO, "WPS AR: cancelled — no retry");
+		return;
+	}
+
+	if (wpa_s->wps_ar.count >= WPAS_AR_RETRY_MAX_COUNT) {
+		wps_ar_printf(MSG_INFO,
+			      "WPS AR: retry limit (%d) reached — giving up",
+			      WPAS_AR_RETRY_MAX_COUNT);
+		wpa_s->wps_ar.active = 0;
+		return;
+	}
+
+	delay = WPAS_AR_RETRY_BASE_SEC << wpa_s->wps_ar.count;
+	if (delay > WPAS_AR_RETRY_MAX_SEC)
+		delay = WPAS_AR_RETRY_MAX_SEC;
+
+	wps_ar_printf(MSG_INFO, "WPS AR: scheduling retry #%d in %d s",
+		      wpa_s->wps_ar.count + 1, delay);
+
+	wpa_s->wps_ar.active = 1;
+	eloop_cancel_timeout(wpas_ar_retry_cb, wpa_s, NULL);
+	eloop_register_timeout(delay, 0, wpas_ar_retry_cb, wpa_s, NULL);
+}
+
+/*
+ * wpas_ar_retry_cb - eloop callback: restart WPS PBC after backoff delay.
+ *
+ * Increments the retry count then calls wpas_wps_start_pbc() directly.
+ * wpas_wps_start_pbc() calls wpas_clear_wps() internally; the guard in
+ * wpas_clear_wps() (active == 1) prevents that call from wiping our state.
+ */
+static void wpas_ar_retry_cb(void *eloop_ctx, void *timeout_ctx)
+{
+	struct wpa_supplicant *wpa_s = eloop_ctx;
+	const u8 *bssid;
+
+	if (!wpa_s->wps_ar.active || wpa_s->wps_ar.cancelled)
+		return;
+
+	wpa_s->wps_ar.count++;
+	wps_ar_printf(MSG_INFO, "WPS AR: retry #%d", wpa_s->wps_ar.count);
+
+	bssid = is_zero_ether_addr(wpa_s->wps_ar.bssid) ?
+		NULL : wpa_s->wps_ar.bssid;
+
+	/*
+	 * active stays 1 so wpas_clear_wps() (called inside
+	 * wpas_wps_start_pbc) does not zero out the AR context.
+	 */
+	wpas_wps_start_pbc(wpa_s, bssid, 0,
+			   wpa_s->wps_ar.multi_ap_backhaul_sta);
+}
+#endif /* CONFIG_WPS_ENROLLEE_AUTO_RETRY */
 
 
 static void wpas_wps_clear_ap_info(struct wpa_supplicant *wpa_s)
@@ -633,6 +730,15 @@ static void wpa_supplicant_wps_event_m2d(struct wpa_supplicant *wpa_s,
 				       NULL);
 	}
 #endif /* CONFIG_P2P */
+#ifdef CONFIG_WPS_ENROLLEE_AUTO_RETRY
+	/*
+	 * AR: AP rejected with M2D (AP busy, overlap, or other reason).
+	 * Schedule a retry — the AP may accept us once its current session
+	 * completes or the rejection condition clears.
+	 */
+	if (!wpa_s->wps_success)
+		wpas_ar_schedule(wpa_s);
+#endif /* CONFIG_WPS_ENROLLEE_AUTO_RETRY */
 }
 
 
@@ -675,6 +781,17 @@ static void wpa_supplicant_wps_event_fail(struct wpa_supplicant *wpa_s,
 	wpa_printf(MSG_DEBUG, "WPS: Register timeout to clear WPS network");
 	eloop_cancel_timeout(wpas_wps_clear_timeout, wpa_s, NULL);
 	eloop_register_timeout(0, 100000, wpas_wps_clear_timeout, wpa_s, NULL);
+
+#ifdef CONFIG_WPS_ENROLLEE_AUTO_RETRY
+	/*
+	 * AR: WPS message exchange failed (any of M1~M8, EAP timeout, etc.).
+	 * Schedule a retry. The wpas_wps_clear_timeout above will call
+	 * wpas_clear_wps() after 100ms; the AR guard there preserves our
+	 * retry context since active==1.
+	 */
+	if (!wpa_s->wps_success)
+		wpas_ar_schedule(wpa_s);
+#endif /* CONFIG_WPS_ENROLLEE_AUTO_RETRY */
 
 	wpas_notify_wps_event_fail(wpa_s, fail);
 	wpas_p2p_wps_failed(wpa_s, fail);
@@ -742,6 +859,14 @@ static void wpa_supplicant_wps_event_success(struct wpa_supplicant *wpa_s)
 	 */
 	eloop_register_timeout(10, 0, wpas_wps_reenable_networks_cb, wpa_s,
 			       NULL);
+
+#ifdef CONFIG_WPS_ENROLLEE_AUTO_RETRY
+	/*
+	 * AR: WPS succeeded — clear retry state unconditionally.
+	 */
+	wpas_ar_clear(wpa_s);
+	wps_ar_printf(MSG_INFO, "WPS AR: success - state cleared");
+#endif /* CONFIG_WPS_ENROLLEE_AUTO_RETRY */
 
 	wpas_p2p_wps_success(wpa_s, wpa_s->bssid, 0);
 }
@@ -1053,6 +1178,19 @@ static void wpas_clear_wps(struct wpa_supplicant *wpa_s)
 	}
 
 	wpas_wps_clear_ap_info(wpa_s);
+
+#ifdef CONFIG_WPS_ENROLLEE_AUTO_RETRY
+	/*
+	 * AR guard: if a retry sequence is active (wps_ar.active == 1),
+	 * this call to wpas_clear_wps() is coming from inside
+	 * wpas_wps_start_pbc() during a retry attempt.
+	 * Do NOT clear the AR context here — the retry callback needs it.
+	 * In all other cases (success, cancel, timeout) AR state is cleared
+	 * by the respective handlers before reaching here.
+	 */
+	if (!wpa_s->wps_ar.active)
+		wpas_ar_clear(wpa_s);
+#endif /* CONFIG_WPS_ENROLLEE_AUTO_RETRY */
 }
 
 
@@ -1073,6 +1211,16 @@ static void wpas_wps_timeout(void *eloop_ctx, void *timeout_ctx)
 	 * during an EAP-WSC exchange).
 	 */
 	wpas_notify_wps_event_fail(wpa_s, &data.fail);
+#ifdef CONFIG_WPS_ENROLLEE_AUTO_RETRY
+	/*
+	 * AR: PBC walk time (120s) expired. Schedule retry — AP may become
+	 * available or its PBC session may complete by next attempt.
+	 * Must call wpas_ar_schedule() BEFORE wpas_clear_wps() so the
+	 * AR guard in wpas_clear_wps() can see active==1 and preserve state.
+	 */
+	if (!wpa_s->wps_success)
+		wpas_ar_schedule(wpa_s);
+#endif /* CONFIG_WPS_ENROLLEE_AUTO_RETRY */
 	wpas_clear_wps(wpa_s);
 #ifdef WPS_SDK_CB
 	wpa_supplicant_wps_event(NULL, WPS_EV_PBC_TIMEOUT, NULL);
@@ -1237,6 +1385,46 @@ int wpas_wps_start_pbc(struct wpa_supplicant *wpa_s, const u8 *bssid,
 	}
 #endif /* CONFIG_AP */
 	wpas_clear_wps(wpa_s);
+
+#ifdef CONFIG_WPS_ENROLLEE_AUTO_RETRY
+	/*
+	 * AR context init:
+	 * - If called from the retry callback (active==1), preserve count/bssid
+	 *   so the backoff progression continues correctly.
+	 * - If called fresh by the user (active==0), reset everything.
+	 */
+	if (!wpa_s->wps_ar.active) {
+		os_memset(&wpa_s->wps_ar, 0, sizeof(wpa_s->wps_ar));
+		if (bssid)
+			os_memcpy(wpa_s->wps_ar.bssid, bssid, ETH_ALEN);
+		wpa_s->wps_ar.multi_ap_backhaul_sta = multi_ap_backhaul_sta;
+		wps_ar_printf(MSG_INFO, "WPS AR: fresh start, context initialized");
+	}
+
+	/* Precompute DH keypair at PBC trigger to avoid per-session
+	 * crypto_mod_exp() cost in dh5_init() */
+	if (!wpa_s->wps->dh_privkey || !wpa_s->wps->dh_pubkey) {
+#if 0
+		wps_ar_printf(MSG_INFO,
+			"WPS AR: [build_pubkey] reuse path "
+			"wps=%p priv=%p pub=%p",
+			wpa_s->wps,
+			wpa_s->wps->dh_privkey, wpa_s->wps->dh_pubkey);
+#endif
+		struct wpabuf *priv = NULL;
+		struct wpabuf *pub	= dh_init(dh_groups_get(5), &priv);
+		pub = wpabuf_zeropad(pub, 192);
+		if (pub && priv) {
+				wpabuf_clear_free(wpa_s->wps->dh_privkey);
+				wpabuf_free(wpa_s->wps->dh_pubkey);
+				wpa_s->wps->dh_privkey = priv;
+				wpa_s->wps->dh_pubkey  = pub;
+				wps_ar_printf(MSG_INFO,
+					   "WPS AR: STA DH keypair precomputed at PBC");
+		}
+	}
+#endif /* CONFIG_WPS_ENROLLEE_AUTO_RETRY */
+
 	ssid = wpas_wps_add_network(wpa_s, 0, NULL, bssid);
 	if (ssid == NULL)
 		return -1;
@@ -1450,6 +1638,16 @@ int wpas_wps_cancel(struct wpa_supplicant *wpa_s)
 
 	wpa_msg(wpa_s, MSG_INFO, WPS_EVENT_CANCEL);
 	wpa_s->after_wps = 0;
+
+#ifdef CONFIG_WPS_ENROLLEE_AUTO_RETRY
+	/*
+	 * AR: Explicit user cancel — mark cancelled and clear retry state
+	 * so any pending eloop timer does not fire another attempt.
+	 */
+	wpa_s->wps_ar.cancelled = 1;
+	wpas_ar_clear(wpa_s);
+	wps_ar_printf(MSG_INFO, "WPS AR: cancelled by user");
+#endif /* CONFIG_WPS_ENROLLEE_AUTO_RETRY */
 
 	return 0;
 }

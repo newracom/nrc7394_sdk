@@ -27,6 +27,10 @@
 #ifndef __NRC_PING_H__
 #define __NRC_PING_H__
 
+#include "ping.h"
+
 int  ping_run(int argc, char *argv[]);
+ping_parm_t * ping_init_parameters(void);
+void ping_deinit_parameters(ping_parm_t* parm);
 
 #endif /* __NRC_PING_H__ */

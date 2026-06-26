@@ -4113,7 +4113,7 @@ void wpas_dpp_rx_action(struct wpa_supplicant *wpa_s, const u8 *src,
 			MAC2STR(src), freq, type);
 		return;
 	}
-	wpa_msg(wpa_s, MSG_INFO, DPP_EVENT_RX "src=" MACSTR " freq=%u type=%d",
+	wpa_msg(wpa_s, MSG_DEBUG, DPP_EVENT_RX "src=" MACSTR " freq=%u type=%d",
 		MAC2STR(src), freq, type);
 
 	switch (type) {

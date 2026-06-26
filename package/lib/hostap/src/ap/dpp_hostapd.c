@@ -2743,7 +2743,7 @@ void hostapd_dpp_rx_action(struct hostapd_data *hapd, const u8 *src,
 			MAC2STR(src), freq, type);
 		return;
 	}
-	wpa_msg(hapd->msg_ctx, MSG_INFO, DPP_EVENT_RX "src=" MACSTR
+	wpa_msg(hapd->msg_ctx, MSG_DEBUG, DPP_EVENT_RX "src=" MACSTR
 		" freq=%u type=%d", MAC2STR(src), freq, type);
 
 #ifdef CONFIG_DPP2

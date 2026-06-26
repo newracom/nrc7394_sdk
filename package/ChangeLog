@@ -4,6 +4,41 @@
 *
 *******************************************************************
 
+[2026-06-26]
+Change summary for version 1.3.6:
+
+  New features
+    * Added support for J-Link
+
+  Bugfix
+    * Fixed an intermittent crash that occurred when a deauthentication frame was received from the AP during transmission (TX).
+    * Fixed an intermittent crash during background scanning for roaming.
+    * Fixed a bug in nvs_get_str_or_blob().
+    * Fixed an intermittent issue where TX power was not being restored from the BD (Board Data) upon waking up from sleep mode.
+    * Fixed an issue where the STA remained connected when failing to detect a fast AP reset.
+    * Fixed an issue where all bands' TX power became invalid when only one band was calibrated while using both 800 MHz and 900 MHz bands simultaneously.
+    * Fixed a wrong_key error that occurred after a beacon miss.
+
+  Changes
+    * Update SDK APIs
+      o Refer to UG-7394-005-Standalone SDK API document
+    * Update AT-CMD
+      o Refer to UG-7394-006-AT_Command document
+    * Added support for US OP35/OP36 channels.
+    * Added support for EU OP30 channels.
+    * Added per-VIF (Virtual Interface) TX power configuration.
+    * Added support for Winbond W77Q32JWXGIR flash memory.
+    * Adjusted the duty margin to match the MCS when the beacon frame MCS changes.
+    * Improved EVM performance by adding LO leakage compensation.
+    * Enabled the GCC -fstack-protector-strong option for enhanced stack security.
+    * Flushed PMKSA when SoftAP deauthenticates a STA due to BSS Max Idle.
+    * Changed EAPOL frames to be transmitted as QoS frames.
+    * Ported the nanopb library.
+    * Ported LittleFS.
+    * Ported minizip.
+    * Ported the SC16IS750 driver.
+    * Ported iperf3.
+
 [2025-12-30]
 Change summary for version 1.3.5:
 

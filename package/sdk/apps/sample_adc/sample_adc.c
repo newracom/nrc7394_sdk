@@ -26,7 +26,7 @@
 #include "nrc_sdk.h"
 
 #define TEST_COUNT 10
-#define TEST_INTERVAL 2000 /* msec */
+#define TEST_INTERVAL 1000 /* msec */
 
 /******************************************************************************
  * FunctionName : run_sample_adc
@@ -37,12 +37,19 @@
 nrc_err_t run_sample_adc(int count, int interval)
 {
 	nrc_usr_print("[%s] Sample App for ADC API \n", __func__);
-#ifdef NRC7394
+
+#if defined(NRC7292)
+	nrc_adc_enable(ADC1);
+	nrc_adc_enable(ADC2);
+	nrc_adc_enable(ADC3);
+#else
 	nrc_adc_set_gpio(ADC0, GPIO_17);
 	nrc_adc_set_gpio(ADC1, GPIO_18);
+	nrc_adc_enable(ADC0);
+	nrc_adc_enable(ADC1);
 #endif
-	nrc_adc_init(true);
-	_delay_ms(100);
+	
+	_delay_ms(200);
 
 	for(int i=0; i<count; i++) {
 		nrc_usr_print("[%s] ", __func__);

@@ -107,7 +107,7 @@ nrc_err_t run_sample_gpio(int count, int interval)
 #ifdef USE_GPIO_INTERRUPT
 	gpio_conf.gpio_pin = GPIO_INT1_PIN;
 	gpio_conf.gpio_dir = GPIO_INPUT;
-	gpio_conf.gpio_mode = GPIO_PULL_DOWN;
+	gpio_conf.gpio_mode = GPIO_FLOATING;
 	gpio_conf.gpio_alt= GPIO_FUNC;
 	nrc_gpio_config(&gpio_conf);
 #if defined(NRC7394)
@@ -120,7 +120,7 @@ nrc_err_t run_sample_gpio(int count, int interval)
 
 	gpio_conf.gpio_pin = GPIO_INT0_PIN;
 	gpio_conf.gpio_dir = GPIO_INPUT;
-	gpio_conf.gpio_mode = GPIO_PULL_DOWN;
+	gpio_conf.gpio_mode = GPIO_FLOATING;
 	gpio_conf.gpio_alt= GPIO_FUNC;
 	nrc_gpio_config(&gpio_conf);
 #if defined(NRC7394)

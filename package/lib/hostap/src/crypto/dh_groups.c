@@ -1200,6 +1200,7 @@ struct wpabuf * dh_init(const struct dh_group *dh, struct wpabuf **priv)
 
 	wpabuf_clear_free(*priv);
 
+	//CPA("DH: dh_init [private] START TSF=%u\n", TSF);
 	*priv = wpabuf_alloc(dh->prime_len);
 	if (*priv == NULL)
 		return NULL;
@@ -1215,6 +1216,7 @@ struct wpabuf * dh_init(const struct dh_group *dh, struct wpabuf **priv)
 		/* Make sure private value is smaller than prime */
 		*(wpabuf_mhead_u8(*priv)) = 0;
 	}
+	//CPA("DH: dh_init [private] END TSF=%u\n", TSF);
 	wpa_hexdump_buf_key(MSG_DEBUG, "DH: private value", *priv);
 
 	pv_len = dh->prime_len;
@@ -1224,6 +1226,7 @@ struct wpabuf * dh_init(const struct dh_group *dh, struct wpabuf **priv)
 		*priv = NULL;
 		return NULL;
 	}
+	//CPA("DH: dh_init [public] crypto_mod_exp START TSF=%u\n", TSF);
 	if (crypto_mod_exp(dh->generator, dh->generator_len,
 						wpabuf_head(*priv), wpabuf_len(*priv),
 						dh->prime, dh->prime_len, wpabuf_mhead(pv),
@@ -1232,6 +1235,7 @@ struct wpabuf * dh_init(const struct dh_group *dh, struct wpabuf **priv)
 		wpa_printf(MSG_INFO, "DH: crypto_mod_exp failed");
 		return NULL;
 	}
+	//CPA("DH: dh_init [public] crypto_mod_exp END TSF=%u\n", TSF);
 	wpabuf_put(pv, pv_len);
 	wpa_hexdump_buf(MSG_DEBUG, "DH: public value", pv);
 
@@ -1261,6 +1265,7 @@ dh_derive_shared(const struct wpabuf *peer_public,
 	if (shared == NULL)
 		return NULL;
 
+	//CPA("DH: derive_shared [derive] crypto_mod_exp START TSF=%u\n", TSF);
 	if (crypto_mod_exp(wpabuf_head(peer_public), wpabuf_len(peer_public),
 						wpabuf_head(own_private), wpabuf_len(own_private),
 						dh->prime, dh->prime_len,
@@ -1269,6 +1274,7 @@ dh_derive_shared(const struct wpabuf *peer_public,
 		wpa_printf(MSG_INFO, "DH: crypto_mod_exp failed");
 		return NULL;
 	}
+	//CPA("DH: derive_shared [derive] crypto_mod_exp END TSF=%u\n", TSF);
 
 	wpabuf_put(shared, shared_len);
 	wpa_hexdump_buf_key(MSG_DEBUG, "DH: shared key", shared);

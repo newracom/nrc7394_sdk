@@ -3,9 +3,9 @@
 
 #define VERSION_BRANCH "origin/nrc7394-release-sdk-v1.3"
 
-#define VERSION_BUILD "65dc154"
+#define VERSION_BUILD "c864554"
 #define VERSION_MAJOR 1
 #define VERSION_MINOR 3
-#define VERSION_REVISION 5
+#define VERSION_REVISION 6
 #define SW_ID 1
 #endif //_BUILD_VER_H_

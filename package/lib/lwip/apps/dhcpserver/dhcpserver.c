@@ -18,6 +18,7 @@
 #include "lwip/pbuf.h"
 #include "lwip/udp.h"
 #include "lwip/mem.h"
+#include "lwip/dns.h"
 #include "dhcpserver.h"
 #include "lwip/etharp.h"
 
@@ -262,12 +263,39 @@ static u8_t* add_offer_options(u8_t* optptr)
 	}
 
 #ifdef USE_DNS
-	*optptr++ = DHCP_OPTION_DNS_SERVER;
-	*optptr++ = 4;
-	*optptr++ = ip4_addr1(&ipadd);
-	*optptr++ = ip4_addr2(&ipadd);
-	*optptr++ = ip4_addr3(&ipadd);
-	*optptr++ = ip4_addr4(&ipadd);
+	if (softap_if && softap_if->name[0] == 'e' && softap_if->name[1] == 't') {
+		const ip_addr_t *dns[2] = { dns_getserver(0), dns_getserver(1) };
+		u8_t dns_count = 0;
+
+		for (size_t i = 0; i < LWIP_ARRAYSIZE(dns); i++) {
+			if (dns[i] && IP_IS_V4(dns[i]) && !ip_addr_isany(dns[i])) {
+				dns_count++;
+			}
+		}
+
+		if (dns_count > 0) {
+			*optptr++ = DHCP_OPTION_DNS_SERVER;
+			*optptr++ = dns_count * 4;
+
+			for (size_t i = 0; i < LWIP_ARRAYSIZE(dns); i++) {
+				if (dns[i] && IP_IS_V4(dns[i]) && !ip_addr_isany(dns[i])) {
+					const ip4_addr_t *dns4 = ip_2_ip4(dns[i]);
+
+					*optptr++ = ip4_addr1(dns4);
+					*optptr++ = ip4_addr2(dns4);
+					*optptr++ = ip4_addr3(dns4);
+					*optptr++ = ip4_addr4(dns4);
+				}
+			}
+		}
+	} else {
+		*optptr++ = DHCP_OPTION_DNS_SERVER;
+		*optptr++ = 4;
+		*optptr++ = ip4_addr1(&ipadd);
+		*optptr++ = ip4_addr2(&ipadd);
+		*optptr++ = ip4_addr3(&ipadd);
+		*optptr++ = ip4_addr4(&ipadd);
+	}
 #endif
 
 #ifdef CLASS_B_NET
@@ -1201,6 +1229,24 @@ bool dhcps_get_ip (u8_t *mac, ip4_addr_t *ip)
 		pdhcps_pool = pnode->pnode;
 		if (memcmp(pdhcps_pool->mac, mac, 6) == 0) {
 			memcpy(ip, &pdhcps_pool->ip, sizeof(ip4_addr_t));
+			return true;
+		}
+
+		pnode = pnode->pnext;
+	}
+
+	return false;
+}
+
+bool dhcps_get_mac (const ip4_addr_t *ip, u8_t *mac)
+{
+	struct dhcps_pool *pdhcps_pool = NULL;
+	list_node *pnode = plist;
+
+	while (pnode != NULL) {
+		pdhcps_pool = pnode->pnode;
+		if (memcmp(&pdhcps_pool->ip, ip, sizeof(ip4_addr_t)) == 0) {
+			memcpy(mac, pdhcps_pool->mac, 6);
 			return true;
 		}
 

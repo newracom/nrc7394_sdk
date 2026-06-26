@@ -96,6 +96,23 @@ typedef struct {
 	char     country_code[2];
 } sf_sys_config_gpio_band_select_t;
 
+// 4 Bytes
+typedef struct {
+	uint32_t valid      : 1;
+	uint32_t reserved1  : 1;
+	uint32_t pin        : 6;
+	uint32_t bypass_loss: 4;
+	uint32_t reserved2  : 20;
+} sf_sys_config_adaptive_lna_t;
+
+// 4 Bytes
+typedef struct {
+	uint32_t valid      : 1;
+	uint32_t reserved1  : 7;
+	uint32_t tlpf_gac   : 8;
+	uint32_t reserved2  : 16;
+} sf_sys_config_lo_self_cal_t;
+
 //768 Bytes (256 + 512)
 typedef struct {
 	uint32_t                         version; /* sys_config structure version*/
@@ -117,7 +134,9 @@ typedef struct {
 	char                             serial_number[32];
 	char                             mfgt_version[32];
 	sf_sys_config_gpio_band_select_t gpio_band_select;
-	uint8_t                          reserved2[140];
+	sf_sys_config_adaptive_lna_t     adaptive_lna;
+	sf_sys_config_lo_self_cal_t      lo_self_cal;
+	uint8_t                          reserved2[132];
 	char                             user_factory[SYSCONFIG_USER_FACTORY_SIZE];
 } sf_sys_config_t;
 /* sysconfig END */
@@ -393,6 +412,8 @@ bool API 	nrc_config_rf_cal_select_first_filtered_data(rf_cal_data_header_filter
 void API 	nrc_config_rf_cal_select_first_valid_data();
 bool API 	nrc_config_rf_cal_select_data_by_country_code(char *country_code, uint8_t id);
 bool API 	nrc_config_rf_cal_select_data_by_worldwide_code(uint8_t id);
+void API 	nrc_config_rf_cal_cache_init(void);
+bool API 	nrc_config_rf_cal_valid_data_count(uint8_t *data_count);
 
 void API 	nrc_config_load_rf_cal_block(uint8_t* rf_cal_block_data);
 void API 	nrc_config_erase_rf_cal_block(void);

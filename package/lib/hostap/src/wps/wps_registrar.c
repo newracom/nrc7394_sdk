@@ -138,6 +138,11 @@ struct wps_registrar_device {
 	u8 uuid[WPS_UUID_LEN];
 };
 
+/* Forward declaration needed by MS helper functions below */
+static void wps_registrar_remove_pbc_session(struct wps_registrar *reg,
+					     const u8 *uuid_e,
+					     const u8 *p2p_dev_addr);
+
 
 struct wps_registrar {
 	struct wps_context *wps;
@@ -190,6 +195,37 @@ struct wps_registrar {
 	struct os_reltime pbc_ignore_start;
 #endif /* WPS_WORKAROUNDS */
 
+#ifdef CONFIG_WPS_REGISTRAR_MULTI_SELECT
+	/**
+	 * ms_active_uuid - UUID-E of the STA currently being served.
+	 * Zeroed when no session is active.
+	 */
+	u8  ms_active_uuid[WPS_UUID_LEN];
+
+	/**
+	 * ms_active_uuid_set - 1 when a PBC session is locked to
+	 * ms_active_uuid, 0 when the registrar is idle / between sessions.
+	 */
+	int ms_active_uuid_set;
+
+	/*
+	 * ms_pbc_restarted - Set to 1 by ms_pbc_restart_cb() after PBC is
+	 * restarted for waiting STAs.	Cleared to 0 when the first M1 is
+	 * received and the session is locked to a UUID-E.
+	 * While this flag is 1, overlap detection is suppressed so that
+	 * two simultaneous M1s do not trigger a false overlap abort before
+	 * the MS lock has been established.
+	 */
+	int ms_pbc_restarted;
+
+	/**
+	 * ms_sta_fails - Linked list of per-STA consecutive failure counts.
+	 * An entry is created on the first failure and removed on success or
+	 * when the count reaches MS_MAX_FAIL_PER_STA.
+	 */
+	struct ms_sta_fail *ms_sta_fails;
+#endif /* CONFIG_WPS_REGISTRAR_MULTI_SELECT */
+
 	/**
 	 * multi_ap_backhaul_ssid - SSID to supply to a Multi-AP backhaul
 	 * enrollee
@@ -221,6 +257,255 @@ struct wps_registrar {
 	 */
 	size_t multi_ap_backhaul_network_key_len;
 };
+
+
+
+#ifdef CONFIG_WPS_REGISTRAR_MULTI_SELECT
+/*
+ * ms_clear_active - Clear the active UUID-E lock.
+ * Called after a session ends (success or failure) before restarting PBC.
+ */
+static void ms_clear_active(struct wps_registrar *reg)
+{
+	os_memset(reg->ms_active_uuid, 0, WPS_UUID_LEN);
+	reg->ms_active_uuid_set = 0;
+	reg->ms_pbc_restarted = 0;
+	wps_ms_printf(MSG_INFO, "active UUID cleared");
+}
+
+
+/*
+ * ms_free_sta_fails - Free all per-STA failure count entries.
+ * Called on PBC timeout or full registrar deinit.
+ */
+static void ms_free_sta_fails(struct wps_registrar *reg)
+{
+	struct ms_sta_fail *cur = reg->ms_sta_fails;
+	struct ms_sta_fail *next;
+
+	while (cur) {
+		next = cur->next;
+		os_free(cur);
+		cur = next;
+	}
+	reg->ms_sta_fails = NULL;
+}
+
+
+/*
+ * ms_find_sta_fail - Find per-STA failure entry by UUID-E.
+ * Returns pointer to entry or NULL if not found.
+ */
+static struct ms_sta_fail * ms_find_sta_fail(struct wps_registrar *reg,
+					     const u8 *uuid_e)
+{
+	struct ms_sta_fail *cur;
+
+	for (cur = reg->ms_sta_fails; cur; cur = cur->next) {
+		if (os_memcmp(cur->uuid_e, uuid_e, WPS_UUID_LEN) == 0)
+			return cur;
+	}
+	return NULL;
+}
+
+
+/*
+ * ms_increment_fail - Increment failure count for a STA.
+ * Creates a new entry if one does not exist yet.
+ * Returns the updated fail_count, or -1 on OOM.
+ */
+static int ms_increment_fail(struct wps_registrar *reg, const u8 *uuid_e)
+{
+	struct ms_sta_fail *entry;
+
+	entry = ms_find_sta_fail(reg, uuid_e);
+	if (!entry) {
+		entry = os_zalloc(sizeof(*entry));
+		if (!entry) {
+			wps_ms_printf(MSG_ERROR,
+				   "WPS MS: OOM allocating ms_sta_fail");
+			return -1;
+		}
+		os_memcpy(entry->uuid_e, uuid_e, WPS_UUID_LEN);
+		entry->next = reg->ms_sta_fails;
+		reg->ms_sta_fails = entry;
+	}
+	entry->fail_count++;
+	return entry->fail_count;
+}
+
+
+/*
+ * ms_remove_sta_fail - Remove and free the per-STA failure entry.
+ * Called on success or when a STA is evicted after too many failures.
+ */
+static void ms_remove_sta_fail(struct wps_registrar *reg, const u8 *uuid_e)
+{
+	struct ms_sta_fail *cur = reg->ms_sta_fails;
+	struct ms_sta_fail *prev = NULL;
+
+	while (cur) {
+		if (os_memcmp(cur->uuid_e, uuid_e, WPS_UUID_LEN) == 0) {
+			if (prev)
+				prev->next = cur->next;
+			else
+				reg->ms_sta_fails = cur->next;
+			os_free(cur);
+			return;
+		}
+		prev = cur;
+		cur = cur->next;
+	}
+}
+
+
+/*
+ * ms_has_waiting_sta - Check whether any STA other than the active one
+ * is still present in pbc_sessions and has not yet expired.
+ * Returns 1 if at least one waiting STA exists, 0 otherwise.
+ * This function is read-only; it does not modify any list.
+ */
+static int ms_has_waiting_sta(struct wps_registrar *reg)
+{
+	struct wps_pbc_session *pbc;
+	struct os_reltime now;
+
+	os_get_reltime(&now);
+
+	for (pbc = reg->pbc_sessions; pbc; pbc = pbc->next) {
+		/* Skip expired entries */
+		if (os_reltime_expired(&now, &pbc->timestamp,
+				       WPS_PBC_WALK_TIME))
+			break; /* list is time-ordered, no need to continue */
+
+		/* Skip the currently active STA */
+		if (reg->ms_active_uuid_set &&
+		    os_memcmp(pbc->uuid_e, reg->ms_active_uuid,
+			      WPS_UUID_LEN) == 0)
+			continue;
+
+		/* Found a different, non-expired STA */
+		wps_ms_printf(MSG_DEBUG,
+			   "WPS MS: waiting STA found in pbc_sessions ("
+			   MACSTR ")", MAC2STR(pbc->addr));
+		return 1;
+	}
+
+	return 0;
+}
+
+
+/*
+ * ms_pbc_restart_cb - eloop callback: re-enable PBC mode for waiting STAs.
+ * Calls the upper-layer pbc_restart_cb registered in wps_context.
+ * Whichever STA sends M1 first after this will win the next session.
+ */
+static void ms_pbc_restart_cb(void *eloop_ctx, void *timeout_ctx)
+{
+	struct wps_registrar *reg = eloop_ctx;
+
+	wps_ms_printf(MSG_INFO,
+		   "WPS MS: restarting PBC — next STA to send M1 wins");
+
+	reg->ms_pbc_restarted = 1;
+
+	if (reg->wps && reg->wps->pbc_restart_cb)
+		reg->wps->pbc_restart_cb(reg->wps->cb_ctx, NULL);
+	else
+		wps_ms_printf(MSG_WARNING,
+			   "WPS MS: pbc_restart_cb not registered");
+}
+
+
+/* Forward decls used by MS path (definitions appear later in this file). */
+static void wps_registrar_stop_pbc(struct wps_registrar *reg);
+
+/*
+ * ms_restart_pbc_if_needed - Schedule a PBC restart if waiting STAs exist.
+ * Called after every session end (success or failure).
+ */
+static void ms_restart_pbc_if_needed(struct wps_registrar *reg)
+{
+	if (ms_has_waiting_sta(reg)) {
+		wps_ms_printf(MSG_INFO,
+			   "WPS MS: waiting STAs detected, restarting PBC "
+			   "in %d s", MS_PBC_RESTART_DELAY_SEC);
+		eloop_cancel_timeout(ms_pbc_restart_cb, reg, NULL);
+		eloop_register_timeout(MS_PBC_RESTART_DELAY_SEC, 0,
+				       ms_pbc_restart_cb, reg, NULL);
+	} else {
+		/* No queued STAs: end PBC immediately so beacon WPS IE is
+		 * removed and no late M1 is accepted. */
+		wps_ms_printf(MSG_INFO,
+			   "WPS MS: no waiting STAs — closing PBC window");
+		wps_free_pbc_sessions(reg->pbc_sessions);
+		reg->pbc_sessions = NULL;
+		wps_registrar_stop_pbc(reg);
+	}
+}
+
+
+/*
+ * wps_registrar_ms_deinit - Release all MS state (called from
+ * wps_registrar_deinit).
+ */
+void wps_registrar_ms_deinit(struct wps_registrar *reg)
+{
+	eloop_cancel_timeout(ms_pbc_restart_cb, reg, NULL);
+	ms_clear_active(reg);
+	ms_free_sta_fails(reg);
+}
+
+
+/*
+ * wps_registrar_ms_on_session_fail - Handle failure of the active STA's
+ * session.  Called from wps_deinit() when a registrar-side session ends
+ * without reaching wps_process_wsc_done() (i.e. failure or abort).
+ *
+ * Logic:
+ *   1. Increment this STA's fail count.
+ *   2. If count >= MS_MAX_FAIL_PER_STA: evict the STA entirely.
+ *   3. Clear the active UUID lock.
+ *   4. Restart PBC if other STAs are still waiting.
+ */
+void wps_registrar_ms_on_session_fail(struct wps_registrar *reg,
+				      const u8 *uuid_e)
+{
+	int fail_count;
+
+	if (!reg->ms_active_uuid_set ||
+	    os_memcmp(reg->ms_active_uuid, uuid_e, WPS_UUID_LEN) != 0) {
+		/*
+		 * The session that failed was not the one we locked.
+		 * This can happen if deinit is called for a rejected STA
+		 * (one that received M2D). Nothing to do.
+		 */
+		return;
+	}
+
+	fail_count = ms_increment_fail(reg, uuid_e);
+	if (fail_count < 0) {
+		/* OOM — treat as eviction to avoid getting stuck */
+		fail_count = MS_MAX_FAIL_PER_STA;
+	}
+
+	wps_ms_printf(MSG_INFO,
+		   "WPS MS: active STA failed (fail_count=%d/%d)",
+		   fail_count, MS_MAX_FAIL_PER_STA);
+
+	if (fail_count >= MS_MAX_FAIL_PER_STA) {
+		wps_ms_printf(MSG_INFO,
+			   "WPS MS: STA exceeded max failures — evicting");
+		ms_remove_sta_fail(reg, uuid_e);
+		/* Remove from pbc_sessions so ms_has_waiting_sta()
+		 * no longer counts this STA as a waiting candidate. */
+		wps_registrar_remove_pbc_session(reg, uuid_e, NULL);
+	}
+
+	ms_clear_active(reg);
+	ms_restart_pbc_if_needed(reg);
+}
+#endif /* CONFIG_WPS_REGISTRAR_MULTI_SELECT */
 
 
 static int wps_set_ie(struct wps_registrar *reg);
@@ -433,6 +718,34 @@ int wps_registrar_pbc_overlap(struct wps_registrar *reg,
 	struct wps_pbc_session *pbc;
 	struct wps_pbc_session *first = NULL;
 	struct os_reltime now;
+
+#ifdef CONFIG_WPS_REGISTRAR_MULTI_SELECT
+	/*
+	 * MS: While a session is locked to ms_active_uuid, suppress overlap
+	 * detection for any other UUID-E.  Without this suppression the
+	 * standard overlap check would abort the active session every time a
+	 * second STA sends a Probe Request or M1.
+	 */
+	if (reg->ms_active_uuid_set && uuid_e &&
+	    os_memcmp(reg->ms_active_uuid, uuid_e, WPS_UUID_LEN) != 0) {
+		wps_ms_printf(MSG_DEBUG,
+			   "WPS MS: suppressing overlap for non-active "
+			   "UUID-E — active session protected");
+		return 0;
+	}
+
+	/*
+	 * PBC was just restarted for waiting STAs (ms_pbc_restarted=1).
+	 * Two STAs may send M1 simultaneously before the MS lock is
+	 * established.  Suppress overlap until the first M1 locks a UUID-E.
+	 */
+	if (reg->ms_pbc_restarted) {
+		wps_ms_printf(MSG_INFO,
+			  "WPS MS: suppressing overlap! PBC freshly restarted, "
+			  "waiting for first M1 to lock UUID-E");
+		return 0;
+	}
+#endif /* CONFIG_WPS_REGISTRAR_MULTI_SELECT */
 
 	os_get_reltime(&now);
 
@@ -750,6 +1063,9 @@ void wps_registrar_deinit(struct wps_registrar *reg)
 		return;
 	eloop_cancel_timeout(wps_registrar_pbc_timeout, reg, NULL);
 	eloop_cancel_timeout(wps_registrar_set_selected_timeout, reg, NULL);
+#ifdef CONFIG_WPS_REGISTRAR_MULTI_SELECT
+	wps_registrar_ms_deinit(reg);
+#endif /* CONFIG_WPS_REGISTRAR_MULTI_SELECT */
 	wps_registrar_flush(reg);
 	wpabuf_clear_free(reg->extra_cred);
 	bin_clear_free(reg->multi_ap_backhaul_network_key,
@@ -1025,6 +1341,17 @@ static void wps_registrar_pbc_timeout(void *eloop_ctx, void *timeout_ctx)
 
 	wpa_printf(MSG_DEBUG, "WPS: PBC timed out - disable PBC mode");
 	wps_pbc_timeout_event(reg->wps);
+#ifdef CONFIG_WPS_REGISTRAR_MULTI_SELECT
+	/*
+	 * MS: Full reset on timeout. All waiting STAs are likely also expired.
+	 * Cancel any pending restart timer and clear all MS state.
+	 * No automatic PBC restart — operator must re-issue wps_pbc.
+	 */
+	eloop_cancel_timeout(ms_pbc_restart_cb, reg, NULL);
+	ms_clear_active(reg);
+	ms_free_sta_fails(reg);
+	wps_ms_printf(MSG_INFO, "WPS MS: timeout - state cleared");
+#endif /* CONFIG_WPS_REGISTRAR_MULTI_SELECT */
 	wps_registrar_stop_pbc(reg);
 }
 
@@ -1078,8 +1405,22 @@ static void wps_registrar_pbc_completed(struct wps_registrar *reg)
 {
 	wpa_printf(MSG_DEBUG, "WPS: PBC completed - stopping PBC mode");
 	eloop_cancel_timeout(wps_registrar_pbc_timeout, reg, NULL);
+#ifdef CONFIG_WPS_REGISTRAR_MULTI_SELECT
+	/*
+	 * MS: Do not call wps_registrar_stop_pbc() here.
+	 * ms_restart_pbc_if_needed() will call wps_registrar_button_pushed()
+	 * via the restart callback which properly re-enables PBC mode if
+	 * waiting STAs exist.  If no STAs are waiting, PBC will end naturally
+	 * after ms_restart_pbc_if_needed() logs "no waiting STAs".
+	 * We still send the disable event so upper layers know the current
+	 * session is done.
+	 */
+	wps_pbc_disable_event(reg->wps);
+	/* MS clear and conditional restart are done in wps_process_wsc_done */
+#else
 	wps_registrar_stop_pbc(reg);
 	wps_pbc_disable_event(reg->wps);
+#endif /* CONFIG_WPS_REGISTRAR_MULTI_SELECT */
 }
 
 
@@ -2751,6 +3092,51 @@ static enum wps_process_res wps_process_m1(struct wps_data *wps,
 		wps_registrar_add_pbc_session(wps->wps->registrar,
 					      wps->mac_addr_e, wps->uuid_e);
 		wps->pbc = 1;
+
+#ifdef CONFIG_WPS_REGISTRAR_MULTI_SELECT
+		{
+			struct wps_registrar *reg = wps->wps->registrar;
+
+			if (reg->ms_active_uuid_set) {
+				if (os_memcmp(reg->ms_active_uuid, wps->uuid_e,
+					      WPS_UUID_LEN) != 0) {
+					/*
+					 * A different STA is currently in
+					 * session.  Reject this STA with M2D
+					 * so it will retry later.
+					 */
+					wps_ms_printf(MSG_INFO,
+						   "WPS MS: rejecting M1 from "
+						   MACSTR " — session busy",
+						   MAC2STR(wps->mac_addr_e));
+					wps->state = SEND_M2D;
+					wps->config_error =
+						WPS_CFG_MULTIPLE_PBC_DETECTED;
+					return WPS_CONTINUE;
+				}
+				/*
+				 * Same UUID-E as active STA: this is a
+				 * retransmission — fall through normally.
+				 */
+				wps_ms_printf(MSG_INFO,
+					   "WPS MS: M1 retransmission from "
+					   "active STA " MACSTR,
+					   MAC2STR(wps->mac_addr_e));
+			} else {
+				/*
+				 * No active session yet — lock to this STA.
+				 * Whichever STA sent M1 first wins.
+				 */
+				os_memcpy(reg->ms_active_uuid, wps->uuid_e,
+					  WPS_UUID_LEN);
+				reg->ms_active_uuid_set = 1;
+				reg->ms_pbc_restarted = 0;
+				wps_ms_printf(MSG_INFO,
+					   "WPS MS: session locked to " MACSTR,
+					   MAC2STR(wps->mac_addr_e));
+			}
+		}
+#endif /* CONFIG_WPS_REGISTRAR_MULTI_SELECT */
 	}
 
 #ifdef WPS_WORKAROUNDS
@@ -3379,6 +3765,22 @@ static enum wps_process_res wps_process_wsc_done(struct wps_data *wps,
 	 * merge them into APs own list.. */
 
 	wps_success_event(wps->wps, wps->mac_addr_e);
+
+#ifdef CONFIG_WPS_REGISTRAR_MULTI_SELECT
+	if (wps->pbc) {
+		/*
+		 * MS success path:
+		 * 1. Remove this STA's failure record (it succeeded).
+		 * 2. Clear the UUID lock so the next STA can be served.
+		 * 3. Restart PBC if other STAs are still waiting.
+		 * Note: ms_clear_active() must happen AFTER wps_success_event()
+		 * so that the success event is associated with the right UUID.
+		 */
+		ms_remove_sta_fail(wps->wps->registrar, wps->uuid_e);
+		ms_clear_active(wps->wps->registrar);
+		ms_restart_pbc_if_needed(wps->wps->registrar);
+	}
+#endif /* CONFIG_WPS_REGISTRAR_MULTI_SELECT */
 
 	return WPS_DONE;
 }

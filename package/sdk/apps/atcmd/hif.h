@@ -160,18 +160,21 @@ extern void _hif_fifo_putc (_hif_fifo_t *fifo, char c);
 extern int _hif_fifo_read (_hif_fifo_t *fifo, char *buf, int len);
 extern int _hif_fifo_write (_hif_fifo_t *fifo, char *buf, int len);
 
-extern int _hif_uart_open (_hif_info_t *info);
-extern void _hif_uart_close (void);
-extern int _hif_uart_change (_hif_uart_t *uart);
-extern int _hif_uart_read (char *buf, int len);
-extern int _hif_uart_write (char *buf, int len);
-extern void _hif_uart_get_info (_hif_uart_t *info);
+extern int hif_uart_open (_hif_info_t *info);
+extern void hif_uart_close (void);
+extern int hif_uart_change (_hif_uart_t *uart);
+extern int hif_uart_read (char *buf, int len);
+extern int hif_uart_write (char *buf, int len);
+extern void hif_uart_get_info (_hif_uart_t *info);
+extern const char *str_hif_uart_hfc (enum uart_hardware_flow_control hfc);
 
 extern int _hif_hspi_open (_hif_info_t *info);
 extern void _hif_hspi_close (void);
 extern int _hif_hspi_read (char *buf, int len);
 extern int _hif_hspi_write (char *buf, int len);
-extern void _hfi_hspi_eirq_boot_done (bool active_high);
+#if !defined(NRC7292)
+extern void _hif_hspi_eirq_boot_done (bool active_high);
+#endif
 extern void _hif_hspi_enter_sleep (bool check_txq, bool check_rxq, uint32_t timeout);
 
 extern void _hif_set_type (enum _HIF_TYPE type);

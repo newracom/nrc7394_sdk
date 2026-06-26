@@ -73,6 +73,7 @@ ping_parm_t * ping_init_parameters(void)
 	parm->seq_num = 0;
 	parm->ping_thread.thread_handle = NULL;
 	parm->force_stop = 0;
+	parm->stop_on_success = 0;
 	memset(&parm->addr, 0, sizeof(ip_addr_t));
 	parm->next = NULL;
 

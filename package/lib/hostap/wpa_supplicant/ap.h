@@ -44,6 +44,9 @@ void ap_eapol_tx_status(void *ctx, const u8 *dst,
 			const u8 *data, size_t len, int ack);
 void ap_client_poll_ok(void *ctx, const u8 *addr);
 void ap_rx_from_unknown_sta(void *ctx, const u8 *addr, int wds);
+#if defined(INCLUDE_SA_QUERY_UNPROT_DISCONNECT)
+void ap_rx_unprot_disconnect(struct wpa_supplicant *wpa_s, const u8 *addr);
+#endif
 void ap_mgmt_rx(void *ctx, struct rx_mgmt *rx_mgmt);
 void ap_mgmt_tx_cb(void *ctx, const u8 *buf, size_t len, u16 stype, int ok);
 int wpa_supplicant_ap_update_beacon(struct wpa_supplicant *wpa_s);

@@ -118,6 +118,7 @@ void dhcps_coarse_tmr(void);
 
 /* Get IP address with matching mac address */
 bool dhcps_get_ip(u8_t *mac, ip4_addr_t *ip);
+bool dhcps_get_mac (const ip4_addr_t *ip, u8_t *mac);
 int dhcps_status(void);
 struct netif *dhcps_get_interface(void);
 bool wifi_softap_set_dhcps_lease_time(u32_t minute);

@@ -218,4 +218,33 @@ void wps_registrar_remove_nfc_pw_token(struct wps_registrar *reg,
 int wps_cb_new_psk(struct wps_registrar *reg, const u8 *mac_addr,
 		   const u8 *p2p_dev_addr, const u8 *psk, size_t psk_len);
 
+#ifdef CONFIG_WPS_REGISTRAR_MULTI_SELECT
+/**
+ * struct ms_sta_fail - Per-STA failure count entry for Multi-Select PBC
+ *
+ * Tracks how many consecutive WPS session failures a specific Enrollee
+ * has accumulated. Once the count reaches MS_MAX_FAIL_PER_STA the STA
+ * is evicted from the waiting set so that other STAs can proceed.
+ */
+struct ms_sta_fail {
+	struct ms_sta_fail *next;
+	u8  uuid_e[WPS_UUID_LEN];
+	int fail_count;
+};
+
+/* Maximum consecutive failures allowed per STA before eviction */
+#ifndef MS_MAX_FAIL_PER_STA
+#define MS_MAX_FAIL_PER_STA  3
+#endif
+
+/* Delay (seconds) before restarting PBC after a session ends */
+#ifndef MS_PBC_RESTART_DELAY_SEC
+#define MS_PBC_RESTART_DELAY_SEC  2
+#endif
+
+void wps_registrar_ms_deinit(struct wps_registrar *reg);
+void wps_registrar_ms_on_session_fail(struct wps_registrar *reg,
+				      const u8 *uuid_e);
+#endif /* CONFIG_WPS_REGISTRAR_MULTI_SELECT */
+
 #endif /* WPS_I_H */

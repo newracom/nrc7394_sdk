@@ -42,12 +42,21 @@ enum ATCMD_BASIC_EVENT
 #endif		
 };
 
-#define ATCMD_MSG_BEVENT(fmt, ...)		ATCMD_MSG_EVENT("BEVENT", fmt, ##__VA_ARGS__)
+typedef struct
+{
+	_hif_uart_t uart;
+
+} atcmd_basic_retinfo_t;
+
+typedef atcmd_basic_retinfo_t atcmd_basic_info_t;
+
+/**********************************************************************************************/
 
 extern int atcmd_basic_enable (void);
 extern void atcmd_basic_disable (void);
 
-extern bool atcmd_gpio_pin_valid (int pin);
+extern void atcmd_gpio_init (bool deepsleep_wakeup);
+extern bool atcmd_gpio_is_reserved (int num);
 
 #if defined(CONFIG_ATCMD_FWUPDATE)
 extern int atcmd_firmware_download (char *buf, int len);
@@ -72,6 +81,8 @@ extern void atcmd_sf_user_write_event_done (uint32_t offset, uint32_t length);
 #define ATCMD_MSG_RXD_SFSYSUSER(buf, len, fmt, ...)	\
 		atcmd_msg_snprint(ATCMD_MSG_TYPE_EVENT, buf, len, "RXD_SFSYSUSER:" fmt, ##__VA_ARGS__)
 #endif
+
+#define ATCMD_MSG_BEVENT(fmt, ...)		ATCMD_MSG_EVENT("BEVENT", fmt, ##__VA_ARGS__)
 
 /**********************************************************************************************/
 #endif /* #ifndef __NRC_ATCMD_BASIC_H__ */

@@ -49,7 +49,7 @@ extern uint32_t sf_size;
 
 #define SF_SLOT_DATA_OFFSET 12
 #define SF_SLOT_CRC_OFFSET 8
-#define SF_SLOT_MAX_LEN 4084 /* 4KB - size of Header */
+#define SF_SLOT_MAX_LEN 8180 /* 8KB - size of Header */
 
 #define SIZE_OF_TX_PWR_TBL      64
 #define SIZE_OF_FREQ_DELTA_TBL  64
@@ -123,6 +123,8 @@ bool		hal_sf_write_user_data(uint32_t user_data_offset, uint8_t* data, uint32_t 
 bool		hal_sf_read_user_data(uint8_t* data, uint32_t user_data_offset, uint32_t size);
 bool		hal_sf_write_device_info(uint8_t* data, uint16_t size);
 bool		hal_sf_read_device_info(uint8_t* data, uint16_t size);
+int			hal_sf_raw_xfer(const uint8_t *tx, uint32_t txLen,
+                              uint8_t *rx, uint32_t rxLen);
 bool		nrc_sf_fota_support(void);
 uint32_t	nrc_sf_fota_max_fw_size(void);
 uint32_t	nrc_sf_fota_addr(void);
@@ -147,6 +149,7 @@ bool 		system_sflash_update_slot(uint32_t address, uint8_t *data, size_t size);
 #define W25Q32JVIQ_JEDEC_ID (0xEF4016)
 #define W25Q32JWBYIQ_JEDEC_ID (0xEF6016)
 #define W25Q32JWBYIM_JEDEC_ID (0xEF8016)
+#define W77Q32JWXGIR_JEDEC_ID (0xEF8A16)
 #define GD25LQ16C_JEDEC_ID (0xC86015)
 #define GD25LQ40C_JEDEC_ID (0xC86013)
 #define GD25WQ16E_JEDEC_ID (0xC86515)

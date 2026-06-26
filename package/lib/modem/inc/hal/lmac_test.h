@@ -14,10 +14,21 @@ void lmac_test_tsf_handler();
 bool lmac_test_timer_busy();
 bool lmac_test_timer_start(uint32_t interval , int32_t (*cb)(void *param) );
 void lmac_test_timer_stop();
+bool lmac_test_set_freq_bw(uint8_t vif_id, uint32_t freq_100k, bw_t bw_idx);
 #if defined(INCLUDE_MANUAL_CONT_TX_SUPPORT)
-bool lmac_test_cont_tx(bool enable, uint32_t freq_100k, int bw_idx, uint8_t mcs, uint8_t txpwr, uint8_t type);
-bool lmac_test_cont_tx_interval(bool enable, uint32_t freq_100k, int bw_idx, uint8_t mcs, uint8_t txpwr, uint8_t type, uint32_t interval);
-bool lmac_test_sine_tx(bool enable, uint32_t freq_100k, int bw_idx, uint8_t txpwr);
+void lmac_test_stop(int vif_id);
+bool lmac_test_set_config(uint8_t vif_id, bw_t bw_idx, uint8_t mcs, uint8_t txpwr, uint8_t type, uint32_t interval);
+void lmac_test_start(void);
+
+bool lmac_test_cont_tx(bool enable, uint32_t freq_100k, bw_t bw_idx, uint8_t mcs, uint8_t txpwr, uint8_t type, uint32_t interval);
+bool lmac_test_sine_tx(bool enable, uint32_t freq_100k, bw_t bw_idx, uint8_t txpwr);
+int8_t lmac_test_get_rssi_wo_conn(int vif_id);
+int8_t lmac_test_get_rssi_avg_wo_conn(int vif_id);
+uint8_t lmac_test_get_snr_wo_conn(int vif_id);
+uint8_t lmac_test_get_snr_avg_wo_conn(int vif_id);
+void lmac_test_set_rssi_wo_conn(int vif_id, int8_t rx_rssi, uint8_t snr);
+bool lmac_test_get_enable_rx_rssi_snr();
+void lmac_test_set_enable_rx_rssi_snr(bool enable);
 #endif
 int32_t test_on_timer(void *param);
 
@@ -64,8 +75,8 @@ void set_emulated_per(bool v);
 uint8_t get_per(int n);
 uint8_t get_lmac_test_mode();
 void add_test_tx_total_count(uint8_t mcs, int count);
-int32_t get_packet_count();
-void set_packet_count(int32_t v);
+int32_t lmac_test_get_packet_count();
+void lmac_test_set_packet_count(int32_t v);
 void inc_test_tx_fail_count(uint8_t mcs);
 bool get_snr_print();
 void set_snr_print(bool v);
@@ -84,4 +95,5 @@ uint32_t get_interval();
 #else
 int32_t get_interval();
 #endif
+
 #endif /* LMAC_TEST_H */

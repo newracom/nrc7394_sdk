@@ -250,7 +250,9 @@ int sha256_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 	for (i = 0; i < num_elem; ++i)
 		mbedtls_sha256_update(&ctx, addr[i], len[i]);
 
+	//CPA("SHA256 START TSF=%u\n", TSF);
 	mbedtls_sha256_finish(&ctx, mac);
+	//CPA("SHA256 END TSF=%u\n", TSF);
 	mbedtls_sha256_free(&ctx);
 
 	return 0;
@@ -290,10 +292,237 @@ int sha384_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 	return 0;
 }
 
+#if (MBEDTLS_VERSION_MAJOR >= 3)
+#define MD4_BLOCK_LENGTH	64
+#define MD4_DIGEST_LENGTH	16
+
+typedef struct {
+	u32 state[4];
+	u64 count;
+	u8 buffer[MD4_BLOCK_LENGTH];
+} mbedtls_md4_fallback_context;
+
+static void mbedtls_md4_fallback_transform(u32 state[4],
+					       const u8 block[MD4_BLOCK_LENGTH]);
+
+static void mbedtls_md4_fallback_init(mbedtls_md4_fallback_context *ctx)
+{
+	ctx->count = 0;
+	ctx->state[0] = 0x67452301;
+	ctx->state[1] = 0xefcdab89;
+	ctx->state[2] = 0x98badcfe;
+	ctx->state[3] = 0x10325476;
+}
+
+static void mbedtls_md4_fallback_update(mbedtls_md4_fallback_context *ctx,
+					    const u8 *input, size_t len)
+{
+	size_t have, need;
+
+	if (!ctx)
+		return;
+
+	if (!input)
+		return;
+
+	have = (size_t) ((ctx->count >> 3) & (MD4_BLOCK_LENGTH - 1));
+	need = MD4_BLOCK_LENGTH - have;
+	ctx->count += (u64) len << 3;
+
+	if (len >= need) {
+		if (have != 0) {
+			os_memcpy(ctx->buffer + have, input, need);
+			mbedtls_md4_fallback_transform(ctx->state, ctx->buffer);
+			input += need;
+			len -= need;
+			have = 0;
+		}
+
+		while (len >= MD4_BLOCK_LENGTH) {
+			mbedtls_md4_fallback_transform(ctx->state, input);
+			input += MD4_BLOCK_LENGTH;
+			len -= MD4_BLOCK_LENGTH;
+		}
+	}
+
+	if (len != 0)
+		os_memcpy(ctx->buffer + have, input, len);
+}
+
+#define MD4_PUT_32BIT_LE(cp, value) do { \
+	(cp)[3] = (u8) ((u32) (value) >> 24); \
+	(cp)[2] = (u8) ((u32) (value) >> 16); \
+	(cp)[1] = (u8) ((u32) (value) >> 8); \
+	(cp)[0] = (u8) (value); \
+} while (0)
+
+static void md4_put_64bit_le(u8 *cp, u64 value)
+{
+	if (!cp)
+		return;
+
+	cp[0] = (u8) (value & 0xff);
+	cp[1] = (u8) ((value / 0x100ULL) & 0xff);
+	cp[2] = (u8) ((value / 0x10000ULL) & 0xff);
+	cp[3] = (u8) ((value / 0x1000000ULL) & 0xff);
+	cp[4] = (u8) ((value / 0x100000000ULL) & 0xff);
+	cp[5] = (u8) ((value / 0x10000000000ULL) & 0xff);
+	cp[6] = (u8) ((value / 0x1000000000000ULL) & 0xff);
+	cp[7] = (u8) ((value / 0x100000000000000ULL) & 0xff);
+}
+
+static const u8 md4_fallback_padding[MD4_BLOCK_LENGTH] = {
+	0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+};
+
+static void mbedtls_md4_fallback_final(u8 digest[MD4_DIGEST_LENGTH],
+					   mbedtls_md4_fallback_context *ctx)
+{
+	mbedtls_md4_fallback_context *local_ctx;
+	u8 count[8];
+	u64 bit_count = 0;
+	size_t padlen;
+	int i;
+
+	if (!digest)
+		return;
+
+	if (!ctx)
+		return;
+
+	local_ctx = ctx;
+	if (!local_ctx)
+		return;
+
+	bit_count = local_ctx->count;
+	md4_put_64bit_le(count, bit_count);
+	padlen = MD4_BLOCK_LENGTH -
+		((size_t) ((bit_count / 8) & (MD4_BLOCK_LENGTH - 1)));
+	if (padlen < 1 + 8)
+		padlen += MD4_BLOCK_LENGTH;
+
+	mbedtls_md4_fallback_update(local_ctx, md4_fallback_padding, padlen - 8);
+	mbedtls_md4_fallback_update(local_ctx, count, 8);
+
+	for (i = 0; i < 4; i++)
+		MD4_PUT_32BIT_LE(digest + i * 4, local_ctx->state[i]);
+
+	os_memset(local_ctx, 0, sizeof(*local_ctx));
+}
+
+#define MD4_F1(x, y, z) ((z) ^ ((x) & ((y) ^ (z))))
+#define MD4_F2(x, y, z) (((x) & (y)) | ((x) & (z)) | ((y) & (z)))
+#define MD4_F3(x, y, z) ((x) ^ (y) ^ (z))
+#define MD4_STEP(f, w, x, y, z, data, s) \
+	((w) += (f((x), (y), (z)) + (data)), \
+	 (w) = ((w) << (s)) | ((w) >> (32 - (s))))
+
+static void mbedtls_md4_fallback_transform(u32 state[4],
+					       const u8 block[MD4_BLOCK_LENGTH])
+{
+	u32 a, b, c, d, in[MD4_BLOCK_LENGTH / 4];
+
+#if BYTE_ORDER == LITTLE_ENDIAN
+	os_memcpy(in, block, sizeof(in));
+#else
+	size_t i;
+
+	for (i = 0; i < MD4_BLOCK_LENGTH / 4; i++) {
+		in[i] = (u32) block[i * 4 + 0] |
+			((u32) block[i * 4 + 1] << 8) |
+			((u32) block[i * 4 + 2] << 16) |
+			((u32) block[i * 4 + 3] << 24);
+	}
+#endif
+
+	a = state[0];
+	b = state[1];
+	c = state[2];
+	d = state[3];
+
+	MD4_STEP(MD4_F1, a, b, c, d, in[0], 3);
+	MD4_STEP(MD4_F1, d, a, b, c, in[1], 7);
+	MD4_STEP(MD4_F1, c, d, a, b, in[2], 11);
+	MD4_STEP(MD4_F1, b, c, d, a, in[3], 19);
+	MD4_STEP(MD4_F1, a, b, c, d, in[4], 3);
+	MD4_STEP(MD4_F1, d, a, b, c, in[5], 7);
+	MD4_STEP(MD4_F1, c, d, a, b, in[6], 11);
+	MD4_STEP(MD4_F1, b, c, d, a, in[7], 19);
+	MD4_STEP(MD4_F1, a, b, c, d, in[8], 3);
+	MD4_STEP(MD4_F1, d, a, b, c, in[9], 7);
+	MD4_STEP(MD4_F1, c, d, a, b, in[10], 11);
+	MD4_STEP(MD4_F1, b, c, d, a, in[11], 19);
+	MD4_STEP(MD4_F1, a, b, c, d, in[12], 3);
+	MD4_STEP(MD4_F1, d, a, b, c, in[13], 7);
+	MD4_STEP(MD4_F1, c, d, a, b, in[14], 11);
+	MD4_STEP(MD4_F1, b, c, d, a, in[15], 19);
+
+	MD4_STEP(MD4_F2, a, b, c, d, in[0] + 0x5a827999, 3);
+	MD4_STEP(MD4_F2, d, a, b, c, in[4] + 0x5a827999, 5);
+	MD4_STEP(MD4_F2, c, d, a, b, in[8] + 0x5a827999, 9);
+	MD4_STEP(MD4_F2, b, c, d, a, in[12] + 0x5a827999, 13);
+	MD4_STEP(MD4_F2, a, b, c, d, in[1] + 0x5a827999, 3);
+	MD4_STEP(MD4_F2, d, a, b, c, in[5] + 0x5a827999, 5);
+	MD4_STEP(MD4_F2, c, d, a, b, in[9] + 0x5a827999, 9);
+	MD4_STEP(MD4_F2, b, c, d, a, in[13] + 0x5a827999, 13);
+	MD4_STEP(MD4_F2, a, b, c, d, in[2] + 0x5a827999, 3);
+	MD4_STEP(MD4_F2, d, a, b, c, in[6] + 0x5a827999, 5);
+	MD4_STEP(MD4_F2, c, d, a, b, in[10] + 0x5a827999, 9);
+	MD4_STEP(MD4_F2, b, c, d, a, in[14] + 0x5a827999, 13);
+	MD4_STEP(MD4_F2, a, b, c, d, in[3] + 0x5a827999, 3);
+	MD4_STEP(MD4_F2, d, a, b, c, in[7] + 0x5a827999, 5);
+	MD4_STEP(MD4_F2, c, d, a, b, in[11] + 0x5a827999, 9);
+	MD4_STEP(MD4_F2, b, c, d, a, in[15] + 0x5a827999, 13);
+
+	MD4_STEP(MD4_F3, a, b, c, d, in[0] + 0x6ed9eba1, 3);
+	MD4_STEP(MD4_F3, d, a, b, c, in[8] + 0x6ed9eba1, 9);
+	MD4_STEP(MD4_F3, c, d, a, b, in[4] + 0x6ed9eba1, 11);
+	MD4_STEP(MD4_F3, b, c, d, a, in[12] + 0x6ed9eba1, 15);
+	MD4_STEP(MD4_F3, a, b, c, d, in[2] + 0x6ed9eba1, 3);
+	MD4_STEP(MD4_F3, d, a, b, c, in[10] + 0x6ed9eba1, 9);
+	MD4_STEP(MD4_F3, c, d, a, b, in[6] + 0x6ed9eba1, 11);
+	MD4_STEP(MD4_F3, b, c, d, a, in[14] + 0x6ed9eba1, 15);
+	MD4_STEP(MD4_F3, a, b, c, d, in[1] + 0x6ed9eba1, 3);
+	MD4_STEP(MD4_F3, d, a, b, c, in[9] + 0x6ed9eba1, 9);
+	MD4_STEP(MD4_F3, c, d, a, b, in[5] + 0x6ed9eba1, 11);
+	MD4_STEP(MD4_F3, b, c, d, a, in[13] + 0x6ed9eba1, 15);
+	MD4_STEP(MD4_F3, a, b, c, d, in[3] + 0x6ed9eba1, 3);
+	MD4_STEP(MD4_F3, d, a, b, c, in[11] + 0x6ed9eba1, 9);
+	MD4_STEP(MD4_F3, c, d, a, b, in[7] + 0x6ed9eba1, 11);
+	MD4_STEP(MD4_F3, b, c, d, a, in[15] + 0x6ed9eba1, 15);
+
+	state[0] += a;
+	state[1] += b;
+	state[2] += c;
+	state[3] += d;
+	os_memset(in, 0, sizeof(in));
+}
+#endif
+
 int md4_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 {
+	if (!mac || !len || (!addr && num_elem != 0))
+		return -1;
+
 #if (MBEDTLS_VERSION_MAJOR >= 3)
-	return -1;
+	mbedtls_md4_fallback_context ctx;
+	size_t i;
+
+	mbedtls_md4_fallback_init(&ctx);
+
+	for (i = 0; i < num_elem; ++i) {
+		const u8 *chunk = addr[i];
+		size_t chunk_len = len[i];
+
+		if (!chunk && chunk_len != 0)
+			return -1;
+		mbedtls_md4_fallback_update(&ctx, chunk, chunk_len);
+	}
+
+	mbedtls_md4_fallback_final(mac, &ctx);
+	return 0;
 #else
 	mbedtls_md4_context ctx;
 	size_t i;
@@ -301,8 +530,16 @@ int md4_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 	mbedtls_md4_init(&ctx);
 	mbedtls_md4_starts(&ctx);
 
-	for (i = 0; i < num_elem; ++i)
-		mbedtls_md4_update(&ctx, addr[i], len[i]);
+	for (i = 0; i < num_elem; ++i) {
+		const u8 *chunk = addr[i];
+		size_t chunk_len = len[i];
+
+		if (!chunk && chunk_len != 0) {
+			mbedtls_md4_free(&ctx);
+			return -1;
+		}
+		mbedtls_md4_update(&ctx, chunk, chunk_len);
+	}
 
 	mbedtls_md4_finish(&ctx, mac);
 	mbedtls_md4_free(&ctx);
@@ -315,6 +552,9 @@ int md4_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 int hmac_sha384_vector(const u8 *key, size_t key_len, size_t num_elem,
 		const u8 *addr[], const size_t *len, u8 *mac)
 {
+	if (!key || !len || !mac || (!addr && num_elem != 0))
+		return -1;
+
 	return mbedtls_hmac_vector(MBEDTLS_MD_SHA384, key, key_len, num_elem, addr,
 				   len, mac);
 }
@@ -323,12 +563,18 @@ int hmac_sha384_vector(const u8 *key, size_t key_len, size_t num_elem,
 int hmac_sha384(const u8 *key, size_t key_len, const u8 *data,
 		size_t data_len, u8 *mac)
 {
+	if (!data || !mac)
+		return -1;
+
 	return hmac_sha384_vector(key, key_len, 1, &data, &data_len, mac);
 }
 
 int hmac_sha512_vector(const u8 *key, size_t key_len, size_t num_elem,
 		const u8 *addr[], const size_t *len, u8 *mac)
 {
+	if (!key || !len || !mac || (!addr && num_elem != 0))
+		return -1;
+
 	return mbedtls_hmac_vector(MBEDTLS_MD_SHA512, key, key_len, num_elem, addr,
 				   len, mac);
 }
@@ -337,6 +583,9 @@ int hmac_sha512_vector(const u8 *key, size_t key_len, size_t num_elem,
 int hmac_sha512(const u8 *key, size_t key_len, const u8 *data,
 		size_t data_len, u8 *mac)
 {
+	if (!data || !mac)
+		return -1;
+
 	return hmac_sha512_vector(key, key_len, 1, &data, &data_len, mac);
 }
 

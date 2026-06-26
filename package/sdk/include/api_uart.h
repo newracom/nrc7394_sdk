@@ -205,7 +205,7 @@ nrc_err_t nrc_uart_get(int ch, char *data);
 
 
 /**********************************************
- * @fn nrc_err_t nrc_uart_register_intr_handler(int ch, intr_handler_fn cb)
+ * @fn nrc_err_t nrc_uart_register_interrupt_handler(int ch, intr_handler_fn cb)
  *
  * @brief register user callback for UART input
  *

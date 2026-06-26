@@ -172,6 +172,22 @@ void wps_deinit(struct wps_data *data)
 	} else if (data->registrar)
 		wps_registrar_unlock_pin(data->wps->registrar, data->uuid_e);
 
+#ifdef CONFIG_WPS_REGISTRAR_MULTI_SELECT
+	/*
+	 * MS failure path: wps_deinit() is called for every session end.
+	 * The success path (wps_process_wsc_done) already cleared
+	 * ms_active_uuid_set to 0 before reaching here.
+	 * Therefore, if ms_active_uuid_set is still 1 AND the uuid_e matches,
+	 * this session ended without success — treat it as a failure.
+	 *
+	 * Only applies to registrar-side PBC sessions.
+	 */
+	if (data->registrar && data->pbc &&
+	    data->wps && data->wps->registrar)
+		wps_registrar_ms_on_session_fail(data->wps->registrar,
+						 data->uuid_e);
+#endif /* CONFIG_WPS_REGISTRAR_MULTI_SELECT */
+
 	wpabuf_clear_free(data->dh_privkey);
 	wpabuf_free(data->dh_pubkey_e);
 	wpabuf_free(data->dh_pubkey_r);

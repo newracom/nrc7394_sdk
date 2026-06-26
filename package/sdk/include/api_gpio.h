@@ -106,15 +106,14 @@ typedef enum {
 
 /** @brief GPIO mode */
 typedef enum {
-	GPIO_PULL_UP = 0,	/**< GPIO Pull up	*/
-	GPIO_PULL_DOWN,	/**< GPIO Pull down	*/
-	GPIO_FLOATING,		/**< GPIO Floating	*/
+	GPIO_FLOATING = 0,		/**< GPIO Floating	*/
+	GPIO_PULL_UP,	/**< GPIO Pull up	*/
 } NRC_GPIO_MODE;
 
 /** @brief GPIO alternative function */
 typedef enum {
 	GPIO_FUNC = 0,		/**< Normal GPIO input/output operation */
-	GPIO_ALT_FUNC = 1,	/**< Alternate function (e.g., UART/SPI/etc.) */
+	GPIO_ALT_FUNC = 1,   /* ALT0/ALT2 */
 } NRC_GPIO_ALT;
 
 // For compatibility

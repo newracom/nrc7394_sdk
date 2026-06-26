@@ -185,7 +185,7 @@ nrc_err_t run_sample_wps_pbc_sta(WIFI_CONFIG *param)
 
 	/* Set TX Power */
 	txpower = param->tx_power;
-	if(nrc_wifi_set_tx_power(txpower, 1) != WIFI_SUCCESS) {
+	if(nrc_wifi_set_tx_power(0, txpower, 1) != WIFI_SUCCESS) {
 		nrc_usr_print("[%s] Fail set TX Power\n", __func__);
 		return WIFI_FAIL;
 	}

@@ -40,13 +40,17 @@
 
 #define ATCMD_VER_MAJOR			(1)
 #define ATCMD_VER_MINOR			(26)
-#define ATCMD_VER_REVISION		(16)
+#define ATCMD_VER_REVISION		(22)
 
 /**********************************************************************************************/
 
+#if defined(NRC7394)
+#define CONFIG_ATCMD_RECOVERY
+#endif
+
 #if defined(CONFIG_SAE) && defined(CONFIG_OWE)
 #define CONFIG_ATCMD_WPA3
-#if defined(NRC7394)
+#if !defined(NRC7292)
 #define CONFIG_ATCMD_SOFTAP_WPA3 
 #endif
 #endif
@@ -188,10 +192,11 @@ enum ATCMD_ID
 	ATCMD_BASIC_VERSION = 0,
 	ATCMD_BASIC_BOOT,
 	ATCMD_BASIC_HEAP,
-#if defined(NRC7394)
+#if !defined(NRC7292)
 	ATCMD_BASIC_XTAL,
 #endif
 	ATCMD_BASIC_UART,
+	ATCMD_BASIC_GPIOCFG_PS,
 	ATCMD_BASIC_GPIOCFG,
 	ATCMD_BASIC_GPIOVAL,
 	ATCMD_BASIC_ADC,
@@ -254,6 +259,9 @@ enum ATCMD_ID
 
 	ATCMD_WIFI_CONTINUOUS_TX,
 	ATCMD_WIFI_SINE_TX,
+
+	ATCMD_WIFI_TX_COUNT,
+	ATCMD_WIFI_RX_COUNT,
 
 	ATCMD_WIFI_TIMEOUT,
 
@@ -437,6 +445,10 @@ extern int atcmd_msg_vsnprint (int type, char *buf, int len, const char *fmt, va
 
 #if defined(CONFIG_ATCMD_INTERNAL)
 #include "atcmd_internal.h"
+#endif
+
+#if defined(CONFIG_ATCMD_RECOVERY)
+#include "atcmd_retinfo.h"
 #endif
 
 /**********************************************************************************************/

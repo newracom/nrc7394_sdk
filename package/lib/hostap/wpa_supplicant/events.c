@@ -1627,7 +1627,6 @@ wpa_supplicant_select_bss(struct wpa_supplicant *wpa_s,
 			wpa_ssid_txt(bss->ssid, bss->ssid_len));
 		return bss;
 	}
-
 	return NULL;
 }
 
@@ -2056,7 +2055,7 @@ static int wpa_supplicant_need_to_roam(struct wpa_supplicant *wpa_s,
 
 	if (current_bss == selected) {
 		wpa_msg(wpa_s, MSG_INFO,
-			"Skip roaming - current BSS SNR is better");
+			"Skip roaming - current BSS has better signal");
 		return 0;
 	}
 
@@ -3666,6 +3665,9 @@ static int could_be_psk_mismatch(struct wpa_supplicant *wpa_s, u16 reason_code,
 	if (locally_generated) {
 		if (reason_code == WLAN_REASON_IE_IN_4WAY_DIFFERS)
 			return 0;
+
+		if (reason_code == WLAN_REASON_PREV_AUTH_NOT_VALID)
+			return 0;
 	}
 
 	return 1;
@@ -3751,8 +3753,15 @@ static void wpa_supplicant_event_disassoc_finish(struct wpa_supplicant *wpa_s,
 			fast_reconnect = wpa_s->current_bss;
 			fast_reconnect_ssid = wpa_s->current_ssid;
 		} else if (wpa_s->wpa_state >= WPA_ASSOCIATING) {
-			while(wpa_s->scanning){
+			/* Wait for ongoing scan with timeout to prevent infinite loop */
+			int scan_wait_count = 0;
+			const int max_scan_wait = 50; /* 5 seconds max (50 * 100ms) */
+			while(wpa_s->scanning && scan_wait_count < max_scan_wait){
 				os_sleep(0, 100000);
+				scan_wait_count++;
+			}
+			if (scan_wait_count >= max_scan_wait) {
+				wpa_msg(wpa_s, MSG_WARNING, "Timeout waiting for scan to complete, proceeding anyway");
 			}
 			wpa_supplicant_req_scan(wpa_s, 0, 100000);
 		} else {
@@ -4184,6 +4193,14 @@ static void wpa_supplicant_event_unprot_deauth(struct wpa_supplicant *wpa_s,
 		   "dropped: " MACSTR " -> " MACSTR
 		   " (reason code %u)",
 		   MAC2STR(e->sa), MAC2STR(e->da), e->reason_code);
+#if defined(CONFIG_AP) && defined(INCLUDE_SA_QUERY_UNPROT_DISCONNECT)
+	if (wpa_s->ap_iface) {
+		/* AP: the unprotected Deauth came from a STA. Verify the STA with an
+		 * SA Query before tearing down its association. */
+		ap_rx_unprot_disconnect(wpa_s, e->sa);
+		return;
+	}
+#endif /* CONFIG_AP && INCLUDE_SA_QUERY_UNPROT_DISCONNECT */
 	sme_event_unprot_disconnect(wpa_s, e->sa, e->da, e->reason_code);
 }
 
@@ -4195,6 +4212,14 @@ static void wpa_supplicant_event_unprot_disassoc(struct wpa_supplicant *wpa_s,
 		   "dropped: " MACSTR " -> " MACSTR
 		   " (reason code %u)",
 		   MAC2STR(e->sa), MAC2STR(e->da), e->reason_code);
+#if defined(CONFIG_AP) && defined(INCLUDE_SA_QUERY_UNPROT_DISCONNECT)
+	if (wpa_s->ap_iface) {
+		/* AP: the unprotected Disassoc came from a STA. Verify the STA with an
+		 * SA Query before tearing down its association. */
+		ap_rx_unprot_disconnect(wpa_s, e->sa);
+		return;
+	}
+#endif /* CONFIG_AP && INCLUDE_SA_QUERY_UNPROT_DISCONNECT */
 	sme_event_unprot_disconnect(wpa_s, e->sa, e->da, e->reason_code);
 }
 

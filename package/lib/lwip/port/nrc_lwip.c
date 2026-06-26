@@ -133,7 +133,11 @@ int netif_ip_update(struct netif *netif)
 		return 0;
 	}
 
-	LWIP_ERROR("netif_ip_update: config is null", config != NULL, return -1);
+	if (config == NULL) {
+		LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE,
+				("netif_ip_update: config is NULL\n"));
+		return -1;
+	}
 
 	/* Sorry, multi netif is not supported */
 	if (config->valid && netif->num != config->net_id)
@@ -561,6 +565,35 @@ bool wifi_get_ip_address(int vif_id, char **ip_addr)
 #endif /* LWIP_IPV4 */
 }
 
+bool wifi_get_dns_address(int vif_id, char **dns1_addr, char **dns2_addr)
+{
+#if LWIP_IPV4
+	ip_addr_t *dnsserver1, *dnsserver2 = NULL;
+
+	if ((vif_id != 0) && (vif_id != 1))
+		return false;
+
+	if (!dns1_addr || !dns2_addr)
+		return false;
+
+	dnsserver1 = (ip_addr_t *)dns_getserver(0);
+	dnsserver2 = (ip_addr_t *)dns_getserver(1);
+
+	{
+		static char dns1_buf[IP4ADDR_STRLEN_MAX];
+		static char dns2_buf[IP4ADDR_STRLEN_MAX];
+		ip4addr_ntoa_r((const ip4_addr_t *)ip_2_ip4(dnsserver1), dns1_buf, sizeof(dns1_buf));
+		ip4addr_ntoa_r((const ip4_addr_t *)ip_2_ip4(dnsserver2), dns2_buf, sizeof(dns2_buf));
+		*dns1_addr = dns1_buf;
+		*dns2_addr = dns2_buf;
+	}
+
+	return true;
+#else
+	return false;
+#endif /* LWIP_IPV4 */
+}
+
 void ifconfig_help_display(void)
 {
 	CPA("Usage:\n");
@@ -598,6 +631,21 @@ bool ifconfig_display(WIFI_INTERFACE if_index)
 	ip_addr_debug_print_val(LWIP_DBG_ON, (netif->netmask));
 	CPA("\tgateway:");
 	ip_addr_debug_print_val(LWIP_DBG_ON, (netif->gw));
+#if !defined(NRC7292)
+	{
+		ip_addr_t *dnsserver1, *dnsserver2;
+		dnsserver1 = (ip_addr_t *)dns_getserver(0);
+		if (!ip_addr_isany(dnsserver1)) {
+			CPA("\tdns1:");
+			ip_addr_debug_print_val(LWIP_DBG_ON, (*dnsserver1));
+		}
+		dnsserver2 = (ip_addr_t *)dns_getserver(1);
+		if (!ip_addr_isany(dnsserver2)) {
+			CPA("\tdns2:");
+			ip_addr_debug_print_val(LWIP_DBG_ON, (*dnsserver2));
+		}
+	}
+#endif
 	CPA("\n");
 #endif /* LWIP_IPV4 */
 #if LWIP_IPV6
@@ -650,7 +698,7 @@ bool support_ethernet_accesspoint(void)
 }
 #endif /* SUPPORT_ETHERNET_ACCESSPOINT */
 
-static void ifconfig_display_all()
+void ifconfig_display_all()
 {
 	int i;
 #if LWIP_BRIDGE
@@ -682,7 +730,8 @@ bool wifi_ifconfig(int argc, char *argv[])
 	char* mtu = NULL;
 	int if_idx = -1;
 	struct netif *nif = NULL;
-	ip_addr_t dnsserver;
+	ip_addr_t dnsserver1 = {0};
+	ip_addr_t dnsserver2 = {0};
 	ip_addr_t addr;
 	ip_addr_t gw_addr;
 	ip_addr_t nm_addr;
@@ -725,8 +774,12 @@ bool wifi_ifconfig(int argc, char *argv[])
 			CPA("mtu : %s\n", mtu);
 		} else if (strcmp(argv[i], "-d") == 0 && i + 2 < argc) {
 			dns1 = argv[++i];
-			dns2 = argv[++i];
+			if (!inet_pton(AF_INET, dns1, &dnsserver1))
+				return false;
 			CPA("dns1 : %s\n", dns1);
+			dns2 = argv[++i];
+			if (!inet_pton(AF_INET, dns2, &dnsserver2))
+				return false;
 			CPA("dns2 : %s\n", dns2);
 		} else {
 			if (i==1){
@@ -797,14 +850,21 @@ exit:
 		nif->mtu =atoi(mtu);
 
 	if (dns1 != NULL) {
-		inet_pton(AF_INET, dns1, &dnsserver);
-		dns_setserver(0, &dnsserver);
+		dns_setserver(0, (const ip_addr_t *)&dnsserver1);
 	}
 
 	if (dns2 != NULL) {
-		inet_pton(AF_INET, dns2, &dnsserver);
-		dns_setserver(1, &dnsserver);
+		dns_setserver(1, (const ip_addr_t *)&dnsserver2);
 	}
+
+	if(dns1 != NULL || dns2 != NULL) {
+#if !defined(NRC7292)
+		set_standalone_dns_ipaddr(if_idx,
+			ip4_addr_get_u32(ip_2_ip4(&dnsserver1)),
+			ip4_addr_get_u32(ip_2_ip4(&dnsserver2)));
+#endif
+	}
+
 	ifconfig_display(if_idx);
 	return true;
 }
@@ -838,18 +898,19 @@ bool wifi_get_ip_info(int vif_id, struct ip_info *info)
 
 bool wifi_set_dns_server(ip_addr_t *pri_dns, ip_addr_t *sec_dns)
 {
-	/* Set DNS Server */
-	ip_addr_t dnsserver;
-	if (pri_dns == NULL || ip_addr_isany(pri_dns)) {
-		inet_pton(AF_INET,WIFI_PRIMARY_DNS_SERVER, &dnsserver);
-		dns_setserver(0, &dnsserver);
-		inet_pton(AF_INET, WIFI_SECONDARY_DNS_SERVER, &dnsserver);
-		dns_setserver(1, &dnsserver);
-	} else {
-		dns_setserver(0, pri_dns);
-		dns_setserver(1, sec_dns);
-	}
+	ip_addr_t dnsserver1;
+	ip_addr_t dnsserver2;
 
+	if (pri_dns == NULL || ip_addr_isany(pri_dns) ||
+			sec_dns == NULL || ip_addr_isany(sec_dns)) {
+		inet_pton(AF_INET, WIFI_PRIMARY_DNS_SERVER, &dnsserver1);
+		dns_setserver(0, &dnsserver1);
+		inet_pton(AF_INET, WIFI_SECONDARY_DNS_SERVER, &dnsserver2);
+		dns_setserver(1, &dnsserver2);
+	} else {
+		dns_setserver(0, (const ip_addr_t *)pri_dns);
+		dns_setserver(1, (const ip_addr_t *)sec_dns);
+	}
 	return true;
 }
 
@@ -1013,9 +1074,6 @@ int reset_wifi_ap_mode(int vif)
 static void
 status_callback(struct netif *state_netif)
 {
-	int i=0;
-	struct ip_info if_ip;
-
 	if (netif_is_up(state_netif)) {
 #if defined(INCLUDE_TRACE_WAKEUP)
 #if LWIP_BRIDGE
@@ -1030,7 +1088,6 @@ status_callback(struct netif *state_netif)
 #if defined(INCLUDE_TRACE_WAKEUP)
 			CPA("%s IP is ready : ", module_name());
 			ip_addr_debug_print_val(LWIP_DBG_ON, (state_netif->ip_addr));
-			CPA("\n", module_name());
 #endif /* INCLUDE_TRACE_WAKEUP */
 			if (state_netif == &br_netif && netif_ip_update(state_netif) >= 0)
 				return;
@@ -1038,6 +1095,34 @@ status_callback(struct netif *state_netif)
 				ip4_addr_get_u32(ip_2_ip4(&state_netif->ip_addr)),
 				ip4_addr_get_u32(ip_2_ip4(&state_netif->netmask)),
 				ip4_addr_get_u32(ip_2_ip4(&state_netif->gw)));
+
+			{
+				ip_addr_t *dns1, *dns2;
+				dns1 = (ip_addr_t *)dns_getserver(0);
+				if(ip_addr_isany(dns1)){
+					ip_addr_t tmp_dns1;
+					inet_pton(AF_INET, WIFI_PRIMARY_DNS_SERVER, &tmp_dns1);
+					dns_setserver(0, &tmp_dns1);
+					dns1 = (ip_addr_t *)dns_getserver(0);
+				}
+
+				dns2 = (ip_addr_t *)dns_getserver(1);
+				if(ip_addr_isany(dns2)){
+					ip_addr_t tmp_dns2;
+					inet_pton(AF_INET, WIFI_SECONDARY_DNS_SERVER, &tmp_dns2);
+					dns_setserver(1, &tmp_dns2);
+					dns2 = (ip_addr_t *)dns_getserver(1);
+				}
+
+				if(dns1 && dns2)
+					wifi_set_dns_server(dns1, dns2);
+
+#if !defined(NRC7292)
+				set_standalone_dns_ipaddr(0,
+					ip4_addr_get_u32(ip_2_ip4(dns1)),
+					ip4_addr_get_u32(ip_2_ip4(dns2)));
+#endif
+			}
   		}
 #endif /* LWIP_IPV4 */
 	} else {
@@ -1065,19 +1150,32 @@ link_callback(struct netif *state_netif)
 
 static void set_default_dns_server(void)
 {
-	ip_addr_t *dnsserver = NULL;
+	ip_addr_t *dnsserver1, *dnsserver2 = NULL;
 
-	dnsserver = (ip_addr_t *)dns_getserver(0);
-	if (ip_addr_isany(dnsserver)) {
-		inet_pton(AF_INET, WIFI_PRIMARY_DNS_SERVER, dnsserver);
-		dns_setserver(0, dnsserver);
+	dnsserver1 = (ip_addr_t *)dns_getserver(0);
+	if (ip_addr_isany(dnsserver1)) {
+		ip_addr_t tmp_dns1;
+		inet_pton(AF_INET, WIFI_PRIMARY_DNS_SERVER, &tmp_dns1);
+		dns_setserver(0, &tmp_dns1);
+		dnsserver1 = (ip_addr_t *)dns_getserver(0);
 	}
 
-	dnsserver = (ip_addr_t *)dns_getserver(1);
-	if (ip_addr_isany(dnsserver)) {
-		inet_pton(AF_INET, WIFI_SECONDARY_DNS_SERVER, dnsserver);
-		dns_setserver(1, dnsserver);
+	dnsserver2 = (ip_addr_t *)dns_getserver(1);
+	if (ip_addr_isany(dnsserver2)) {
+		ip_addr_t tmp_dns2;
+		inet_pton(AF_INET, WIFI_SECONDARY_DNS_SERVER, &tmp_dns2);
+		dns_setserver(1, &tmp_dns2);
+		dnsserver2 = (ip_addr_t *)dns_getserver(1);
 	}
+
+	if(dnsserver1 && dnsserver2)
+		wifi_set_dns_server(dnsserver1, dnsserver2);
+
+#if !defined(NRC7292)
+	set_standalone_dns_ipaddr(0,
+		ip4_addr_get_u32(ip_2_ip4(dnsserver1)),
+		ip4_addr_get_u32(ip_2_ip4(dnsserver2)));
+#endif
 }
 
 bool wifi_setup_interface(WIFI_INTERFACE i)

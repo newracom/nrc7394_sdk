@@ -25,6 +25,7 @@ typedef struct
 	uint8_t  dhcp_setting[52 + 4]; /* sizeof(struct dhcp) + sizeof(dhcp_event_handler_t) */
 	uint32_t dhcp_renew:1;
 	uint32_t reserved0:31;
+	uint32_t dns_addr[2];
 #endif
 #if defined(CONFIG_DPP)
 	uint8_t dpp_configurator_id;

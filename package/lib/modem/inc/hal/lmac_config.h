@@ -25,7 +25,8 @@ bool get_uplink_ind(int vif_id);
 uint8_t get_smoothing(int vif_id);
 void set_scrambler(int vif_id, uint8_t v);
 uint8_t get_scrambler(int vif_id);
- 
+extern bool g_fix_scrambler;	/* CLI 'test scrambler 1': force TX seed=0 for M2B IoT */
+
 void set_sniffer_mode(bool v);
 bool get_sniffer_mode();
 void set_sniffer_mode_beacon_display(bool v);
@@ -90,8 +91,8 @@ bool get_bypass_mgmt(uint8_t vif_id);
 void set_bypass_mgmt(uint8_t vif_id, bool v);
 bool get_bypass_beacon(uint8_t vif_id);
 void set_bypass_beacon(uint8_t vif_id, bool v);
-uint8_t get_phy_txgain(void);
-void set_phy_txgain(uint8_t v);
+uint8_t get_phy_txgain(uint8_t vif_id);
+void set_phy_txgain(uint8_t vif_id, uint8_t v);
 uint8_t get_phy_rxgain(void);
 void set_phy_rxgain(uint8_t v);
 bool get_pv1_en(uint8_t vif_id);
@@ -124,25 +125,22 @@ double get_common_cfo_avg();
 void set_common_cfo_avg(double v);
 void set_mgmt_mcs10_permit(bool enable);
 bool get_mgmt_mcs10_permit();
-#if defined(INCLUDE_BD_SUPPORT)
-void set_txpower_per_mcs(int index, uint8_t power);
-uint8_t get_txpower_per_mcs(int index);
+
+void set_txpower_per_mcs(int vif_id, int index, uint8_t power);
+uint8_t get_txpower_per_mcs(int vif_id, int index);
 #if defined(NRC7394)
-void set_lpf_gain_per_mcs(int index, uint16_t lpf_gain);
-uint16_t get_lpf_gain_per_mcs(int index);
+void set_lpf_gain_per_mcs(int vif_id, int index, uint16_t lpf_gain);
+uint16_t get_lpf_gain_per_mcs(int vif_id, int index);
 #endif
-#else
-void set_txpower_per_mcs(uint8_t bw, uint8_t freq_range, uint8_t mcs_range, uint8_t tx_gain);
-uint8_t get_txpower_per_mcs(uint8_t bw, uint8_t freq_range, uint8_t mcs_range);
-#endif /* defined(INCLUDE_BD_SUPPORT) */
+
 void set_ndp_blockack(bool v);
 bool get_ndp_blockack();
 void set_ignore_sec(bool v);
 bool get_ignore_sec();
 void set_doppler(bool v);
 bool get_doppler();
-void set_txgain_per_mcs(int8_t mcs , uint8_t txgain);
-uint8_t get_txgain_per_mcs(int8_t mcs);
+void set_txgain_per_mcs(int vif_id, int8_t mcs , uint8_t txgain);
+uint8_t get_txgain_per_mcs(int vif_id, int8_t mcs);
 void set_auto_gi_flag(bool v);
 bool get_auto_gi_flag(void);
 #if defined(INCLUDE_DYNAMIC_FRAG)
@@ -161,16 +159,7 @@ bool get_enable_auth_ctrl(void);
 bool set_frag_threshold(int32_t v);
 int32_t get_frag_threshold(void);
 
-void set_group_mcs(int8_t mcs);
-int8_t get_group_mcs();
-
-void set_dhcp_mcs(int8_t mcs);
-int8_t get_dhcp_mcs();
-
-void set_null_mcs(int8_t mcs);
-int8_t get_null_mcs();
-
-void set_probe_resp_mcs(int8_t mcs);
-int8_t get_probe_resp_mcs();
+void set_manual_mcs(uint8_t frame_type, int8_t mcs);
+int8_t get_manual_mcs(uint8_t frame_type);
 
 #endif /* LMAC_CONFIG_H */

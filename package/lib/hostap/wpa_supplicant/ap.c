@@ -1219,6 +1219,37 @@ void ap_rx_from_unknown_sta(void *ctx, const u8 *addr, int wds)
 }
 
 
+#if defined(INCLUDE_SA_QUERY_UNPROT_DISCONNECT)
+void ap_rx_unprot_disconnect(struct wpa_supplicant *wpa_s, const u8 *addr)
+{
+#ifdef NEED_AP_MLME
+	struct hostapd_data *hapd;
+	struct sta_info *sta;
+
+	if (!wpa_s->ap_iface)
+		return;
+	hapd = wpa_s->ap_iface->bss[0];
+	sta = ap_get_sta(hapd, addr);
+	if (!sta)
+		return;
+	/* Only verify a STA that is associated with management frame protection. */
+	if ((sta->flags & (WLAN_STA_ASSOC | WLAN_STA_MFP)) !=
+	    (WLAN_STA_ASSOC | WLAN_STA_MFP))
+		return;
+	if (sta->sa_query_count > 0)
+		return; /* SA Query already in progress */
+
+	wpa_printf(MSG_DEBUG,
+		   "AP: Unprotected Deauth/Disassoc from " MACSTR
+		   " - start SA Query before tearing down the association",
+		   MAC2STR(addr));
+	sta->sa_query_unprot = 1;
+	ap_sta_start_sa_query(hapd, sta);
+#endif /* NEED_AP_MLME */
+}
+#endif /* INCLUDE_SA_QUERY_UNPROT_DISCONNECT */
+
+
 void ap_mgmt_rx(void *ctx, struct rx_mgmt *rx_mgmt)
 {
 #ifdef NEED_AP_MLME

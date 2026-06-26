@@ -39,6 +39,7 @@ struct _ping_parm
 	u16_t seq_num;
 	u16_t id;
 	u8_t force_stop;
+	u8_t stop_on_success;
 	sys_thread_t ping_thread;
 	ip_addr_t addr;
 	ping_parm_t* next;

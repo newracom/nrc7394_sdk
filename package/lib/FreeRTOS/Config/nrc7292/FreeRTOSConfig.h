@@ -154,8 +154,8 @@ to exclude the API function. */
 
 /* Normal assert() semantics without relying on the provision of an assert.h
 header file. */
-extern void util_trace_stack_dump(void*);
-#define configASSERT( x ) if( ( x ) == 0 ) { taskDISABLE_INTERRUPTS(); util_trace_stack_dump(NULL); for( ;; ); }
+extern void _util_trace_stack_dump(void*, const char *, uint32_t);
+#define configASSERT( x ) if( ( x ) == 0 ) { taskDISABLE_INTERRUPTS(); _util_trace_stack_dump(NULL, __func__, __LINE__); for( ;; ); }
 
 #if 0
 /* Definitions that map the FreeRTOS port interrupt handlers to their CMSIS

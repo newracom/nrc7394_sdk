@@ -37,6 +37,7 @@ extern struct netif eth_netif;
 extern struct netif* nrc_netif[MAX_IF];
 
 #define NAT 1
+#define W5500_IP "192.168.25.1"
 
 void ethernet_start(void)
 {
@@ -81,17 +82,13 @@ void ethernet_start(void)
 	}
 
 	if (NAT) {
-		strcpy(value, "192.168.2.1");
+		strcpy(value, W5500_IP);
 		nrc_usr_print("Setting eth address to %s...\n", value);
 		ifconfig_param[0] = strdup("eth");
 		ifconfig_param[1] = strdup(value);
 		wifi_ifconfig(2, ifconfig_param);
 		free(ifconfig_param[0]);
 		free(ifconfig_param[1]);
-
-		// wlan0 address is set during wps_pbc connection
-
-		start_dhcps_on_if(&eth_netif, 120);            // NAT only
 	}
 }
 
@@ -109,6 +106,10 @@ void user_init(void)
 	}
 
 	if (connect_to_ap(&param) == NRC_SUCCESS) {
+		if(NAT) {
+                	// wlan0 DNS is set when the station DHCP client finishes.
+                	start_dhcps_on_if(&eth_netif, 120);            // NAT only
+		}
 		nrc_usr_print("Connection to AP successful...\n");
 	} else {
 		nrc_usr_print("Error connecting to AP...\n");

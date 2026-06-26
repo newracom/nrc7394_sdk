@@ -55,10 +55,11 @@
 #include "mbedtls/sha256.h"
 #include "mbedtls/platform_util.h"
 #include "mbedtls/error.h"
-
-#include <string.h>
-
 #include "mbedtls/platform.h"
+
+#if defined(INCLUDE_HW_SECURITY_ACC_SHA)
+#include "drv_sec.h"
+#endif
 
 #if defined(MBEDTLS_ARCH_IS_ARMV8_A)
 
@@ -264,6 +265,15 @@ int mbedtls_sha256_starts(mbedtls_sha256_context *ctx, int is224)
     ctx->total[0] = 0;
     ctx->total[1] = 0;
 
+#if defined(INCLUDE_HW_SECURITY_ACC_SHA)
+	//	  CPA("[%s]\n", __func__);
+
+#if defined(MBEDTLS_SHA224_C)
+    ctx->is224 = is224;
+#endif
+    sha_init(ENDIAN_BI);
+    return sha_configure(SHA_MODE_2, SHA_BIT_256, is224, 1);
+#else
     if (is224 == 0) {
 #if defined(MBEDTLS_SHA256_C)
         ctx->state[0] = 0x6A09E667;
@@ -293,6 +303,7 @@ int mbedtls_sha256_starts(mbedtls_sha256_context *ctx, int is224)
 #endif
 
     return 0;
+#endif //#if defined(INCLUDE_HW_SECURITY_ACC_SHA)
 }
 
 #if !defined(MBEDTLS_SHA256_PROCESS_ALT)
@@ -492,6 +503,39 @@ static
 int mbedtls_internal_sha256_process_c(mbedtls_sha256_context *ctx,
                                       const unsigned char data[SHA256_BLOCK_SIZE])
 {
+#if defined(INCLUDE_HW_SECURITY_ACC_SHA)
+    static unsigned char tmp[64];
+    int ret = 0;
+    int j;
+
+    memcpy(tmp, data, 64);
+
+    for (j=0;j<64;j+=4)
+        convert_endian((tmp + j), 4);
+
+    ret = sha_msg_update (tmp, 64);
+    if (ret != 0)
+        goto fail_hw;
+
+    sha_start();
+    if (sha_is_done() ==0) {
+        ret = 1;
+        goto fail_hw;
+    }
+
+    ret = sha_get_result ((uint8_t*)ctx->state, 32);
+    if (ret != 0)
+        goto fail_hw;
+
+    ret = sha_set_firstblk(0);
+    if (ret != 0)
+        goto fail_hw;
+
+fail_hw:
+    return ret;
+
+#else
+
     struct {
         uint32_t temp1, temp2, W[64];
         uint32_t A[8];
@@ -572,6 +616,7 @@ int mbedtls_internal_sha256_process_c(mbedtls_sha256_context *ctx,
     mbedtls_platform_zeroize(&local, sizeof(local));
 
     return 0;
+#endif //#if defined(INCLUDE_HW_SECURITY_ACC_SHA)
 }
 
 #endif /* !MBEDTLS_SHA256_PROCESS_ALT && !MBEDTLS_SHA256_USE_ARMV8_A_CRYPTO_ONLY */
@@ -757,6 +802,10 @@ int mbedtls_sha256_finish(mbedtls_sha256_context *ctx,
     if (!truncated) {
         MBEDTLS_PUT_UINT32_BE(ctx->state[7], output, 28);
     }
+
+#if defined(INCLUDE_HW_SECURITY_ACC_SHA)
+    //bignum_init(0);
+#endif //#if defined(INCLUDE_HW_SECURITY_ACC_SHA)
 
     ret = 0;
 

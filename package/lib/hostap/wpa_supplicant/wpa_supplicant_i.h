@@ -947,6 +947,20 @@ struct wpa_supplicant {
 	struct os_reltime wps_pin_start_time;
 	bool bssid_ignore_cleared;
 
+#ifdef CONFIG_WPS_ENROLLEE_AUTO_RETRY
+	/**
+	 * wps_ar - Auto-retry context for WPS PBC Enrollee.
+	 * Zeroed on fresh wpas_wps_start_pbc() and preserved across retries.
+	 */
+	struct {
+		int  active;                /* 1 = retry sequence in progress */
+		int  cancelled;             /* 1 = user cancelled, no retry */
+		int  count;                 /* retries attempted so far */
+		u8   bssid[ETH_ALEN];       /* original target BSSID */
+		int  multi_ap_backhaul_sta; /* preserved from start_pbc */
+	} wps_ar;
+#endif /* CONFIG_WPS_ENROLLEE_AUTO_RETRY */
+
 	struct wpabuf *pending_eapol_rx;
 	struct os_reltime pending_eapol_rx_time;
 	u8 pending_eapol_rx_src[ETH_ALEN];

@@ -2062,19 +2062,15 @@ static void _atcmd_boot_reason_event (void)
 	ATCMD_MSG_EVENT("BOOT", "\"%s\"", str_br);
 }
 
-static void _atcmd_boot_wake_up (int wake_reason)
+static void _atcmd_boot_done (bool recovered)
 {
+	bool deepsleep_wakeup = recovered && wifi_api_wakeup_done();
 
-}
-
-static void _atcmd_boot_done (void)
-{
-	uint8_t boot_reason = atcmd_boot_reason();
-	bool deepsleep_wakeup = (boot_reason & BR_PMC) && wifi_api_wakeup_done();
+	atcmd_gpio_init(deepsleep_wakeup);
 
 	_atcmd_boot_reason_event();
-#if defined(CONFIG_ATCMD_HSPI)
-	_hfi_hspi_eirq_boot_done(true);
+#if !defined(NRC7292) && defined(CONFIG_ATCMD_HSPI)
+	_hif_hspi_eirq_boot_done(true);
 #endif
 
 	if (deepsleep_wakeup)
@@ -2098,7 +2094,7 @@ int atcmd_enable (_hif_info_t *info)
 #else
 	char *hif_rx_buf = NULL;
 #endif
-	uint8_t boot_reason;
+	bool recovered = atcmd_boot_is_recovered();
 	int ret;
 
 	if (!info)
@@ -2135,6 +2131,27 @@ int atcmd_enable (_hif_info_t *info)
 	else
 		atcmd_history_disable();
 
+#if defined(CONFIG_ATCMD_RECOVERY)
+	atcmd_retinfo_init();
+
+	switch (info->type)
+	{
+		case _HIF_TYPE_UART:
+		case _HIF_TYPE_UART_HFC:
+		{
+			atcmd_basic_retinfo_t *retinfo = (atcmd_basic_retinfo_t *)atcmd_retinfo_basic_addr();
+
+			if (!recovered)
+				memcpy(&retinfo->uart, &info->uart, sizeof(_hif_uart_t));
+			else
+				memcpy(&info->uart, &retinfo->uart, sizeof(_hif_uart_t));
+		}
+
+		default:
+			break;
+	}
+#endif
+
 	atcmd_user_enable();
 	atcmd_socket_enable();
 	atcmd_wifi_enable();
@@ -2148,9 +2165,10 @@ int atcmd_enable (_hif_info_t *info)
 
 	ret = _hif_open(info);
 	if (ret == 0)
+	{
+		_atcmd_boot_done(recovered);
 		atcmd_prompt_enter();
-
-	_atcmd_boot_done();
+	}
 
 	return ret;
 }

@@ -19,6 +19,11 @@
 #include "wpa_auth.h"
 #include "ieee802_11.h"
 
+#if defined(INCLUDE_SA_QUERY_TEST_INJECT)
+/* Implemented in lib/hostap/src/drivers/driver_nrc.c */
+bool nrc_get_sa_query_noresp(void);
+#endif
+
 
 u8 * hostapd_eid_assoc_comeback_time(struct hostapd_data *hapd,
 				     struct sta_info *sta, u8 *eid)
@@ -296,6 +301,16 @@ void ieee802_11_sa_query_action(struct hostapd_data *hapd,
 	if (action_type == WLAN_SA_QUERY_REQUEST) {
 		if (sta)
 			sta->post_csa_sa_query = 0;
+#if defined(INCLUDE_SA_QUERY_TEST_INJECT)
+		/* TEST: drop our SA Query Response to force the peer (STA) to
+		 * time out and disconnect (Case 2). */
+		if (nrc_get_sa_query_noresp()) {
+			wpa_printf(MSG_INFO,
+				   "TEST: suppress SA Query Response to " MACSTR,
+				   MAC2STR(sa));
+			return;
+		}
+#endif
 		ieee802_11_send_sa_query_resp(hapd, sa, trans_id);
 		return;
 	}

@@ -88,7 +88,8 @@ typedef struct
 
 typedef struct
 {
-#define WIFI_CHANNEL_NUM_MAX	50
+/* Raised from 50 to 70: US standard (45) + Op35/Op36 extended (18) + margin */
+#define WIFI_CHANNEL_NUM_MAX	70
 
 	int n_channel;
 	wifi_channel_t channel[WIFI_CHANNEL_NUM_MAX];
@@ -125,6 +126,44 @@ typedef void (*wifi_event_cb_t) (int, void *, int);
 typedef void (*wifi_wps_cb_t) (enum WPS_STATUS, int, ...);
 
 typedef void (*dhcpc_event_cb_t) (void);
+
+typedef struct
+{
+	uint32_t freq;
+	uint8_t bw;
+	uint8_t mcs;
+	uint8_t txpwr;
+	uint8_t type;
+	uint32_t interval;
+} wifi_ctx_params_t;
+
+typedef struct
+{
+	uint32_t freq;
+	uint8_t bw;
+	uint8_t txpwr;
+} wifi_stx_params_t;
+
+typedef struct
+{
+	uint32_t n_OK;
+	uint32_t b_OK;	
+
+	union
+	{
+		struct
+		{
+			uint32_t n_RTX;
+			uint32_t b_RTX;
+		}; /* TX */
+
+		struct
+		{
+			uint32_t n_NOK;
+			uint32_t b_NOK;	
+		}; /* RX */
+	};
+} wifi_data_count_t;
 
 /**********************************************************************************************/
 
@@ -173,7 +212,7 @@ extern void wifi_api_set_rate_control (bool rate_ctrl);
 extern int wifi_api_get_mcs (wifi_mcs_t *index0, wifi_mcs_t *index1);
 extern int wifi_api_set_mcs (uint8_t index);
 
-extern int wifi_api_get_duty_cycle (uint32_t *window, uint32_t *duration, uint32_t *margin);
+extern int wifi_api_get_duty_cycle (uint32_t *window, uint32_t *duration, uint32_t *margin, uint32_t *remain_duration);
 extern int wifi_api_set_duty_cycle (uint32_t window, uint32_t duration, uint32_t margin);
 
 extern int wifi_api_get_cca_threshold (int *threshold);
@@ -269,6 +308,18 @@ extern void wifi_api_set_4address (bool enable);
 
 extern int wifi_api_enable_wps (const char *bssid, wifi_wps_cb_t cb);
 extern int wifi_api_disable_wps (void);
+
+extern int wifi_api_continuous_tx_enable (wifi_ctx_params_t *params);
+extern int wifi_api_continuous_tx_disable (void);
+
+extern int wifi_api_sine_tx_enable (wifi_stx_params_t *params);
+extern int wifi_api_sine_tx_disable (void);
+
+extern int wifi_api_tx_data_count (wifi_data_count_t *count);
+#define wifi_api_tx_data_count_clear()	wifi_api_tx_data_count(NULL)
+
+extern int wifi_api_rx_data_count (wifi_data_count_t *count);
+#define wifi_api_rx_data_count_clear()	wifi_api_rx_data_count(NULL)
 
 /**********************************************************************************************/
 #endif /* #ifndef __ATCMD_WIFI_API_H__ */

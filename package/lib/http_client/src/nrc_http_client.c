@@ -33,7 +33,7 @@
 #include "nrc_http_client_debug.h"
 
 #define HTTPC_MAX_HOSTNAME 128
-#define HTTPC_MAX_URI 1024
+#define HTTPC_MAX_URI 2048
 
 typedef enum {
 	METHOD_GET,
@@ -84,13 +84,29 @@ typedef struct {
 #define HTTPS_PORT 443
 
 
-/** read timeout to 10 sec */
-#define HTTP_SSL_READ_TIMEOUT 10000
+/** read timeout to 30 sec.
+ * Cloud-hosted HTTPS endpoints can exceed 10 sec over S1G during TLS setup. */
+#define HTTP_SSL_READ_TIMEOUT 30000
+
+static int httpc_ssl_close(con_handle_t *ssl_handle);
 #endif
 
 static const char *module_name()
 {
 	return "sdk_httpc: ";
+}
+
+static int httpc_host_header_needs_port(http_info_t *info)
+{
+	if (!info || info->port[0] == '\0')
+		return 0;
+	if (info->scheme == HTTP && strcmp(info->port, "80") == 0)
+		return 0;
+#if defined(SUPPORT_HTTPS_CLIENT)
+	if (info->scheme == HTTPS && strcmp(info->port, "443") == 0)
+		return 0;
+#endif
+	return 1;
 }
 
 static int httpc_parse_url(const char *url, http_info_t *info)
@@ -292,6 +308,8 @@ static int httpc_ssl_conn(con_handle_t *handle, http_info_t *info, ssl_certs_t *
 {
 	const char *pers = "httpc_ssl";
 	http_ssl_t *http_ssl = NULL;
+	int have_ca_cert = 0;
+	int have_client_cert = 0;
 	uint32_t flags;
 	int ret = 0;
 
@@ -334,44 +352,57 @@ static int httpc_ssl_conn(con_handle_t *handle, http_info_t *info, ssl_certs_t *
 	/*
 	 * 0. Initialize certificates
 	 */
-	HTTPC_LOGD( "  . Loading the CA root certificate ..." );
+	have_ca_cert = certs && certs->ca_cert && certs->ca_cert_length > 0;
+	have_client_cert = certs &&
+		certs->client_cert && certs->client_cert_length > 0 &&
+		certs->client_pk && certs->client_pk_length > 0;
 
-	ret = mbedtls_x509_crt_parse( &http_ssl->cacert, (const unsigned char *) certs->ca_cert,
-								  certs->ca_cert_length );
-	if( ret < 0 ) {
-		HTTPC_LOGE(" failed\n  !  mbedtls_x509_crt_parse returned -0x%x while parsing root cert", -ret);
-		goto exit;
+	if (have_ca_cert) {
+		HTTPC_LOGD( "  . Loading the CA root certificate ..." );
+
+		ret = mbedtls_x509_crt_parse( &http_ssl->cacert,
+									  (const unsigned char *) certs->ca_cert,
+									  certs->ca_cert_length );
+		if( ret < 0 ) {
+			HTTPC_LOGE(" failed\n  !  mbedtls_x509_crt_parse returned -0x%x while parsing root cert", -ret);
+			goto exit;
+		}
+
+		HTTPC_LOGD( " ok (%d skipped)", ret );
 	}
 
-	HTTPC_LOGD( " ok (%d skipped)", ret );
+	if (have_client_cert) {
+		HTTPC_LOGD( "  . Loading the Client certificate ..." );
 
-	HTTPC_LOGD( "  . Loading the Client certificate ..." );
+		ret = mbedtls_x509_crt_parse( &http_ssl->clicert,
+									  (const unsigned char *) certs->client_cert,
+									  certs->client_cert_length );
+		if( ret < 0 ) {
+			HTTPC_LOGE(" failed\n  !  mbedtls_x509_crt_parse returned -0x%x while parsing device cert", -ret);
+			goto exit;
+		}
 
-	ret = mbedtls_x509_crt_parse( &http_ssl->clicert, (const unsigned char *) certs->client_cert,
-								certs->client_cert_length );
-	if( ret < 0 ) {
-		HTTPC_LOGE(" failed\n  !  mbedtls_x509_crt_parse returned -0x%x while parsing device cert", -ret);
-		goto exit;
-	}
+		HTTPC_LOGD( " ok (%d skipped)", ret );
 
-	HTTPC_LOGD( " ok (%d skipped)", ret );
-
-	HTTPC_LOGD( "  . Loading the Client private key ..." );
+		HTTPC_LOGD( "  . Loading the Client private key ..." );
 
 #if defined(NRC_MBEDTLS_V3)
-	ret = mbedtls_pk_parse_key( &http_ssl->pkey, (const unsigned char *) certs->client_pk,
-								certs->client_pk_length, NULL, 0,
-								mbedtls_ctr_drbg_random, &http_ssl->ctr_drbg );
+		ret = mbedtls_pk_parse_key( &http_ssl->pkey,
+									(const unsigned char *) certs->client_pk,
+									certs->client_pk_length, NULL, 0,
+									mbedtls_ctr_drbg_random, &http_ssl->ctr_drbg );
 #else
-	ret = mbedtls_pk_parse_key( &http_ssl->pkey, (const unsigned char *) certs->client_pk,
-								certs->client_pk_length, NULL, 0);
+		ret = mbedtls_pk_parse_key( &http_ssl->pkey,
+									(const unsigned char *) certs->client_pk,
+									certs->client_pk_length, NULL, 0);
 #endif
-	if( ret < 0 ) {
-		HTTPC_LOGE(" failed\n  !  mbedtls_pk_parse_key returned -0x%x while parsing private key\n\n", -ret);
-		goto exit;
-	}
+		if( ret < 0 ) {
+			HTTPC_LOGE(" failed\n  !  mbedtls_pk_parse_key returned -0x%x while parsing private key\n\n", -ret);
+			goto exit;
+		}
 
-	HTTPC_LOGD( " ok (%d skipped)", ret );
+		HTTPC_LOGD( " ok (%d skipped)", ret );
+	}
 
 	/*
 	 * 1. Start the connection
@@ -404,8 +435,12 @@ static int httpc_ssl_conn(con_handle_t *handle, http_info_t *info, ssl_certs_t *
 	/* OPTIONAL is not optimal for security,
 	 * but makes interop easier in this simplified example */
 	mbedtls_ssl_conf_authmode( &http_ssl->ssl_conf, MBEDTLS_SSL_VERIFY_OPTIONAL );
-	mbedtls_ssl_conf_ca_chain( &http_ssl->ssl_conf, &http_ssl->cacert, NULL );
-	mbedtls_ssl_conf_own_cert( &http_ssl->ssl_conf, &http_ssl->clicert, &http_ssl->pkey);
+	if (have_ca_cert) {
+		mbedtls_ssl_conf_ca_chain( &http_ssl->ssl_conf, &http_ssl->cacert, NULL );
+	}
+	if (have_client_cert) {
+		mbedtls_ssl_conf_own_cert( &http_ssl->ssl_conf, &http_ssl->clicert, &http_ssl->pkey);
+	}
 	mbedtls_ssl_conf_rng( &http_ssl->ssl_conf, mbedtls_ctr_drbg_random, &http_ssl->ctr_drbg );
 	mbedtls_ssl_conf_dbg( &http_ssl->ssl_conf, httpc_debug, stdout );
 	mbedtls_ssl_conf_read_timeout( &http_ssl->ssl_conf, HTTP_SSL_READ_TIMEOUT);
@@ -464,6 +499,10 @@ static int httpc_ssl_conn(con_handle_t *handle, http_info_t *info, ssl_certs_t *
 		HTTPC_LOGD( " ok" );
 #endif
 exit:
+	if (ret != 0 && http_ssl != NULL) {
+		httpc_ssl_close(handle);
+		*handle = INVALID_HANDLE;
+	}
 	return ret;
 }
 
@@ -471,6 +510,9 @@ static int httpc_ssl_close(con_handle_t *ssl_handle)
 {
 	http_ssl_t *http_ssl = (http_ssl_t *)(*ssl_handle);
 	int ret = 0;
+
+	if (!http_ssl)
+		return 0;
 
 	do {
 		ret = mbedtls_ssl_close_notify(&http_ssl->ssl_ctx);
@@ -486,6 +528,7 @@ static int httpc_ssl_close(con_handle_t *ssl_handle)
 	mbedtls_ctr_drbg_free( &http_ssl->ctr_drbg );
 	mbedtls_entropy_free( &http_ssl->entropy );
 	nrc_mem_free(http_ssl);
+	*ssl_handle = INVALID_HANDLE;
 
 	return 0;
 }
@@ -547,6 +590,7 @@ static int httpc_send_header(con_handle_t *handle, int method, http_info_t *info
 {
 	int ret = -1;
 	const char *method_str = NULL;
+	int host_needs_port = 0;
 	size_t default_header_len = 0;
 	size_t header_len = 0;
 	char *default_header = NULL;
@@ -569,8 +613,9 @@ static int httpc_send_header(con_handle_t *handle, int method, http_info_t *info
 			return HTTPC_RET_ERROR_INVALID_METHOD;
 	}
 
+	host_needs_port = httpc_host_header_needs_port(info);
 	default_header_len = strlen(method_str) + strlen(info->uri) +
-			strlen(info->host) + strlen(info->port) + 32;
+			strlen(info->host) + (host_needs_port ? strlen(info->port) + 1 : 0) + 32;
 	default_header = (char *)nrc_mem_malloc(default_header_len);
 	if (!default_header) {
 		HTTPC_LOGE("[%s] allocating memory for default_header failed.", __func__);
@@ -580,8 +625,15 @@ static int httpc_send_header(con_handle_t *handle, int method, http_info_t *info
 
 	HTTPC_LOGI("--- Request Header ---\n");
 	/* Send Request-Line of the Request Header */
-	header_len = snprintf((char *)default_header, default_header_len, "%s %s HTTP/1.1\r\nHost: %s:%s\r\n",
-			method_str, info->uri, info->host, info->port);
+	if (host_needs_port) {
+		header_len = snprintf((char *)default_header, default_header_len,
+				"%s %s HTTP/1.1\r\nHost: %s:%s\r\n",
+				method_str, info->uri, info->host, info->port);
+	} else {
+		header_len = snprintf((char *)default_header, default_header_len,
+				"%s %s HTTP/1.1\r\nHost: %s\r\n",
+				method_str, info->uri, info->host);
+	}
 
 	if (header_len > default_header_len) {
 		HTTPC_LOGE("[%s] Header length exceeds buffer size.", __func__);

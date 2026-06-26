@@ -832,6 +832,20 @@ struct wps_context {
 	 */
 	void *cb_ctx;
 
+#ifdef CONFIG_WPS_REGISTRAR_MULTI_SELECT
+	/**
+	 * pbc_restart_cb - Restart PBC for waiting Enrollees (Multi-Select)
+	 * @ctx: Higher layer context data (cb_ctx)
+	 * @timeout_ctx: Unused (required by eloop callback signature)
+	 *
+	 * Called via an eloop timeout after a PBC session completes (success
+	 * or failure) when at least one other Enrollee is still waiting.
+	 * The upper layer should call hostapd_wps_button_pushed() or
+	 * equivalent to re-enable PBC mode.
+	 */
+	void (*pbc_restart_cb)(void *ctx, void *timeout_ctx);
+#endif /* CONFIG_WPS_REGISTRAR_MULTI_SELECT */
+
 	struct upnp_wps_device_sm *wps_upnp;
 
 	/* Pending messages from UPnP PutWLANResponse */

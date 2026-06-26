@@ -11,14 +11,12 @@
 #endif
 
 #if !defined(CUNIT)
-#define MAX_NON_S1G_CHANNEL_NUM 45 	/* Max Num of S1G Channels */
+#define MAX_NON_S1G_CHANNEL_NUM 63 	/* Max Num of S1G Channels (45 base + 18 extended Op35/Op36) */
 #define MAX_S1G_OPER_CLASS 5		/* Max Num of Operation Class */
 #define MAX_NON_S1G_CHANNEL_NUM_1M 17 	/* Max Num of S1G Channels */
 #define MAX_NON_S1G_CHANNEL_NUM_2M 9 	/* Max Num of S1G Channels */
 #define MAX_NON_S1G_CHANNEL_NUM_4M 4 	/* Max Num of S1G Channels */
-#if defined(INCLUDE_BD_SUPPORT)
 #define	MAX_MCS_LEVEL_NUM	11
-#endif /* defined(INCLUDE_BD_SUPPORT) */
 //#define DEFAULT_INDEX 25
 #define DEFAULT_INDEX	0	/* CH NUM => US:30 KR:17(8/2) TW:22 JP:12 EU:7 */
 #define BANDWIDTH_1M	1
@@ -38,12 +36,10 @@ typedef struct {
 	int8_t      primary_loc;				/* for 1MHz bandwidth alignment */
 } CHANNEL_MAPPING_TABLE;
 
-#if defined(INCLUDE_BD_SUPPORT)
 typedef struct {
 	uint8_t	index;
 	uint8_t	tx_pwr_value[MAX_MCS_LEVEL_NUM];
 } CH_TXPWR_INFO;
-#endif /* defined(INCLUDE_BD_SUPPORT) */
 
 #if defined(NRC_ROMLIB)
 enum {
@@ -87,6 +83,8 @@ const struct s1g_channel_table* get_s1g_channel_item(uint8_t index);
 const struct s1g_channel_table* get_s1g_channel_item_by_s1g_freq(const uint16_t s1g_freq);
 const struct s1g_channel_table* get_s1g_channel_item_by_nons1g_freq(const uint16_t nons1g_freq);
 const struct s1g_channel_table* get_s1g_channel_item_by_channel_number(uint8_t index);
+/* bw uses BW_1M/BW_2M/BW_4M enum values, not MHz 1/2/4. */
+const struct s1g_channel_table* get_s1g_channel_item_by_s1g_freq_bw(uint16_t s1g_freq, uint8_t bw);
 #else
 const CHANNEL_MAPPING_TABLE* GetS1GDefaulTable(void);
 const CHANNEL_MAPPING_TABLE* GetS1GFirstTable(void);
@@ -94,6 +92,8 @@ const CHANNEL_MAPPING_TABLE *get_s1g_channel_item(uint8_t index);
 const CHANNEL_MAPPING_TABLE* get_s1g_channel_item_by_s1g_freq(const uint16_t s1g_freq);
 const CHANNEL_MAPPING_TABLE* get_s1g_channel_item_by_nons1g_freq(const uint16_t nons1g_freq);
 const CHANNEL_MAPPING_TABLE *get_s1g_channel_item_by_channel_number(uint8_t index);
+/* bw uses BW_1M/BW_2M/BW_4M enum values, not MHz 1/2/4. */
+const CHANNEL_MAPPING_TABLE* get_s1g_channel_item_by_s1g_freq_bw(uint16_t s1g_freq, uint8_t bw);
 #endif /* defined(INCLUDE_NEW_CHANNEL_CTX) */
 uint8_t APGetChID(const uint16_t nons1g_freq);
 uint8_t APGetS1GChID(const uint16_t nons1g_freq);
@@ -119,16 +119,13 @@ uint32_t GetS1GFreqByNonS1GFreq(const uint16_t nons1g_freq);
 bool UpdateCHTableByCC(const char* country_code);
 void CheckNUpdateCHTableByVif(int vif_id);
 
-#if defined(INCLUDE_BD_SUPPORT)
-void initCurrentTXPwrInfo(void);
+void initCurrentTXPwrInfo(int vif_id);
 void setChannelTXPwrInfoValid(bool valid);
 bool getChannelTXPwrInfoValid();
-CH_TXPWR_INFO * getCurrentTXPwrInfo(void);
+CH_TXPWR_INFO * getCurrentTXPwrInfo(int vif_id);
 CH_TXPWR_INFO * getChannelTXPwrInfo(uint16_t ch);
 void getChannelMask(uint32_t *l, uint32_t *h);
 void setChannelMask(uint32_t l, uint32_t h);
-#endif /* defined(INCLUDE_BD_SUPPORT) */
-
 
 #endif /* !defined(CUNIT) */
 #endif    // UMAC_S1G_CHANNEL_H

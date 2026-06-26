@@ -482,8 +482,8 @@ static int eap_wsc_getTimeout(struct eap_sm *sm, void *priv)
 {
 	/* Recommended retransmit times: retransmit timeout 5 seconds,
 	 * per-message timeout 15 seconds, i.e., 3 tries. */
-	sm->MaxRetrans = 2; /* total 3 attempts */
-	return 5;
+	sm->MaxRetrans = 1; /* total 3 attempts */
+	return 20;
 }
 
 

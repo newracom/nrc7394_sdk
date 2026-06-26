@@ -18,6 +18,7 @@
 #if (MBEDTLS_VERSION_MAJOR >= 3)
 #include "mbedtls/ssl.h"
 #include "mbedtls/ssl_ciphersuites.h"
+#include "../../../mbedtls/v3/mbedtls/library/ssl_misc.h"
 #else
 #include "mbedtls/ssl_internal.h"
 #ifdef ESPRESSIF_USE
@@ -113,8 +114,9 @@ static int tls_mbedtls_read(void *ctx, unsigned char *buf, size_t len)
 	struct tls_connection *conn = (struct tls_connection *)ctx;
 	struct tls_data *data = &conn->tls_io_data;
 	struct wpabuf *local_buf;
+	size_t avail = data->in_data ? wpabuf_len(data->in_data) : 0;
 
-	if (data->in_data == NULL || len > wpabuf_len(data->in_data)) {
+	if (data->in_data == NULL || len > avail) {
 		/* We don't have suffient buffer available for read */
 		wpa_printf(MSG_INFO, "len=%zu not available in input", len);
 		return MBEDTLS_ERR_SSL_WANT_READ;
@@ -644,13 +646,16 @@ int tls_connection_set_verify(void *tls_ctx, struct tls_connection *conn,
 int get_ciphersuite_info(const mbedtls_ssl_context *ssl, const mbedtls_ssl_ciphersuite_t **ciphersuite_info)
 {
 	mbedtls_ssl_session session;
-	const char *ciphersuite_name;
 	int ciphersuite_id;
+
+	if (ssl && ssl->handshake && ssl->handshake->ciphersuite_info) {
+		*ciphersuite_info = ssl->handshake->ciphersuite_info;
+		return 0;
+	}
 
 	mbedtls_ssl_session_init(&session);
 
 	if (mbedtls_ssl_get_session(ssl, &session) == 0) {
-		ciphersuite_name = mbedtls_ssl_get_ciphersuite_name(session.ciphersuite);
 		ciphersuite_id = session.ciphersuite;
 		*ciphersuite_info = mbedtls_ssl_ciphersuite_from_id(ciphersuite_id);
 	} else {
@@ -667,13 +672,16 @@ struct wpabuf * tls_connection_handshake(void *tls_ctx,
 					 const struct wpabuf *in_data,
 					 struct wpabuf **appl_data)
 {
+	if (!conn || !conn->tls)
+		return NULL;
+
 	tls_context_t *tls = conn->tls;
 	int ret = 0;
 	struct wpabuf *resp;
 
 	/* data freed by sender */
 	conn->tls_io_data.out_data = NULL;
-	if (wpabuf_len(in_data)) {
+	if (in_data && wpabuf_len(in_data)) {
 		conn->tls_io_data.in_data = wpabuf_dup(in_data);
 	}
 
@@ -684,8 +692,13 @@ struct wpabuf * tls_connection_handshake(void *tls_ctx,
 			if (tls->ssl.handshake) {
 #if (MBEDTLS_VERSION_MAJOR >= 3)
 				const mbedtls_ssl_ciphersuite_t *ciphersuite_info;
-				mbedtls_ctr_drbg_random(&tls->ctr_drbg, conn->randbytes, TLS_RANDOM_LEN * 2);
+				os_memcpy(conn->randbytes, tls->ssl.handshake->randbytes,
+					  TLS_RANDOM_LEN * 2);
 				get_ciphersuite_info(&tls->ssl, &ciphersuite_info);
+				if (!ciphersuite_info) {
+					ret = -1;
+					break;
+				}
 				conn->mac = ciphersuite_info->mac;
 #else
 				os_memcpy(conn->randbytes, tls->ssl.handshake->randbytes,
@@ -702,7 +715,6 @@ struct wpabuf * tls_connection_handshake(void *tls_ctx,
 			break;
 	}
 	if (ret < 0 && ret != MBEDTLS_ERR_SSL_WANT_READ) {
-		wpa_printf(MSG_INFO, "%s: ret is %d line:%d", __func__, ret, __LINE__);
 		goto end;
 	}
 

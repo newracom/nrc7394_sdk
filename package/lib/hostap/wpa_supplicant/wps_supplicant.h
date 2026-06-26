@@ -88,6 +88,24 @@ void wpas_wps_update_ap_info(struct wpa_supplicant *wpa_s,
 void wpas_wps_notify_assoc(struct wpa_supplicant *wpa_s, const u8 *bssid);
 int wpas_wps_reenable_networks_pending(struct wpa_supplicant *wpa_s);
 
+#ifdef CONFIG_WPS_ENROLLEE_AUTO_RETRY
+/* Base retry delay in seconds — doubles each attempt */
+#ifndef WPAS_AR_RETRY_BASE_SEC
+#define WPAS_AR_RETRY_BASE_SEC    10
+#endif
+
+/* Maximum retry delay in seconds */
+#ifndef WPAS_AR_RETRY_MAX_SEC
+//#define WPAS_AR_RETRY_MAX_SEC     60
+#define WPAS_AR_RETRY_MAX_SEC     10
+#endif
+
+/* Maximum number of auto-retries before giving up */
+#ifndef WPAS_AR_RETRY_MAX_COUNT
+#define WPAS_AR_RETRY_MAX_COUNT    8
+#endif
+#endif /* CONFIG_WPS_ENROLLEE_AUTO_RETRY */
+
 #else /* CONFIG_WPS */
 
 static inline int wpas_wps_init(struct wpa_supplicant *wpa_s)

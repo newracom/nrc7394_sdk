@@ -64,10 +64,27 @@ int wps_build_public_key(struct wps_data *wps, struct wpabuf *msg)
 			wps->dh_ctx = dh5_init_fixed(wps->dh_privkey, pubkey);
 #endif /* CONFIG_WPS_NFC */
 	} else {
+#if defined(CONFIG_WPS_REGISTRAR_MULTI_SELECT)
+		if (wps->wps->dh_privkey && wps->wps->dh_pubkey) {
+			/* Reuse precomputed DH keypair — skip crypto_mod_exp() */
+			wps_ms_printf(MSG_INFO, "WPS: Reuse precomputed DH keys");
+			dh5_free(wps->dh_ctx);
+			wps->dh_privkey = wpabuf_dup(wps->wps->dh_privkey);
+			pubkey = wpabuf_dup(wps->wps->dh_pubkey);
+			pubkey = wpabuf_zeropad(pubkey, 192);
+			wps->dh_ctx	 = dh5_init_fixed(wps->dh_privkey, pubkey);
+		} else {
+			wps_ms_printf(MSG_INFO, "WPS: Generate new DH keys");
+			dh5_free(wps->dh_ctx);
+			wps->dh_ctx = dh5_init(&wps->dh_privkey, &pubkey);
+			pubkey = wpabuf_zeropad(pubkey, 192);
+		}
+#else
 		wpa_printf(MSG_DEBUG, "WPS: Generate new DH keys");
 		dh5_free(wps->dh_ctx);
 		wps->dh_ctx = dh5_init(&wps->dh_privkey, &pubkey);
 		pubkey = wpabuf_zeropad(pubkey, 192);
+#endif
 	}
 	if (wps->dh_ctx == NULL || wps->dh_privkey == NULL || pubkey == NULL) {
 		wpa_printf(MSG_DEBUG, "WPS: Failed to initialize "

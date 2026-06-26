@@ -40,9 +40,11 @@
   #define UL64(x) x##ULL
 #endif
 
-#include <string.h>
-
 #include "mbedtls/platform.h"
+
+#if defined(INCLUDE_HW_SECURITY_ACC_SHA)
+#include "drv_sec.h"
+#endif
 
 #if defined(__aarch64__)
 #  if defined(MBEDTLS_SHA512_USE_A64_CRYPTO_IF_PRESENT) || \
@@ -260,6 +262,18 @@ int mbedtls_sha512_starts(mbedtls_sha512_context *ctx, int is384)
     ctx->total[0] = 0;
     ctx->total[1] = 0;
 
+#if defined(INCLUDE_HW_SECURITY_ACC_SHA)
+//    CPA("[%s]\n", __func__);
+
+#if defined(MBEDTLS_SHA384_C)
+    ctx->is384 = is384;
+#endif
+
+    sha_init(ENDIAN_BI);
+    return sha_configure(SHA_MODE_2, SHA_BIT_512, is384, 1);
+
+#else
+
     if (is384 == 0) {
 #if defined(MBEDTLS_SHA512_C)
         ctx->state[0] = UL64(0x6A09E667F3BCC908);
@@ -289,6 +303,8 @@ int mbedtls_sha512_starts(mbedtls_sha512_context *ctx, int is384)
 #endif
 
     return 0;
+
+#endif //#if defined(INCLUDE_HW_SECURITY_ACC_SHA)
 }
 
 #if !defined(MBEDTLS_SHA512_PROCESS_ALT)
@@ -601,6 +617,41 @@ static
 int mbedtls_internal_sha512_process_c(mbedtls_sha512_context *ctx,
                                       const unsigned char data[SHA512_BLOCK_SIZE])
 {
+#if defined(INCLUDE_HW_SECURITY_ACC_SHA)
+    static unsigned char tmp[128];
+    int ret = 0;
+    int j;
+
+    memcpy(tmp, data, 128);
+
+    for (j=0;j<128;j+=4)
+        convert_endian((tmp + j), 4);
+
+    ret = sha_msg_update (tmp, 128);
+    if (ret != 0)
+        goto fail_hw;
+
+    sha_start();
+    if (sha_is_done() ==0) {
+        ret = 1;
+        goto fail_hw;
+    }
+
+    // ret = sha_get_result_64 ((uint8_t*)ctx->state, 64);
+    ret = sha_get_result ((uint8_t*)ctx->state, 64);
+
+    if (ret != 0)
+        goto fail_hw;
+
+    ret = sha_set_firstblk(0);
+    if (ret != 0)
+        goto fail_hw;
+
+fail_hw:
+    return ret;
+
+#else
+
     int i;
     struct {
         uint64_t temp1, temp2, W[80];
@@ -688,6 +739,8 @@ int mbedtls_internal_sha512_process_c(mbedtls_sha512_context *ctx,
     mbedtls_platform_zeroize(&local, sizeof(local));
 
     return 0;
+
+#endif //#if defined(INCLUDE_HW_SECURITY_ACC_SHA)
 }
 
 #endif /* !MBEDTLS_SHA512_PROCESS_ALT && !MBEDTLS_SHA512_USE_A64_CRYPTO_ONLY */
@@ -876,6 +929,11 @@ int mbedtls_sha512_finish(mbedtls_sha512_context *ctx,
 
 exit:
     mbedtls_sha512_free(ctx);
+
+#if defined(INCLUDE_HW_SECURITY_ACC_SHA)
+    bignum_init(0);
+#endif //#if defined(INCLUDE_HW_SECURITY_ACC_SHA)
+
     return ret;
 }
 

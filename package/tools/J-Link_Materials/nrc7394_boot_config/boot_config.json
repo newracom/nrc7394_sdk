@@ -1,0 +1,5 @@
+{
+	"jlink_enable": 1,
+    "wdt_disable": 1,
+    "crc_check_skip": 1
+}

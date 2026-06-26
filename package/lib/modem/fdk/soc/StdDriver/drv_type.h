@@ -11,6 +11,25 @@
 #define __RAM_FUNC __ramfunc
 #endif
 
+#ifndef __MALLOC
+#define __MALLOC			malloc
+#endif
+
+#ifndef __FREE
+#define __FREE				free
+#endif
+
+enum{
+	drv_err_no_support				= -20,
+	drv_err_internal				= -10,
+	drv_err_handle_matching			= -5,
+	drv_err_register				= -4,
+	drv_err_handle_allocate			= -3,
+	drv_err_core_allocate			= -2,
+	drv_err_opened					= -1,
+	drv_ok_							= 0,
+	drv_fail_						= 1,
+};
 
 #if 0
 typedef unsigned __int8		INT8U;

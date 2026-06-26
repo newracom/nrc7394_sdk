@@ -1180,8 +1180,26 @@ static void ap_sa_query_timer(void *eloop_ctx, void *timeout_ctx)
 		   hapd->conf->iface, MAC2STR(sta->addr), sta->sa_query_count);
 
 	if (sta->sa_query_count > 0 &&
-	    ap_check_sa_query_timeout(hapd, sta))
+	    ap_check_sa_query_timeout(hapd, sta)) {
+#if defined(INCLUDE_SA_QUERY_UNPROT_DISCONNECT)
+		if (sta->sa_query_unprot) {
+			/*
+			 * The SA Query was started because an unprotected
+			 * Deauth/Disassoc was received from this STA and the STA
+			 * never confirmed it is still present. Tear the STA down so
+			 * subsequent frames are handled as Class 3 (non-associated)
+			 * and the STA has to reconnect.
+			 */
+			sta->sa_query_unprot = 0;
+			wpa_printf(MSG_DEBUG,
+				   "%s: SA Query (unprotected disconnect) timed out for "
+				   MACSTR " - remove STA",
+				   hapd->conf->iface, MAC2STR(sta->addr));
+			ap_free_sta(hapd, sta);
+		}
+#endif /* INCLUDE_SA_QUERY_UNPROT_DISCONNECT */
 		return;
+	}
 	if (sta->sa_query_count >= 1000)
 		return;
 
@@ -1233,6 +1251,9 @@ void ap_sta_stop_sa_query(struct hostapd_data *hapd, struct sta_info *sta)
 	os_free(sta->sa_query_trans_id);
 	sta->sa_query_trans_id = NULL;
 	sta->sa_query_count = 0;
+#if defined(INCLUDE_SA_QUERY_UNPROT_DISCONNECT)
+	sta->sa_query_unprot = 0;
+#endif
 }
 
 

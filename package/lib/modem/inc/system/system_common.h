@@ -166,7 +166,6 @@ bw_t str_to_bw(const char *str);
 //#include    "lmac.h"
 #include    "hal_phy_register.h"
 
-#include     "hal_pwm.h"
 #include     "hal_ssp.h"
 #include     "hal_gdma.h"
 #include     "hal_wdt.h"

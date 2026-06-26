@@ -1,0 +1,12 @@
+PROJECT_ROOT := $(abspath $(CURDIR))
+IS_WSL := $(shell grep -i microsoft /proc/version 2>/dev/null)
+
+ifneq ($(IS_WSL),)
+    WINDOWS_PROJECT_ROOT := $(shell wslpath -m "$(PROJECT_ROOT)")
+
+    $(info PROJECT_ROOT = $(PROJECT_ROOT))
+    $(info WINDOWS_PROJECT_ROOT = $(WINDOWS_PROJECT_ROOT))
+
+    CFLAGS += -ffile-prefix-map=$(PROJECT_ROOT)=$(WINDOWS_PROJECT_ROOT)
+    CFLAGS += -fdebug-prefix-map=$(PROJECT_ROOT)=$(WINDOWS_PROJECT_ROOT)
+endif

@@ -234,7 +234,7 @@ void lmac_ps_set_ampdu_manual(uint8_t ac, uint8_t manual);
 void lmac_ps_set_tx_seqnum(uint8_t tid, uint16_t sn);
 void lmac_ps_set_rx_seqnum(uint8_t tid, uint16_t sn, uint16_t bitmap);
 void lmac_ps_set_ba_state(uint8_t tid, bool add, uint8_t ba_state);
-void lmac_ps_set_txpwr(uint8_t tx_pwr, uint8_t type);
+void lmac_ps_set_txpwr(int vif_id, uint8_t tx_pwr, uint8_t type);
 void lmac_ps_set_rxgain(uint8_t rx_gain);
 void lmac_ps_set_sgi(uint8_t sgi);
 void lmac_ps_set_bss_maxidle(uint8_t option, uint16_t usf_period);
@@ -244,6 +244,9 @@ void lmac_ps_set_sae_pwe(uint8_t sae_pwe);
 void lmac_ps_set_pmk(uint8_t *pmk, uint32_t pmk_len);
 uint32_t lmac_ps_get_pmk(uint8_t **pmk);
 void lmac_ps_set_ip_addr(uint32_t ipaddr, uint32_t netmask, uint32_t gwaddr);
+#if !defined(NRC7292)
+void lmac_ps_set_dns_server(uint32_t ipaddr1, uint32_t ipaddr2);
+#endif
 void lmac_ps_set_ip_mode(uint32_t ip_mode);
 void lmac_ps_set_ucode_wake_src(uint8_t source);
 void lmac_ps_set_init_retention();
@@ -306,6 +309,8 @@ void lmac_ps_set_bcn_interval(uint16_t bcn_interval);
 void lmac_ps_set_1m_prim_loc(uint8_t prim_loc);
 void lmac_ps_set_rc_status(uint8_t maxtp, uint8_t tp2, uint8_t maxp, uint8_t lowest, uint8_t probe);
 void lmac_ps_set_support_ch_width(uint8_t width);
+void lmac_ps_set_loc_1m_prim_ch(int8_t loc);
+void lmac_ps_set_bw_4m_2m_prim_loc(int8_t loc);
 
 /* Dynamic PS API */
 void lmac_dyn_ps_init();

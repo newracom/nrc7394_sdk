@@ -107,7 +107,7 @@ int _hif_read (char *buf, int len)
 		case _HIF_TYPE_UART:
 		case _HIF_TYPE_UART_HFC:
 #if defined(CONFIG_ATCMD_UART) || defined(CONFIG_ATCMD_UART_HFC)
-			rd_size = _hif_uart_read(buf, len);
+			rd_size = hif_uart_read(buf, len);
 #endif
 			break;
 
@@ -133,7 +133,7 @@ int _hif_write (char *buf, int len)
 		case _HIF_TYPE_UART:
 		case _HIF_TYPE_UART_HFC:
 #if defined(CONFIG_ATCMD_UART) || defined(CONFIG_ATCMD_UART_HFC)
-			wr_size = _hif_uart_write(buf, len);
+			wr_size = hif_uart_write(buf, len);
 #endif
 			break;
 
@@ -252,10 +252,10 @@ int _hif_open (_hif_info_t *info)
 		[_HIF_TYPE_HSPI] = _hif_hspi_open,
 #endif
 #if defined(CONFIG_ATCMD_UART)
-		[_HIF_TYPE_UART] = _hif_uart_open,
+		[_HIF_TYPE_UART] = hif_uart_open,
 #endif
 #if defined(CONFIG_ATCMD_UART_HFC)
-		[_HIF_TYPE_UART_HFC] = _hif_uart_open
+		[_HIF_TYPE_UART_HFC] = hif_uart_open
 #endif
 	};
 
@@ -308,10 +308,10 @@ void _hif_close (void)
 		[_HIF_TYPE_HSPI] = _hif_hspi_close,
 #endif
 #if defined(CONFIG_ATCMD_UART)
-		[_HIF_TYPE_UART] = _hif_uart_close,
+		[_HIF_TYPE_UART] = hif_uart_close,
 #endif
 #if defined(CONFIG_ATCMD_UART_HFC)
-		[_HIF_TYPE_UART_HFC] = _hif_uart_close
+		[_HIF_TYPE_UART_HFC] = hif_uart_close
 #endif
 	};
 

@@ -297,6 +297,24 @@ nrc_err_t nrc_read_user_data(uint8_t* buffer, uint32_t user_data_offset, uint32_
 
 #if !defined(NRC7292)
 /**********************************************
+ * @fn     nrc_err_t nrc_sflash_raw_transfer(const uint8_t *tx, uint32_t txLen, uint8_t *rx, uint32_t rxLen)
+ *
+ * @brief  Perform a raw transfer with the serial flash.
+ *
+ * @param  tx: A pointer to the data to be transmitted.
+ *
+ * @param  txLen: The length of the data to be transmitted.
+ *
+ * @param  rx: A pointer to the buffer where the received data will be stored.
+ *
+ * @param  rxLen: The length of the data to be received.
+ *
+ * @return If successful, NRC_SUCCESS is returned. Otherwise, NRC_FAIL is returned.
+ ***********************************************/
+nrc_err_t nrc_sflash_raw_transfer(const uint8_t *tx, uint32_t txLen,
+							  uint8_t *rx, uint32_t rxLen);
+
+/**********************************************
  * @fn     uint8_t nrc_get_xtal_status(void)
  *
  * @brief  Get the status of the crystal (xtal)
