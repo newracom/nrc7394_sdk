@@ -1,0 +1,7 @@
+smartconn.LinkStatus.mac        max_size:6
+smartconn.LinkStatus.parent_mac max_size:6
+smartconn.Candidate.bssid       max_size:6
+smartconn.BlackItem.bssid       max_size:6
+
+smartconn.LinkStatus.candidates max_count:10
+smartconn.LinkStatus.blacklist  max_count:10

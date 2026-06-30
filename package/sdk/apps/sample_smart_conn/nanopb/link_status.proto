@@ -1,0 +1,30 @@
+syntax = "proto2";
+package smartconn;
+
+message Candidate {
+  required bytes bssid = 1;   // 6 bytes
+  required sint32 rssi = 2;   // dBm
+  required sint32 hop  = 3;   // current_hop
+}
+
+message BlackItem {
+  required bytes bssid = 1;   // 6 bytes
+}
+
+message Version {
+  required uint32 major = 1;
+  required uint32 minor = 2;
+  required uint32 patch = 3;
+}
+
+message LinkStatus {
+  required bytes  mac        = 1;  // 6
+  optional bytes  parent_mac = 2;  // 6 (parent_valid==1 일 때만)
+  required uint32 hop        = 3;
+  required sint32 rssi       = 4;
+
+  optional Version ver = 5;
+
+  repeated Candidate candidates = 6;
+  repeated BlackItem  blacklist  = 7;
+}
